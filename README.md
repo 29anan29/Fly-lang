@@ -1,6 +1,6 @@
 <div align="center">
 
-![Fly Logo](assets/logo.svg)
+  <img src="assets/logo.svg" alt="Fly Logo" width="200" />
 
 # Fly-Lang
 
