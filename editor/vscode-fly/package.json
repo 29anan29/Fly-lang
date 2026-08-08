@@ -28,7 +28,8 @@
     "onCommand:fly.build",
     "onCommand:fly.check",
     "onCommand:fly.run",
-    "onCommand:fly.update"
+    "onCommand:fly.update",
+    "onCommand:fly.updateExtension"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -71,6 +72,11 @@
       {
         "command": "fly.update",
         "title": "Fly: Check for Updates",
+        "category": "Fly"
+      },
+      {
+        "command": "fly.updateExtension",
+        "title": "Check Extension Update",
         "category": "Fly"
       }
     ],

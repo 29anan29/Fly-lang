@@ -5,7 +5,7 @@ import {
 	ServerOptions,
 	TransportKind
 } from 'vscode-languageclient/node';
-import { buildFile, runFile, checkForUpdates } from './commands';
+import { buildFile, runFile, checkForUpdates, checkExtensionUpdate } from './commands';
 import { flyPath } from './fly';
 
 let client: LanguageClient | undefined;
@@ -15,7 +15,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('fly.check', () => void forceCheck()),
 		vscode.commands.registerCommand('fly.build', () => activeBuild()),
 		vscode.commands.registerCommand('fly.run', () => activeRun()),
-		vscode.commands.registerCommand('fly.update', () => checkForUpdates())
+		vscode.commands.registerCommand('fly.update', () => checkForUpdates()),
+		vscode.commands.registerCommand('fly.updateExtension', () => void checkExtensionUpdate(context))
 	);
 
 	const serverOptions: ServerOptions = {

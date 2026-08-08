@@ -41,6 +41,7 @@ testdata/            正反例测试文件
 ## 版本与发布
 
 - 版本注入：`go build -ldflags "-X flylang/internal/version.Version=v1.2.3 -X flylang/internal/version.Commit=<sha> -X flylang/internal/version.Repo=29anan29/Fly-lang"`，CI 用 `VERSION_LDFLAGS` 环境变量传入（见 .github/workflows/release.yml）
+- 版本渠道细分：`version.IsDev()` 判定（Version 空/`dev`/含 `-dev` → dev 版）；`fly version` 输出 `vX.Y.Z (release)` 或 `0.X.Y-dev (commit)`；`fly update --channel dev|release`（默认随当前版本），dev 渠道查 GitHub prerelease（`update.LatestDev`），无预发布时回退正式版渠道；CI 在 tag 含 `-dev` 时 `gh release create --prerelease`
 - 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
 - `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（internal/update.AssetFor），改 CI 产物名必须同步改这里
 - 交互式 update：先 `CheckWritable` 预检，不可写时终端（TTY）自动 `sudo <exe> update <原参数>` 提权重试，非 TTY 回退"建议 sudo 重试"提示；确认用 `update.Confirm`，ANSI 颜色由 `isTTY`（ioctl TIOCGWINSZ，见 cmd/fly/tty*.go）控制

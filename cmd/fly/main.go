@@ -41,6 +41,7 @@ build 选项:
 update 选项:
   --check       仅检查新版本（有新版退出码 2）
   --force       同版本也强制更新
+  --channel <dev|release>  更新渠道（默认随当前版本：dev 版→dev，正式版→release）
   --proxy <url> 走代理（http://、https://、socks5://）`
 
 func main() {
@@ -145,12 +146,24 @@ func cmdUpdate(args []string) int {
 	checkOnly := false
 	force := false
 	proxy := ""
+	channel := ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--check":
 			checkOnly = true
 		case "--force":
 			force = true
+		case "--channel":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "--channel 需要参数 dev|release")
+				return 2
+			}
+			i++
+			channel = args[i]
+			if channel != "dev" && channel != "release" {
+				fmt.Fprintf(os.Stderr, "未知渠道 %q（支持 dev|release）\n", channel)
+				return 2
+			}
 		case "--proxy":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "--proxy 需要代理地址参数")
@@ -163,6 +176,13 @@ func cmdUpdate(args []string) int {
 			return 2
 		}
 	}
+	if channel == "" {
+		if version.IsDev() {
+			channel = "dev"
+		} else {
+			channel = "release"
+		}
+	}
 	u := update.New()
 	if proxy != "" {
 		if err := u.SetProxy(proxy); err != nil {
@@ -170,17 +190,28 @@ func cmdUpdate(args []string) int {
 			return 1
 		}
 	}
-	rel, err := u.Latest()
+	var rel *update.Release
+	var err error
+	if channel == "dev" {
+		rel, err = u.LatestDev()
+		if err != nil {
+			fmt.Println(yellow("dev 渠道暂无预发布版本，回退到正式版渠道"))
+			channel = "release"
+		}
+	}
+	if channel == "release" {
+		rel, err = u.Latest()
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v（可用 --proxy socks5://host:port 走代理）\n", err)
 		return 1
 	}
 	if !u.IsOutdated(rel.TagName) && !force {
-		fmt.Printf("当前已是最新版本 %s\n", version.String())
+		fmt.Printf("当前已是最新版本 %s（%s 渠道）\n", version.String(), channel)
 		return 0
 	}
 	if checkOnly {
-		fmt.Printf("发现新版本 %s（当前 %s）\n", rel.TagName, version.String())
+		fmt.Printf("发现新版本 %s（%s 渠道，当前 %s）\n", rel.TagName, channel, version.String())
 		return 2
 	}
 	asset, err := u.AssetFor(runtime.GOOS, runtime.GOARCH, rel)
@@ -209,7 +240,7 @@ func cmdUpdate(args []string) int {
 		return 1
 	}
 
-	fmt.Println(yellow(fmt.Sprintf("发现新版本 %s（当前 %s）", rel.TagName, version.String())))
+	fmt.Println(yellow(fmt.Sprintf("发现新版本 %s（%s 渠道，当前 %s）", rel.TagName, channel, version.String())))
 	if strings.TrimSpace(rel.Body) != "" {
 		fmt.Println(cyan("更新内容："))
 		for _, line := range strings.Split(rel.Body, "\n") {

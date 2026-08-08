@@ -1,5 +1,7 @@
 package version
 
+import "strings"
+
 var (
 	Version = "dev"
 	Commit  = ""
@@ -7,10 +9,18 @@ var (
 )
 
 func String() string {
-	if Commit != "" && len(Commit) >= 7 {
-		return Version + " (" + Commit[:7] + ")"
+	if IsDev() {
+		if Commit != "" && len(Commit) >= 7 {
+			return Version + " (" + Commit[:7] + ")"
+		}
+		return Version
 	}
-	return Version
+	return Version + " (release)"
+}
+
+func IsDev() bool {
+	v := strings.ToLower(Version)
+	return v == "" || v == "dev" || strings.Contains(v, "-dev")
 }
 
 func TrimTag(tag string) string {

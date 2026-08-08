@@ -1,0 +1,831 @@
+# FlyToDos —— 用 Fly-Lang（Python 3.10+ 安全超集）像素级复刻，PyQt6 桌面版
+# 原版：Wails + Vue（Organic Biophilic 主题）；本版：PyQt6 纯标准库数据层，零 Web 依赖。
+# 用法：pip install PyQt6 && fly build example/flytodos_qt/flytodos_qt.fly -o flytodos_qt.py && python3 flytodos_qt.py
+
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from functools import cmp_to_key, partial
+
+from PyQt6.QtCore import Qt, QTimer, QSize
+from PyQt6.QtGui import QAction, QBrush, QColor, QPainter
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QLineEdit, QPushButton, QLabel, QDialog, QTextEdit, QComboBox, QScrollArea, QGridLayout, QFrame, QMenu, QStackedWidget, QFormLayout, QButtonGroup
+
+DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flytodos_qt_data.json")
+
+STATUSES = ["pending", "in_progress", "completed", "cancelled"]
+PRIORITIES = ["low", "medium", "high"]
+COLORS = ["#228B22", "#8B4513", "#87CEEB", "#D2B48C", "#556B2F", "#CD853F", "#6B8E23", "#B8860B"]
+
+STATUS_CN = {"pending": "待办", "in_progress": "进行中", "completed": "已完成", "cancelled": "已取消"}
+PRI_CN = {"low": "低", "medium": "中", "high": "高"}
+STATUS_MARK = {"pending": "\u25ef", "in_progress": "\u25d1", "completed": "\u25cf", "cancelled": "\u2715"}
+STATUS_COLOR = {
+    "pending": "#9E9E9E",
+    "in_progress": "#1E88E5",
+    "completed": "#43A047",
+    "cancelled": "#E53935",
+}
+PRI_COLOR = {"low": "#8D6E63", "medium": "#F57C00", "high": "#D32F2F"}
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def empty_db():
+    return {"tasks": [], "inspirations": [], "next_id": 1}
+
+
+def load_db():
+    try:
+        f = open(DATA_FILE, encoding="utf-8")
+    except Exception:
+        return empty_db()
+    try:
+        return json.load(f)
+    except Exception:
+        return empty_db()
+    finally:
+        f.close()
+
+
+def save_db(db):
+    f = open(DATA_FILE, "w", encoding="utf-8")
+    try:
+        json.dump(db, f, ensure_ascii=False, indent=2)
+    finally:
+        f.close()
+
+
+def next_id(db):
+    nid = db["next_id"]
+    db["next_id"] = nid + 1
+    return nid
+
+
+def normalize_task(payload):
+    task = {
+        "id": payload.get("id"),
+        "parentId": payload.get("parentId"),
+        "title": (payload.get("title") or "").strip(),
+        "description": payload.get("description") or "",
+        "status": payload.get("status") or "pending",
+        "priority": payload.get("priority") or "medium",
+        "sortOrder": payload.get("sortOrder") or 0,
+        "dueDate": payload.get("dueDate"),
+        "createdAt": payload.get("createdAt") or now_iso(),
+        "updatedAt": now_iso(),
+        "completedAt": payload.get("completedAt"),
+    }
+    if task["status"] not in STATUSES:
+        task["status"] = "pending"
+    if task["priority"] not in PRIORITIES:
+        task["priority"] = "medium"
+    return task
+
+
+def normalize_inspiration(payload):
+    tags = []
+    for t in payload.get("tags") or []:
+        tags.append(t)
+    color = payload.get("color")
+    if color not in COLORS:
+        color = COLORS[0]
+    return {
+        "id": payload.get("id"),
+        "title": (payload.get("title") or "").strip(),
+        "content": payload.get("content") or "",
+        "tags": tags,
+        "color": color,
+        "pinned": bool(payload.get("pinned")),
+        "createdAt": payload.get("createdAt") or now_iso(),
+        "updatedAt": now_iso(),
+    }
+
+
+def find_task(db, tid):
+    for t in db["tasks"]:
+        if t["id"] == tid:
+            return t
+    return None
+
+
+def find_insp(db, iid):
+    for i in db["inspirations"]:
+        if i["id"] == iid:
+            return i
+    return None
+
+
+def collect_subtree(db, tid, ids):
+    ids.append(tid)
+    for t in db["tasks"]:
+        if t["parentId"] == tid:
+            collect_subtree(db, t["id"], ids)
+
+
+def task_cmp(a, b):
+    sa = a.get("sortOrder") or 0
+    sb = b.get("sortOrder") or 0
+    if sa != sb:
+        return -1 if sa < sb else 1
+    if a["id"] != b["id"]:
+        return -1 if a["id"] < b["id"] else 1
+    return 0
+
+
+def insp_cmp(a, b):
+    if a["pinned"] != b["pinned"]:
+        return -1 if a["pinned"] else 1
+    if a["id"] != b["id"]:
+        return -1 if a["id"] < b["id"] else 1
+    return 0
+
+
+def sorted_tasks(items):
+    return sorted(items, key=cmp_to_key(task_cmp))
+
+
+def sorted_inspirations(items):
+    return sorted(items, key=cmp_to_key(insp_cmp))
+
+
+QSS = """
+QMainWindow { background: #FAF7F2; }
+QWidget { font-family: "Noto Sans CJK SC", "PingFang SC", sans-serif; font-size: 14px; color: #3E3A33; }
+QFrame#Sidebar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2E7D32, stop:1 #1B5E20);
+                 border-radius: 20px; }
+QLabel#SideTitle { color: white; font-size: 22px; font-weight: bold; }
+QLabel#SideSub { color: rgba(255,255,255,0.75); font-size: 12px; }
+QLabel#SideCount { color: rgba(255,255,255,0.85); font-size: 12px; }
+QLabel#SideVer { color: rgba(255,255,255,0.5); font-size: 11px; }
+QPushButton#NavBtn { background: transparent; color: rgba(255,255,255,0.9); border: none;
+                     border-radius: 12px; padding: 10px 14px; font-size: 15px; text-align: left; }
+QPushButton#NavBtn:hover { background: rgba(255,255,255,0.12); }
+QPushButton#NavBtn:checked { background: #4CAF50; color: white; font-weight: bold; }
+QPushButton#PrimaryBtn { background: #228B22; color: white; border: none; border-radius: 12px;
+                         padding: 9px 18px; font-size: 14px; }
+QPushButton#PrimaryBtn:hover { background: #1E7A1E; }
+QPushButton#GhostBtn { background: transparent; color: #228B22; border: 1px solid #228B22;
+                       border-radius: 12px; padding: 8px 14px; }
+QPushButton#GhostBtn:hover { background: rgba(34,139,34,0.08); }
+QLineEdit, QTextEdit, QComboBox { background: white; border: 1px solid #DCD3C3; border-radius: 12px;
+                                  padding: 8px 12px; }
+QLineEdit:focus, QTextEdit:focus { border: 1px solid #228B22; }
+QTreeWidget { background: transparent; border: none; outline: none; }
+QTreeWidget::item { border-radius: 10px; padding: 6px 4px; }
+QTreeWidget::item:hover { background: rgba(34,139,34,0.06); }
+QTreeWidget::item:selected { background: rgba(34,139,34,0.14); color: #1B5E20; }
+QFrame#Card { background: white; border-radius: 16px; }
+QFrame#QuickAdd { background: white; border: 1px dashed #CBBFA9; border-radius: 16px; }
+QMenu { background: white; border: 1px solid #E3DCCB; border-radius: 10px; padding: 6px; }
+QMenu::item { padding: 6px 22px; border-radius: 6px; }
+QMenu::item:selected { background: rgba(34,139,34,0.12); }
+QScrollArea { background: transparent; border: none; }
+QDialog { background: #FAF7F2; }
+QLabel#DialogTitle { font-size: 18px; font-weight: bold; }
+QLabel#TagChip { background: rgba(34,139,34,0.1); color: #1B5E20; border-radius: 8px; padding: 2px 8px; }
+QPushButton#ColorDot { border: 2px solid transparent; border-radius: 14px; }
+QPushButton#ColorDot:checked { border: 2px solid #3E3A33; }
+QScrollBar:vertical { background: transparent; width: 10px; }
+QScrollBar::handle:vertical { background: #D8CDB8; border-radius: 5px; min-height: 30px; }
+"""
+
+
+class BlobBackground(QFrame):
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w = self.width()
+        h = self.height()
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(34, 139, 34, 26))
+        p.drawEllipse(int(-w * 0.18), int(h * 0.08), int(w * 0.42), int(w * 0.42))
+        p.setBrush(QColor(216, 180, 140, 30))
+        p.drawEllipse(int(w * 0.62), int(h * 0.52), int(w * 0.5), int(w * 0.5))
+        p.setBrush(QColor(135, 206, 235, 24))
+        p.drawEllipse(int(w * 0.7), -int(h * 0.2), int(w * 0.45), int(w * 0.45))
+        super().paintEvent(event)
+
+
+class InspCard(QFrame):
+    def __init__(self, page, iid):
+        super().__init__()
+        self.page = page
+        self.iid = iid
+
+    def mouseDoubleClickEvent(self, event):
+        self.page.app.edit_inspiration(self.iid)
+
+
+class TaskDialog(QDialog):
+    def __init__(self, parent, task):
+        super().__init__(parent)
+        self.task = task
+        self.setWindowTitle("编辑任务" if task else "新建任务")
+        self.setMinimumWidth(420)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 18)
+        lay.setSpacing(12)
+        title = QLabel("编辑任务" if task else "新建任务")
+        title.setObjectName("DialogTitle")
+        lay.addWidget(title)
+        form = QFormLayout()
+        form.setSpacing(10)
+        self.title_edit = QLineEdit()
+        self.desc_edit = QTextEdit()
+        self.desc_edit.setFixedHeight(90)
+        self.pri_combo = QComboBox()
+        self.pri_combo.addItems(["medium", "high", "low"])
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(STATUSES)
+        self.due_edit = QLineEdit()
+        self.due_edit.setPlaceholderText("YYYY-MM-DD（可留空）")
+        form.addRow("标题", self.title_edit)
+        form.addRow("描述", self.desc_edit)
+        form.addRow("优先级", self.pri_combo)
+        form.addRow("状态", self.status_combo)
+        form.addRow("截止日期", self.due_edit)
+        lay.addLayout(form)
+        if task:
+            self.title_edit.setText(task["title"])
+            self.desc_edit.setPlainText(task["description"])
+            idx = self.pri_combo.findText(task["priority"])
+            if idx >= 0:
+                self.pri_combo.setCurrentIndex(idx)
+            idx = self.status_combo.findText(task["status"])
+            if idx >= 0:
+                self.status_combo.setCurrentIndex(idx)
+            self.due_edit.setText(task["dueDate"] or "")
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        cancel = QPushButton("取消")
+        cancel.setObjectName("GhostBtn")
+        cancel.clicked.connect(self.do_cancel)
+        ok = QPushButton("保存")
+        ok.setObjectName("PrimaryBtn")
+        ok.clicked.connect(self.do_ok)
+        btns.addWidget(cancel)
+        btns.addWidget(ok)
+        lay.addLayout(btns)
+
+    def do_cancel(self, _checked):
+        self.reject()
+
+    def do_ok(self, _checked):
+        self.accept()
+
+    def values(self):
+        return {
+            "title": self.title_edit.text().strip(),
+            "description": self.desc_edit.toPlainText().strip(),
+            "priority": self.pri_combo.currentText(),
+            "status": self.status_combo.currentText(),
+            "dueDate": self.due_edit.text().strip() or None,
+        }
+
+
+class InspirationDialog(QDialog):
+    def __init__(self, parent, insp):
+        super().__init__(parent)
+        self.insp = insp
+        self.setWindowTitle("编辑灵感" if insp else "新建灵感")
+        self.setMinimumWidth(440)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 18)
+        lay.setSpacing(12)
+        title = QLabel("编辑灵感" if insp else "新建灵感")
+        title.setObjectName("DialogTitle")
+        lay.addWidget(title)
+        self.title_edit = QLineEdit()
+        self.content_edit = QTextEdit()
+        self.content_edit.setFixedHeight(140)
+        self.tags_edit = QLineEdit()
+        self.tags_edit.setPlaceholderText("逗号分隔，如：设计, 灵感")
+        self.color_group = QButtonGroup(self)
+        self.color_btns = []
+        colors = QHBoxLayout()
+        colors.setSpacing(8)
+        for c in COLORS:
+            b = QPushButton()
+            b.setCheckable(True)
+            b.setObjectName("ColorDot")
+            b.setFixedSize(QSize(28, 28))
+            b.setStyleSheet("background: " + c + ";")
+            self.color_group.addButton(b)
+            self.color_btns.append(b)
+            colors.addWidget(b)
+        colors.addStretch(1)
+        lay.addWidget(QLabel("标题"))
+        lay.addWidget(self.title_edit)
+        lay.addWidget(QLabel("内容"))
+        lay.addWidget(self.content_edit)
+        lay.addWidget(QLabel("标签"))
+        lay.addWidget(self.tags_edit)
+        lay.addWidget(QLabel("颜色"))
+        lay.addLayout(colors)
+        if insp:
+            self.title_edit.setText(insp["title"])
+            self.content_edit.setPlainText(insp["content"])
+            self.tags_edit.setText(", ".join(insp["tags"]))
+            idx = 0
+            for i in range(len(COLORS)):
+                if COLORS[i] == insp["color"]:
+                    idx = i
+            self.color_btns[idx].setChecked(True)
+        else:
+            self.color_btns[0].setChecked(True)
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        cancel = QPushButton("取消")
+        cancel.setObjectName("GhostBtn")
+        cancel.clicked.connect(self.do_cancel)
+        ok = QPushButton("保存")
+        ok.setObjectName("PrimaryBtn")
+        ok.clicked.connect(self.do_ok)
+        btns.addWidget(cancel)
+        btns.addWidget(ok)
+        lay.addLayout(btns)
+
+    def do_cancel(self, _checked):
+        self.reject()
+
+    def do_ok(self, _checked):
+        self.accept()
+
+    def values(self):
+        tags = []
+        for part in self.tags_edit.text().split(","):
+            t = part.strip()
+            if t:
+                tags.append(t)
+        color = COLORS[0]
+        for i in range(len(self.color_btns)):
+            if self.color_btns[i].isChecked():
+                color = COLORS[i]
+        return {
+            "title": self.title_edit.text().strip(),
+            "content": self.content_edit.toPlainText().strip(),
+            "tags": tags,
+            "color": color,
+        }
+
+
+class TasksPage(QWidget):
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+        self.child_parent = None
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+        quick = QFrame()
+        quick.setObjectName("QuickAdd")
+        qlay = QHBoxLayout(quick)
+        qlay.setContentsMargins(14, 10, 10, 10)
+        self.quick_edit = QLineEdit()
+        self.quick_edit.setPlaceholderText("快速添加任务，回车创建…")
+        self.quick_edit.setStyleSheet("border: none; background: transparent;")
+        self.quick_edit.returnPressed.connect(partial(self.on_quick_add, None))
+        add_btn = QPushButton("+")
+        add_btn.setObjectName("PrimaryBtn")
+        add_btn.setFixedWidth(44)
+        add_btn.clicked.connect(partial(self.on_quick_add, None))
+        qlay.addWidget(self.quick_edit)
+        qlay.addWidget(add_btn)
+        lay.addWidget(quick)
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        self.tree.setColumnCount(4)
+        self.tree.setColumnWidth(0, 360)
+        self.tree.setColumnWidth(1, 80)
+        self.tree.setColumnWidth(2, 60)
+        self.tree.setIndentation(22)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.on_menu)
+        self.tree.itemClicked.connect(self.on_click)
+        lay.addWidget(self.tree, 1)
+
+    def on_quick_add(self, parent_id, _checked=False):
+        parent_id = parent_id if parent_id is not None else self.child_parent
+        self.child_parent = None
+        text = self.quick_edit.text().strip()
+        if not text:
+            return
+        self.app.create_task(text, "", parent_id)
+        self.quick_edit.clear()
+        self.quick_edit.setPlaceholderText("快速添加任务，回车创建…")
+
+    def on_click(self, item, column):
+        tid = int(item.data(0, Qt.ItemDataRole.UserRole))
+        if tid >= 0:
+            self.app.toggle_task(tid)
+
+    def on_menu(self, pos):
+        item = self.tree.itemAt(pos)
+        if item is None:
+            return
+        tid = int(item.data(0, Qt.ItemDataRole.UserRole))
+        if tid < 0:
+            return
+        menu = QMenu(self)
+        add_child = QAction("添加子任务", self)
+        add_child.triggered.connect(partial(self.app.prompt_child, tid))
+        edit = QAction("编辑", self)
+        edit.triggered.connect(partial(self.app.edit_task, tid))
+        cycle = QAction("切换状态", self)
+        cycle.triggered.connect(partial(self.app.cycle_task, tid))
+        delete = QAction("删除", self)
+        delete.triggered.connect(partial(self.app.delete_task, tid))
+        menu.addAction(add_child)
+        menu.addAction(edit)
+        menu.addAction(cycle)
+        menu.addSeparator()
+        menu.addAction(delete)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
+
+    def refresh(self, db):
+        self.tree.clear()
+        children = {}
+        for t in db["tasks"]:
+            pid = t["parentId"]
+            if pid not in children:
+                children[pid] = []
+            children[pid].append(t)
+        for pid in children:
+            children[pid] = sorted_tasks(children[pid])
+
+        def build(pid, parent_item):
+            for t in children.get(pid) or []:
+                if parent_item is None:
+                    item = QTreeWidgetItem(self.tree)
+                else:
+                    item = QTreeWidgetItem(parent_item)
+                item.setData(0, Qt.ItemDataRole.UserRole, t["id"])
+                mark = STATUS_MARK[t["status"]]
+                item.setText(0, "  " + mark + "  " + t["title"])
+                item.setForeground(0, QBrush(QColor(STATUS_COLOR[t["status"]])))
+                item.setText(1, STATUS_CN[t["status"]])
+                item.setText(2, PRI_CN[t["priority"]])
+                item.setForeground(2, QBrush(QColor(PRI_COLOR[t["priority"]])))
+                item.setText(3, t["dueDate"] or "")
+                item.setForeground(3, QBrush(QColor("#8D8D8D")))
+                if t["status"] == "completed":
+                    font = item.font(0)
+                    font.setStrikeOut(True)
+                    item.setFont(0, font)
+                build(t["id"], item)
+
+        build(None, None)
+        self.tree.expandAll()
+
+
+class InspirationsPage(QWidget):
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.container = QWidget()
+        self.grid = QGridLayout(self.container)
+        self.grid.setContentsMargins(4, 4, 4, 4)
+        self.grid.setSpacing(14)
+        self.scroll.setWidget(self.container)
+        lay.addWidget(self.scroll, 1)
+
+    def clear_cards(self):
+        while self.grid.count():
+            item = self.grid.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+    def refresh(self, db, keyword):
+        self.clear_cards()
+        items = sorted_inspirations(db["inspirations"])
+        col = 0
+        row = 0
+        for i in items:
+            haystack = i["title"] + " " + i["content"] + " " + " ".join(i["tags"])
+            if keyword and keyword not in haystack.lower():
+                continue
+            self.grid.addWidget(self.make_card(i), row, col)
+            col += 1
+            if col >= 3:
+                col = 0
+                row += 1
+        self.container.setMinimumHeight((row + 1) * 194)
+
+    def make_card(self, insp):
+        card = InspCard(self, insp["id"])
+        card.setObjectName("Card")
+        card.setFixedHeight(180)
+        card.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        card.customContextMenuRequested.connect(partial(self.on_card_menu, insp["id"]))
+        v = QVBoxLayout(card)
+        v.setContentsMargins(0, 0, 14, 12)
+        v.setSpacing(6)
+        bar = QFrame()
+        bar.setFixedHeight(6)
+        bar.setStyleSheet("background: " + insp["color"] + ";")
+        v.addWidget(bar)
+        top = QHBoxLayout()
+        title = QLabel(insp["title"])
+        title.setStyleSheet("font-weight: bold; font-size: 15px;")
+        top.addWidget(title)
+        top.addStretch(1)
+        if insp["pinned"]:
+            pin = QLabel("\u2605")
+            pin.setStyleSheet("color: #F57C00; font-size: 15px;")
+            top.addWidget(pin)
+        v.addLayout(top)
+        content = QLabel(insp["content"][:80])
+        content.setWordWrap(True)
+        content.setStyleSheet("color: #6B6B5E;")
+        v.addWidget(content)
+        v.addStretch(1)
+        tags = QHBoxLayout()
+        tags.setSpacing(6)
+        for t in insp["tags"][:4]:
+            chip = QLabel(t)
+            chip.setObjectName("TagChip")
+            tags.addWidget(chip)
+        tags.addStretch(1)
+        v.addLayout(tags)
+        return card
+
+    def on_card_menu(self, iid, pos):
+        menu = QMenu(self)
+        pin_txt = "取消置顶" if self.app.is_pinned(iid) else "置顶"
+        pin = QAction(pin_txt, self)
+        pin.triggered.connect(partial(self.app.toggle_pin, iid))
+        edit = QAction("编辑", self)
+        edit.triggered.connect(partial(self.app.edit_inspiration, iid))
+        delete = QAction("删除", self)
+        delete.triggered.connect(partial(self.app.delete_inspiration, iid))
+        menu.addAction(pin)
+        menu.addAction(edit)
+        menu.addSeparator()
+        menu.addAction(delete)
+        menu.exec(pos)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.db = load_db()
+        self.setWindowTitle("FlyToDos")
+        self.resize(1080, 700)
+        self.setMinimumSize(900, 600)
+        central = BlobBackground(self)
+        self.setCentralWidget(central)
+        outer = QHBoxLayout(central)
+        outer.setContentsMargins(14, 14, 14, 14)
+        outer.setSpacing(14)
+        outer.addWidget(self.build_sidebar())
+        right = QVBoxLayout()
+        right.setSpacing(10)
+        self.top_title = QLabel("任务")
+        self.top_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #3E3A33;")
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("搜索任务…")
+        self.search_edit.textChanged.connect(self.on_search)
+        self.new_btn = QPushButton("+ 新建")
+        self.new_btn.setObjectName("PrimaryBtn")
+        self.new_btn.clicked.connect(self.on_new)
+        top = QHBoxLayout()
+        top.addWidget(self.top_title)
+        top.addStretch(1)
+        top.addWidget(self.search_edit, 1)
+        top.addWidget(self.new_btn)
+        right.addLayout(top)
+        self.stack = QStackedWidget()
+        self.tasks_page = TasksPage(self)
+        self.insp_page = InspirationsPage(self)
+        self.stack.addWidget(self.tasks_page)
+        self.stack.addWidget(self.insp_page)
+        right.addWidget(self.stack, 1)
+        outer.addLayout(right, 1)
+        self.show_tasks()
+
+    def build_sidebar(self):
+        side = QFrame()
+        side.setObjectName("Sidebar")
+        side.setFixedWidth(200)
+        lay = QVBoxLayout(side)
+        lay.setContentsMargins(16, 20, 16, 16)
+        lay.setSpacing(8)
+        title = QLabel("FlyToDos")
+        title.setObjectName("SideTitle")
+        sub = QLabel("待办与灵感")
+        sub.setObjectName("SideSub")
+        lay.addWidget(title)
+        lay.addWidget(sub)
+        lay.addSpacing(18)
+        self.nav_tasks = QPushButton("\u25cf  任务")
+        self.nav_tasks.setObjectName("NavBtn")
+        self.nav_tasks.setCheckable(True)
+        self.nav_tasks.clicked.connect(self.show_tasks)
+        self.nav_insp = QPushButton("\u2726  灵感")
+        self.nav_insp.setObjectName("NavBtn")
+        self.nav_insp.setCheckable(True)
+        self.nav_insp.clicked.connect(self.show_inspirations)
+        lay.addWidget(self.nav_tasks)
+        lay.addWidget(self.nav_insp)
+        lay.addStretch(1)
+        self.side_count = QLabel("")
+        self.side_count.setObjectName("SideCount")
+        self.side_ver = QLabel("Fly-Lang \u00b7 PyQt6")
+        self.side_ver.setObjectName("SideVer")
+        lay.addWidget(self.side_count)
+        lay.addWidget(self.side_ver)
+        return side
+
+    def show_tasks(self, _checked=False):
+        self.nav_tasks.setChecked(True)
+        self.nav_insp.setChecked(False)
+        self.top_title.setText("任务")
+        self.search_edit.setPlaceholderText("搜索任务…")
+        self.stack.setCurrentWidget(self.tasks_page)
+        self.refresh_all()
+
+    def show_inspirations(self, _checked=False):
+        self.nav_tasks.setChecked(False)
+        self.nav_insp.setChecked(True)
+        self.top_title.setText("灵感")
+        self.search_edit.setPlaceholderText("搜索灵感（标题/内容/标签）…")
+        self.stack.setCurrentWidget(self.insp_page)
+        self.refresh_all()
+
+    def on_search(self, text):
+        self.refresh_all()
+
+    def on_new(self, _checked=False):
+        if self.stack.currentWidget() is self.tasks_page:
+            self.prompt_child(None)
+        else:
+            self.new_inspiration()
+
+    def refresh_all(self):
+        self.tasks_page.refresh(self.db)
+        keyword = self.search_edit.text().strip().lower()
+        self.insp_page.refresh(self.db, keyword)
+        total = len(self.db["tasks"])
+        done = 0
+        for t in self.db["tasks"]:
+            if t["status"] == "completed":
+                done += 1
+        n_insp = len(self.db["inspirations"])
+        self.side_count.setText(f"任务 {total} \u00b7 完成 {done} \u00b7 灵感 {n_insp}")
+
+    def persist(self):
+        save_db(self.db)
+
+    def create_task(self, title, description, parent_id):
+        t = normalize_task({
+            "id": next_id(self.db),
+            "parentId": parent_id,
+            "title": title,
+            "description": description,
+        })
+        self.db["tasks"].append(t)
+        self.persist()
+        self.refresh_all()
+
+    def prompt_child(self, parent_id, _checked=False):
+        self.tasks_page.child_parent = parent_id
+        self.tasks_page.quick_edit.setPlaceholderText("子任务标题，回车创建…")
+        self.tasks_page.quick_edit.setFocus()
+
+    def edit_task(self, tid, _checked=False):
+        t = find_task(self.db, tid)
+        if t is None:
+            return
+        dlg = TaskDialog(self, t)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            v = dlg.values()
+            if not v["title"]:
+                return
+            t["title"] = v["title"]
+            t["description"] = v["description"]
+            t["priority"] = v["priority"]
+            t["status"] = v["status"]
+            t["dueDate"] = v["dueDate"]
+            t["updatedAt"] = now_iso()
+            if v["status"] == "completed":
+                t["completedAt"] = now_iso()
+            self.persist()
+            self.refresh_all()
+
+    def toggle_task(self, tid):
+        t = find_task(self.db, tid)
+        if t is None:
+            return
+        if t["status"] == "completed":
+            t["status"] = "pending"
+            t["completedAt"] = None
+        else:
+            t["status"] = "completed"
+            t["completedAt"] = now_iso()
+        t["updatedAt"] = now_iso()
+        self.persist()
+        self.refresh_all()
+
+    def cycle_task(self, tid, _checked=False):
+        t = find_task(self.db, tid)
+        if t is None:
+            return
+        idx = STATUSES.index(t["status"])
+        nxt = STATUSES[(idx + 1) % len(STATUSES)]
+        t["status"] = nxt
+        t["completedAt"] = now_iso() if nxt == "completed" else None
+        t["updatedAt"] = now_iso()
+        self.persist()
+        self.refresh_all()
+
+    def delete_task(self, tid, _checked=False):
+        ids = []
+        collect_subtree(self.db, tid, ids)
+        kept = []
+        for t in self.db["tasks"]:
+            if t["id"] not in ids:
+                kept.append(t)
+        self.db["tasks"] = kept
+        self.persist()
+        self.refresh_all()
+
+    def is_pinned(self, iid):
+        i = find_insp(self.db, iid)
+        return bool(i and i["pinned"])
+
+    def toggle_pin(self, iid, _checked=False):
+        i = find_insp(self.db, iid)
+        if i is None:
+            return
+        i["pinned"] = not i["pinned"]
+        i["updatedAt"] = now_iso()
+        self.persist()
+        self.refresh_all()
+
+    def new_inspiration(self):
+        dlg = InspirationDialog(self, None)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            v = dlg.values()
+            if not v["title"]:
+                return
+            i = normalize_inspiration({
+                "id": next_id(self.db),
+                "title": v["title"],
+                "content": v["content"],
+                "tags": v["tags"],
+                "color": v["color"],
+            })
+            self.db["inspirations"].append(i)
+            self.persist()
+            self.refresh_all()
+
+    def edit_inspiration(self, iid, _checked=False):
+        i = find_insp(self.db, iid)
+        if i is None:
+            return
+        dlg = InspirationDialog(self, i)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            v = dlg.values()
+            if not v["title"]:
+                return
+            i["title"] = v["title"]
+            i["content"] = v["content"]
+            i["tags"] = v["tags"]
+            i["color"] = v["color"]
+            i["updatedAt"] = now_iso()
+            self.persist()
+            self.refresh_all()
+
+    def delete_inspiration(self, iid, _checked=False):
+        kept = []
+        for i in self.db["inspirations"]:
+            if i["id"] != iid:
+                kept.append(i)
+        self.db["inspirations"] = kept
+        self.persist()
+        self.refresh_all()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    app.setStyleSheet(QSS)
+    win = MainWindow()
+    win.show()
+    if os.environ.get("FLYTODOS_SMOKE") == "1":
+        QTimer.singleShot(1500, app.quit)
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

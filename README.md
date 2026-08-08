@@ -49,10 +49,11 @@ sudo installer -pkg fly-<ver>.pkg -target /
 fly update                  # 检查并更新到最新版（交互式：展示更新日志 + 询问是否安装）
 fly update --check          # 仅检查，有新版本时退出码 2
 fly update --force          # 强制更新（即使已是最新）
+fly update --channel dev    # 走 dev 渠道（GitHub 预发布版；默认随当前版本：dev 版→dev，正式版→release）
 fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ```
 
-安装目录不可写时（如 `/usr/bin` 下的旧版），终端里直接执行 `fly update` 会自动通过 `sudo` 提权重试，无需手动 `sudo <路径>/fly update`。
+安装目录不可写时（如 `/usr/bin` 下的旧版），终端里直接执行 `fly update` 会自动通过 `sudo` 提权重试，无需手动 `sudo <路径>/fly update`。版本号细分：`fly version` 显示 `vX.Y.Z (release)`（正式版）或 `0.X.Y-dev (commit)`（dev 版）；打 `vX.Y.Z-dev` 的 tag 由 CI 发布为 prerelease，`fly update --channel dev` 即可获取。
 
 ## 用法
 
@@ -61,7 +62,7 @@ fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ./fly check <file.fly>          仅编译检查（出错退出码 1）
 ./fly run <file.fly>            转译并执行（python3）
 ./fly version                   打印版本与提交号
-./fly update [--check|--force|--proxy <url>]  自更新（见上）
+./fly update [--check|--force|--channel <dev|release>|--proxy <url>]  自更新（见上）
 ```
 
 build 选项：
@@ -77,6 +78,15 @@ build 选项：
 python3 out.py
 ./fly check app.fly
 ./fly run testdata/golden/basic.fly
+```
+
+示例项目（`example/`）：
+
+```bash
+# Web 版待办与灵感（纯标准库 http.server，零依赖）
+./fly build example/flytodos/app.fly -o app.py && python3 app.py   # http://127.0.0.1:8765
+# 桌面版（PyQt6：pip install PyQt6）
+./fly build example/flytodos_qt/flytodos_qt.fly -o flytodos_qt.py && python3 flytodos_qt.py
 ```
 
 ## 8 个安全关键字
@@ -146,8 +156,21 @@ go vet ./...
 - **LSP 编译期诊断**：内置 `fly lsp` 服务器，打开/编辑/保存实时检查，错误进 Problems 面板（与 `fly check` 同一管线）
 - `.fly` 语法高亮（TextMate），8 个安全关键字分色
 - hover：悬停关键字显示语义说明
-- 命令：Build to Python / Run / Check for Updates（支持 socks5 代理）
+- 命令：Build to Python / Run / Check for Updates（支持 socks5 代理）/ Check Extension Update
 - 配置：`fly.path`（指向含 `lsp` 子命令的 fly 二进制，默认 `fly`）、`fly.proxy`
+
+### 插件如何更新
+
+插件未上架 VSCode 市场，随 GitHub Release 发布 `.vsix`，更新方式二选一：
+
+1. **命令面板**（推荐）：`Fly: Check Extension Update` —— 自动查询 GitHub 最新 Release，有新版时提示并打开下载页
+2. **手动安装**：到 [GitHub Releases](https://github.com/29anan29/Fly-lang/releases) 下载 `fly-lang-<版本>.vsix`，执行：
+
+```bash
+code --install-extension fly-lang-<版本>.vsix --force   # 覆盖旧版
+```
+
+`fly-lang-<版本>.vsix` 由 CI 在打 tag 时自动构建；插件版本号与 Release tag 版本保持一致。编译器本身升级用 `fly update`。
 
 详见 [editor/vscode-fly/README.md](editor/vscode-fly/README.md)。
 
@@ -167,5 +190,6 @@ internal/update/   自更新 + SOCKS5 代理
 tools/icon/        图标生成器
 assets/            logo.svg + icon.png
 editor/vscode-fly/ VSCode 插件
+example/            示例：Web 版（http.server）与 PyQt6 桌面版 FlyToDos 复刻
 testdata/          正反例测试文件
 ```
