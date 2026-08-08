@@ -1,0 +1,9 @@
+def greet(name, times=2):
+    for i in range(times):
+        print(f"hello {name} {i}")
+    if times > 10:
+        print("many")
+    else:
+        print("few")
+    return times * 2
+greet("fly")

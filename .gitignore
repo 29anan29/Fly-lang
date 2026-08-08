@@ -1,0 +1,8 @@
+# 编译产物
+fly
+*.exe
+out.py
+
+# VSCode 插件
+node_modules/
+*.vsix
