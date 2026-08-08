@@ -46,11 +46,13 @@ sudo installer -pkg fly-<ver>.pkg -target /
 **自更新**（已安装过 fly 后，`fly update` 会从 GitHub Releases 拉取对应平台的压缩包原地升级）：
 
 ```bash
-fly update                  # 检查并更新到最新版
+fly update                  # 检查并更新到最新版（交互式：展示更新日志 + 询问是否安装）
 fly update --check          # 仅检查，有新版本时退出码 2
 fly update --force          # 强制更新（即使已是最新）
 fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ```
+
+安装目录不可写时（如 `/usr/bin` 下的旧版），终端里直接执行 `fly update` 会自动通过 `sudo` 提权重试，无需手动 `sudo <路径>/fly update`。
 
 ## 用法
 

@@ -43,6 +43,7 @@ testdata/            正反例测试文件
 - 版本注入：`go build -ldflags "-X flylang/internal/version.Version=v1.2.3 -X flylang/internal/version.Commit=<sha> -X flylang/internal/version.Repo=29anan29/Fly-lang"`，CI 用 `VERSION_LDFLAGS` 环境变量传入（见 .github/workflows/release.yml）
 - 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
 - `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（internal/update.AssetFor），改 CI 产物名必须同步改这里
+- 交互式 update：先 `CheckWritable` 预检，不可写时终端（TTY）自动 `sudo <exe> update <原参数>` 提权重试，非 TTY 回退"建议 sudo 重试"提示；确认用 `update.Confirm`，ANSI 颜色由 `isTTY`（ioctl TIOCGWINSZ，见 cmd/fly/tty*.go）控制
 - 代理：`--proxy` 支持 `http://`/`https://`/`socks5://[user:pass@]host:port`（socks5.go 手写实现，带认证）
 
 ## 编码约定

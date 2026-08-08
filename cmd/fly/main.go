@@ -200,6 +200,9 @@ func cmdUpdate(args []string) int {
 	}
 	installDir := filepath.Dir(exeReal)
 	if err := u.CheckWritable(installDir); err != nil {
+		if code := retryWithSudo(exeReal, os.Args[1:]); code >= 0 {
+			return code
+		}
 		fmt.Fprintln(os.Stderr, red(err.Error()))
 		fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("建议：sudo %s update%s 重试（或把 fly 安装到用户可写目录）",
 			exe, proxyArg(proxy))))
@@ -245,6 +248,28 @@ func proxyArg(proxy string) string {
 	return " --proxy " + proxy
 }
 
+func retryWithSudo(exeReal string, args []string) int {
+	if os.Geteuid() == 0 || !isTTY(os.Stdin) {
+		return -1
+	}
+	if _, err := exec.LookPath("sudo"); err != nil {
+		return -1
+	}
+	fmt.Println(yellow(fmt.Sprintf("安装目录不可写，将以 sudo 提权重试（%s %s）", exeReal, strings.Join(args, " "))))
+	cmd := exec.Command("sudo", append([]string{exeReal}, args...)...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return ee.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "error: 无法执行 sudo: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
 const (
 	ansiRed    = "31"
 	ansiGreen  = "32"
@@ -254,14 +279,6 @@ const (
 )
 
 var colorOn = isTTY(os.Stdout) && os.Getenv("NO_COLOR") == ""
-
-func isTTY(f *os.File) bool {
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return fi.Mode()&os.ModeCharDevice != 0
-}
 
 func paint(code, s string) string {
 	if !colorOn {
