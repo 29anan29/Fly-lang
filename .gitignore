@@ -2,6 +2,8 @@
 /fly
 *.exe
 out.py
+build/
+dist/
 
 # VSCode 插件
 node_modules/
