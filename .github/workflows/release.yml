@@ -1,0 +1,161 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  VERSION_LDFLAGS: -X flylang/internal/version.Repo=29anan29/Fly-lang
+
+jobs:
+  linux:
+    name: linux packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build and package
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VER=${VERSION#v}
+          ldflags="-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$SHA $VERSION_LDFLAGS"
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o dist/fly ./cmd/fly
+            tar -czf dist/fly-linux-$arch.tar.gz -C dist fly
+            rm dist/fly
+
+            mkdir -p pkg/usr/bin pkg/usr/share/pixmaps pkg/DEBIAN
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o pkg/usr/bin/fly ./cmd/fly
+            cp assets/icon.png pkg/usr/share/pixmaps/fly.png
+            cat > pkg/DEBIAN/control <<EOF
+Package: flylang
+Version: $VER
+Section: devel
+Priority: optional
+Architecture: $arch
+Maintainer: 29anan29
+Description: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）
+EOF
+            dpkg-deb --build --root-owner-group pkg dist/fly-linux-$arch.deb
+            rm -rf pkg
+          done
+          ls -la dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-pkgs
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS packages
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build and package
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VER=${VERSION#v}
+          ldflags="-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$SHA $VERSION_LDFLAGS"
+          mkdir -p dist perarch/amd64 perarch/arm64
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o perarch/amd64/fly ./cmd/fly
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o perarch/arm64/fly ./cmd/fly
+          tar -czf dist/fly-darwin-amd64.tar.gz -C perarch/amd64 fly
+          tar -czf dist/fly-darwin-arm64.tar.gz -C perarch/arm64 fly
+          lipo -create perarch/amd64/fly perarch/arm64/fly -output dist/fly-universal
+
+          # .pkg 安装包（/usr/local/bin）
+          mkdir -p pkgroot/usr/local/bin
+          cp dist/fly-universal pkgroot/usr/local/bin/fly
+          pkgbuild --root pkgroot --identifier com.flylang.fly --version "$VER" dist/fly-macos-universal.pkg
+
+          # .dmg 磁盘映像
+          mkdir -p dmgstage
+          cp dist/fly-universal dmgstage/fly
+          cp README.md dmgstage/README.md
+          hdiutil create -volname "Fly $VER" -srcfolder dmgstage -ov -format UDZO dist/fly-macos-universal.dmg
+
+          rm dist/fly-universal
+          ls -la dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-pkgs
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: Windows packages
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build and package
+        shell: pwsh
+        env:
+          VERSION: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          $VER = $env:VERSION.TrimStart('v')
+          $ldflags = "-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$env:SHA $env:VERSION_LDFLAGS"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          foreach ($arch in @('amd64', 'arm64')) {
+            $env:CGO_ENABLED = '0'
+            $env:GOOS = 'windows'
+            $env:GOARCH = $arch
+            go build -trimpath -ldflags $ldflags -o dist\fly-$arch.exe .\cmd\fly
+            Compress-Archive -Path dist\fly-$arch.exe -DestinationPath dist\fly-windows-$arch.zip
+          }
+          # SFX 自解压安装包（amd64）
+          & 'C:\Program Files\7-Zip\7z.exe' a -t7z -sfx -mx9 dist\fly-windows-amd64-installer.exe dist\fly-amd64.exe | Out-Null
+          Remove-Item dist\fly-amd64.exe, dist\fly-arm64.exe
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-pkgs
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-pkgs'
+          path: dist
+          merge-multiple: true
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist/
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Fly-Lang $GITHUB_REF_NAME
+
+- Linux: .deb（amd64/arm64）、tar.gz
+- macOS: .pkg + .dmg（universal）、tar.gz
+- Windows: .zip（amd64/arm64）、自解压 exe
+
+更新命令：\`fly update\`（支持 --proxy socks5://）"

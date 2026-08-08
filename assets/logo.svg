@@ -1,0 +1,66 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">Geometric F Logo</title>
+  <desc id="desc">
+    An original layered geometric letter F logo in emerald green and dark blue.
+  </desc>
+
+  <!-- 外层：绿色折叠轮廓 -->
+  <path
+    fill="#35C98B"
+    d="
+      M72 64
+      H440
+      L386 158
+      H232
+      V218
+      H350
+      L298 308
+      H232
+      V448
+      H126
+      V158
+      Z
+    "
+  />
+
+  <!-- 内层：深蓝色 F -->
+  <path
+    fill="#183B56"
+    d="
+      M126 64
+      H350
+      L302 146
+      H214
+      V238
+      H300
+      L258 310
+      H214
+      V384
+      L174 448
+      V128
+      Z
+    "
+  />
+
+  <!-- 中心高光切面 -->
+  <path
+    fill="#A7F3D0"
+    d="
+      M126 64
+      H174
+      V448
+      L126 416
+      V158
+      L72 64
+      Z
+    "
+    opacity="0.92"
+  />
+</svg>

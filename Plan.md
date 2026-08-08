@@ -35,12 +35,18 @@ flylang/
 │   ├── gen/
 │   │   ├── python.go          # 缩进化 Python 代码发射
 │   │   └── inject.go          # seal/trace/cage/only 运行时注入
+│   ├── version/               # Version/Commit/Repo（ldflags -X 注入）
+│   ├── update/                # 自更新：GitHub Releases API + socks5/http 代理（手写 SOCKS5）
 │   └── runtime/fly_runtime.py # go:embed；GuardError/ResourceExhaustedError、白名单代理、冻结容器
+├── tools/icon/                # 图标生成器（输出 assets/icon.png）
+├── assets/                    # logo.svg + icon.png
+├── .github/workflows/release.yml  # 打 v* tag → deb/pkg/dmg/zip/SFX + GitHub Release
 ├── editor/vscode-fly/         # VSCode 插件（TypeScript）
 │   ├── package.json           # contributes: languages/grammar/commands/configuration
 │   ├── syntaxes/fly.tmLanguage.json  # TextMate 语法高亮（Python 子集 + 8 关键字）
 │   ├── src/extension.ts       # 激活逻辑
-│   └── src/diagnostics.ts     # 调 `fly check` 解析报错 → Problem Panel
+│   ├── src/diagnostics.ts     # 调 `fly check` 解析报错 → Problem Panel
+│   └── src/commands.ts        # build/run/update 命令
 └── testdata/                  # .fly 正反例（# fly:error 标记期望编译错误）
 ```
 
@@ -83,6 +89,12 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 - checker：testdata 表驱动反例测试（`# fly:error` 注释标记期望错误，编译必须报错）
 - 集成：golden 测试对比转译输出
 - 行为：生成的 .py 用 Python 3.10 实跑验证 cage/seal/trace 运行时行为
+
+## 发布与自更新
+
+- 打 `v*` tag → `.github/workflows/release.yml`：Linux（deb/tar.gz，amd64+arm64）、macOS（pkg/dmg universal）、Windows（zip + 7z SFX installer），`gh release create` 自动发布
+- `fly update`：查 GitHub Releases latest → 按 `fly-<os>-<arch>.tar.gz|.zip` 匹配下载 → 校验 → 原子替换自身；`--check` 有新版本退出码 2；`--proxy` 支持 `http(s)://` 与 `socks5://[user:pass@]host:port`（手写 SOCKS5，零依赖）
+- 版本注入：`-ldflags "-X flylang/internal/version.Version=... -X ...Commit=... -X ...Repo=29anan29/Fly-lang"`，未注入时显示 `dev`
 
 ## 开发过程（P0 → P6）
 
@@ -163,12 +175,26 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 任务：
 1. `editor/vscode-fly/` 脚手架（package.json、tsconfig、.vscode/launch.json）
 2. `syntaxes/fly.tmLanguage.json`：Python 子集 + 8 关键字分组着色（编译期类 vs 注入类）
-3. `src/extension.ts`：激活、注册命令（Build to Python / Check）
+3. `src/extension.ts`：激活、注册命令（Build to Python / Check / Run / Check for Updates）
 4. `src/diagnostics.ts`：保存触发 `fly check`，解析 `error:` 行 → Diagnostics 集合
-5. 配置 `fly.path`/`fly.checkOnSave`；未装 fly 的降级提示
+5. 配置 `fly.path`/`fly.checkOnSave`/`fly.proxy`；未装 fly 的降级提示
 6. 手动验证清单：高亮、报错面板、跳转、命令
 
 验收：F5 调试下对 testdata 文件检查出全部反例错误，高亮正确。
+
+### P5.5 发布生态（CI 打包 + 自更新 + 图标）
+
+**目标**：一键发布多平台安装包，`fly update` 原地升级。
+
+任务：
+1. `tools/icon/` 图标生成器（多边形光栅化 → assets/icon.png）
+2. `internal/version`：ldflags 注入版本/提交/仓库
+3. `internal/update`：GitHub API 查版本、AssetFor 按平台匹配、tar.gz/zip 解包原子替换、socks5 代理（含认证）手写实现 + 表驱动测试
+4. `cmd/fly` 新增 `version`/`update` 子命令（--check 退出码 2 / --force / --proxy）
+5. `.github/workflows/release.yml`：deb/tar.gz/pkg/dmg/zip/SFX 五类产物 + Release 发布
+6. VSCode 插件补 `Fly: Check for Updates`（复用 `--check`/`--force` + `fly.proxy` 配置）
+
+验收：本地 dpkg-deb 冒烟打包通过；`go test ./...` 全绿。
 
 ### P6 打磨与收尾
 
@@ -182,4 +208,4 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 ## 里程碑（与阶段对应）
 
-P0 基础设施 → P1 lock/guard → P2 safe/mask → P3 only/seal/trace → P4 cage+runtime → P5 VSCode 插件 → P6 打磨
+P0 基础设施 → P1 lock/guard → P2 safe/mask → P3 only/seal/trace → P4 cage+runtime → P5 VSCode 插件 → P5.5 发布生态 → P6 打磨

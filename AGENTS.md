@@ -8,22 +8,33 @@ Fly-Lang 是用 Go 实现的 Python 安全超集转译器。核心文件是 Plan
 - 测试：`go test ./...`
 - 静态检查：`go vet ./...`
 - 手动验证：`./fly build testdata/xxx.fly`（可加 `-o out.py`，用 `python3 out.py` 实跑行为测试）
+- VSCode 插件编译：`cd editor/vscode-fly && npm run compile`（改 src/ 后必须重编译）
 
 ## 架构概览
 
 ```
-cmd/fly/main.go      CLI 入口（build/check/run 子命令）
+cmd/fly/main.go      CLI 入口（build/check/run/version/update）
 internal/lexer/      词法分析
 internal/ast/        AST 节点（必须带 position，报错需要行列号）
 internal/parser/     递归下降解析器
 internal/checker/    编译期语义检查（报错在此阶段产生）
 internal/gen/        代码生成 + 运行时注入
 internal/runtime/    go:embed 的 fly_runtime.py
+internal/version/    版本注入（Version/Commit/Repo，ldflags -X flylang/internal/version.X）
+internal/update/     自更新（GitHub Releases API + SOCKS5/HTTP 代理，零第三方依赖）
+tools/icon/          图标生成器（assets/icon.png 产物）
 editor/vscode-fly/   VSCode 插件（TextMate 语法高亮 + fly check 诊断）
 testdata/            正反例测试文件
 ```
 
 管线：`Lexer → Parser(AST) → checker（编译期报错）→ gen（输出 Python）`。
+
+## 版本与发布
+
+- 版本注入：`go build -ldflags "-X flylang/internal/version.Version=v1.2.3 -X flylang/internal/version.Commit=<sha> -X flylang/internal/version.Repo=29anan29/Fly-lang"`，CI 用 `VERSION_LDFLAGS` 环境变量传入（见 .github/workflows/release.yml）
+- 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
+- `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（internal/update.AssetFor），改 CI 产物名必须同步改这里
+- 代理：`--proxy` 支持 `http://`/`https://`/`socks5://[user:pass@]host:port`（socks5.go 手写实现，带认证）
 
 ## 编码约定
 

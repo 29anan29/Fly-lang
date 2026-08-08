@@ -1,0 +1,108 @@
+{
+  "name": "fly-lang",
+  "displayName": "Fly Lang",
+  "description": "Fly 语言支持：Python 3.10+ 安全增强超集。语法高亮 + 编译期诊断（safe/only/lock/mask/cage/guard/seal/trace）",
+  "version": "0.1.0",
+  "publisher": "29anan29",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/29anan29/Fly-lang"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "fly",
+    "python",
+    "security",
+    "transpiler"
+  ],
+  "activationEvents": [
+    "onLanguage:fly",
+    "onCommand:fly.build",
+    "onCommand:fly.check",
+    "onCommand:fly.run",
+    "onCommand:fly.update"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "fly",
+        "aliases": [
+          "Fly",
+          "fly"
+        ],
+        "extensions": [
+          ".fly"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fly",
+        "scopeName": "source.fly",
+        "path": "./syntaxes/fly.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "fly.build",
+        "title": "Fly: Build to Python",
+        "category": "Fly"
+      },
+      {
+        "command": "fly.check",
+        "title": "Fly: Check",
+        "category": "Fly"
+      },
+      {
+        "command": "fly.run",
+        "title": "Fly: Run",
+        "category": "Fly"
+      },
+      {
+        "command": "fly.update",
+        "title": "Fly: Check for Updates",
+        "category": "Fly"
+      }
+    ],
+    "configuration": {
+      "title": "Fly",
+      "properties": {
+        "fly.path": {
+          "type": "string",
+          "default": "fly",
+          "description": "fly 可执行文件路径（默认从 PATH 查找）"
+        },
+        "fly.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "保存 .fly 文件时自动运行 fly check"
+        },
+        "fly.proxy": {
+          "type": "string",
+          "default": "",
+          "description": "更新检查使用的代理（http://、https://、socks5://）"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
