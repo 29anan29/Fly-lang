@@ -37,15 +37,7 @@ jobs:
             mkdir -p pkg/usr/bin pkg/usr/share/pixmaps pkg/DEBIAN
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o pkg/usr/bin/fly ./cmd/fly
             cp assets/icon.png pkg/usr/share/pixmaps/fly.png
-            cat > pkg/DEBIAN/control <<EOF
-            Package: flylang
-            Version: $VER
-            Section: devel
-            Priority: optional
-            Architecture: $arch
-            Maintainer: 29anan29
-            Description: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）
-            EOF
+            printf 'Package: flylang\nVersion: %s\nSection: devel\nPriority: optional\nArchitecture: %s\nMaintainer: 29anan29\nDescription: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）\n' "$VER" "$arch" > pkg/DEBIAN/control
             dpkg-deb --build --root-owner-group pkg dist/fly-linux-$arch.deb
             rm -rf pkg
           done
