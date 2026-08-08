@@ -38,14 +38,14 @@ jobs:
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o pkg/usr/bin/fly ./cmd/fly
             cp assets/icon.png pkg/usr/share/pixmaps/fly.png
             cat > pkg/DEBIAN/control <<EOF
-Package: flylang
-Version: $VER
-Section: devel
-Priority: optional
-Architecture: $arch
-Maintainer: 29anan29
-Description: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）
-EOF
+            Package: flylang
+            Version: $VER
+            Section: devel
+            Priority: optional
+            Architecture: $arch
+            Maintainer: 29anan29
+            Description: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）
+            EOF
             dpkg-deb --build --root-owner-group pkg dist/fly-linux-$arch.deb
             rm -rf pkg
           done
@@ -158,9 +158,7 @@ EOF
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "$GITHUB_REF_NAME" \
             --notes "Fly-Lang $GITHUB_REF_NAME
-
-- Linux: .deb（amd64/arm64）、tar.gz
-- macOS: .pkg + .dmg（universal）、tar.gz
-- Windows: .zip（amd64/arm64）、自解压 exe
-
-更新命令：\`fly update\`（支持 --proxy socks5://）"
+            - Linux: .deb（amd64/arm64）、tar.gz
+            - macOS: .pkg + .dmg（universal）、tar.gz
+            - Windows: .zip（amd64/arm64）、自解压 exe
+            更新命令：\`fly update\`（支持 --proxy socks5://）"
