@@ -90,11 +90,29 @@ python3 out.py
 | `seal` | 冻结对象，禁止增删改属性 | 对象属性被篡改（编译期生成 `__setattr__` 拦截） |
 | `trace` | 强制审计日志 | 关键操作无记录（编译期插入 logging） |
 
+## 编译期完备检查（可信产物）
+
+Fly 的检查全部发生在**编译期**（lexer → parser → checker），不做编译后的运行时兜底校验：
+
+- `fly check` / `fly build` 通过 = 语义合法，生成的 `.py` 可直接在生产环境运行
+- 不需要"先编译再用 python 解释器跑一遍来验证"——编译通过即可信，像 Rust 一样把问题拦在编译前
+- 8 个安全关键字的检查在编译期拦截或注入运行时护栏（见下表），产物本身即安全边界
+- 编辑器内 LSP 诊断与 `fly check` 是**同一管线**：写代码时看到的错误 = 编译时必然报的错误
+
 ## 报错格式
 
 ```
 error: <file>.fly:12:5: <消息>
 ```
+
+## LSP（编辑器编译期诊断）
+
+`fly lsp` 内置 LSP 服务器（JSON-RPC over stdio，零第三方依赖）：
+
+- 实时编译期诊断（打开/编辑/保存即检查，120ms 防抖）
+- hover 显示 8 个安全关键字语义与所在行源码
+- 诊断 = 编译管线本身，与 `fly check` 完全一致（见上节"可信产物"）
+- 供 VSCode 插件（vscode-languageclient）与任意 LSP 客户端接入
 
 ## 测试
 
@@ -121,17 +139,26 @@ go vet ./...
 
 ## VSCode 插件
 
-`editor/vscode-fly/`：`.fly` 语法高亮（TextMate）、保存自动 `fly check` 诊断（Problems 面板）、Build/Run/Check for Updates 命令（更新支持 socks5 代理）。详见 [editor/vscode-fly/README.md](editor/vscode-fly/README.md)。
+`editor/vscode-fly/`（已发布 v0.2.0）：
+
+- **LSP 编译期诊断**：内置 `fly lsp` 服务器，打开/编辑/保存实时检查，错误进 Problems 面板（与 `fly check` 同一管线）
+- `.fly` 语法高亮（TextMate），8 个安全关键字分色
+- hover：悬停关键字显示语义说明
+- 命令：Build to Python / Run / Check for Updates（支持 socks5 代理）
+- 配置：`fly.path`（指向含 `lsp` 子命令的 fly 二进制，默认 `fly`）、`fly.proxy`
+
+详见 [editor/vscode-fly/README.md](editor/vscode-fly/README.md)。
 
 ## 目录结构
 
 ```
-cmd/fly/           CLI 入口（build/check/run/version/update）
+cmd/fly/           CLI 入口（build/check/run/version/update/lsp）
 internal/lexer/    词法分析
 internal/ast/      AST 节点（带位置信息）
 internal/parser/   递归下降解析器
 internal/checker/  编译期语义检查（P1 起）
 internal/gen/      代码生成 + 运行时注入
+internal/lsp/      LSP 服务器（JSON-RPC stdio：诊断/hover）
 internal/runtime/  fly_runtime.py 运行时支持库（P4 起）
 internal/version/  版本信息（ldflags 注入）
 internal/update/   自更新 + SOCKS5 代理

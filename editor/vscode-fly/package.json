@@ -1,8 +1,8 @@
 {
   "name": "fly-lang",
   "displayName": "Fly Lang",
-  "description": "Fly 语言支持：Python 3.10+ 安全增强超集。语法高亮 + 编译期诊断（safe/only/lock/mask/cage/guard/seal/trace）",
-  "version": "0.1.0",
+  "description": "Fly 语言支持：Python 3.10+ 安全增强超集。LSP 编译期诊断（safe/only/lock/mask/cage/guard/seal/trace）+ 语法高亮",
+  "version": "0.2.0",
   "publisher": "29anan29",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -80,12 +80,7 @@
         "fly.path": {
           "type": "string",
           "default": "fly",
-          "description": "fly 可执行文件路径（默认从 PATH 查找）"
-        },
-        "fly.checkOnSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "保存 .fly 文件时自动运行 fly check"
+          "description": "fly 可执行文件路径（默认从 PATH 查找），内置 LSP 服务器（fly lsp）"
         },
         "fly.proxy": {
           "type": "string",
@@ -104,5 +99,8 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.0"
   }
 }

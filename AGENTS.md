@@ -13,21 +13,30 @@ Fly-Lang 是用 Go 实现的 Python 安全超集转译器。核心文件是 Plan
 ## 架构概览
 
 ```
-cmd/fly/main.go      CLI 入口（build/check/run/version/update）
+cmd/fly/main.go      CLI 入口（build/check/run/version/update/lsp）
 internal/lexer/      词法分析
 internal/ast/        AST 节点（必须带 position，报错需要行列号）
 internal/parser/     递归下降解析器
 internal/checker/    编译期语义检查（报错在此阶段产生）
 internal/gen/        代码生成 + 运行时注入
+internal/lsp/        LSP 服务器（JSON-RPC over stdio，零依赖：诊断/hover/forceCheck）
 internal/runtime/    go:embed 的 fly_runtime.py
 internal/version/    版本注入（Version/Commit/Repo，ldflags -X flylang/internal/version.X）
 internal/update/     自更新（GitHub Releases API + SOCKS5/HTTP 代理，零第三方依赖）
 tools/icon/          图标生成器（assets/icon.png 产物）
-editor/vscode-fly/   VSCode 插件（TextMate 语法高亮 + fly check 诊断）
+editor/vscode-fly/   VSCode 插件（TextMate 高亮 + vscode-languageclient 连 fly lsp）
 testdata/            正反例测试文件
 ```
 
 管线：`Lexer → Parser(AST) → checker（编译期报错）→ gen（输出 Python）`。
+
+## LSP 约定
+
+- `fly lsp`：stdio JSON-RPC 2.0，`Content-Length` 帧；诊断由 `compile.CheckSource`（内存字符串编译）驱动，与 `fly check` 同一管线——改 checker 行为自动同步编辑器诊断
+- 支持：initialize/initialized/shutdown/exit、didOpen/didChange(full)/didSave/didClose、publishDiagnostics、hover（8 关键字文档）、自定义通知 `fly/forceCheck`
+- 行号转换：诊断 `Line/Col`（1 基）→ LSP 0 基；severity 恒为 1（Error）
+- 客户端在 `editor/vscode-fly/src/extension.ts`（vscode-languageclient v10，`start()` 返回 `Promise<void>`，不 push disposable）
+- VSCode 插件 v0.2.0+ 要求 fly 含 `lsp` 子命令，旧二进制连接会失败
 
 ## 版本与发布
 
@@ -56,7 +65,7 @@ testdata/            正反例测试文件
 
 ## VSCode 插件
 
-- `editor/vscode-fly/`：TypeScript 写的轻量插件，无 LSP
-- 高亮走 `syntaxes/fly.tmLanguage.json`（TextMate），诊断走 `src/diagnostics.ts` 调 `fly check` 并解析 `error: <file>.fly:12:5: <消息>` 格式
-- 构建：`npm run compile`；调试：F5（Extension Development Host）；打包：`vsce package`
-- `package.json` 中 `contributes.configuration` 含 `fly.path` 与 `fly.checkOnSave`
+- `editor/vscode-fly/`：TypeScript，诊断走内置 LSP（`fly lsp` 子命令 + vscode-languageclient v10），TextMate 只管高亮
+- 高亮走 `syntaxes/fly.tmLanguage.json`；诊断/hover 由 LSP 提供（与 `fly check` 同一编译管线，见"LSP 约定"）
+- 构建：`npm run compile`；调试：F5（Extension Development Host）；打包：`npx @vscode/vsce package`
+- `package.json` 中 `contributes.configuration` 含 `fly.path` 与 `fly.proxy`（v0.2.0 起，`fly.checkOnSave` 已移除——LSP 常驻无需该开关）

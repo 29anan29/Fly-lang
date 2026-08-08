@@ -9,9 +9,22 @@ import (
 	"strings"
 
 	"flylang/internal/compile"
+	"flylang/internal/lsp"
 	"flylang/internal/update"
 	"flylang/internal/version"
 )
+
+func cmdLSP(args []string) int {
+	if len(args) > 0 {
+		fmt.Fprintln(os.Stderr, "用法: fly lsp（stdio JSON-RPC，供编辑器 LSP 客户端调用）")
+		return 2
+	}
+	if err := lsp.New().Run(os.Stdin, os.Stdout); err != nil {
+		fmt.Fprintf(os.Stderr, "lsp: %v\n", err)
+		return 1
+	}
+	return 0
+}
 
 const usage = `Fly-Lang 编译器
 
@@ -51,6 +64,8 @@ func run(args []string) int {
 		return 0
 	case "update":
 		return cmdUpdate(args[1:])
+	case "lsp":
+		return cmdLSP(args[1:])
 	case "-h", "--help", "help":
 		fmt.Println(usage)
 		return 0

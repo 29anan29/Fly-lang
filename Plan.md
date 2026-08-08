@@ -168,19 +168,19 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 验收：文档示例 5 转译后实跑，超时与超内存两种场景均触发并抛对应异常。
 
-### P5 VSCode 插件
+### P5 VSCode 插件（已升级为 LSP 版）
 
-**目标**：编辑器体验——高亮 + Problems 面板诊断。
+**目标**：编辑器体验——高亮 + LSP 编译期诊断。
 
 任务：
-1. `editor/vscode-fly/` 脚手架（package.json、tsconfig、.vscode/launch.json）
-2. `syntaxes/fly.tmLanguage.json`：Python 子集 + 8 关键字分组着色（编译期类 vs 注入类）
-3. `src/extension.ts`：激活、注册命令（Build to Python / Check / Run / Check for Updates）
-4. `src/diagnostics.ts`：保存触发 `fly check`，解析 `error:` 行 → Diagnostics 集合
-5. 配置 `fly.path`/`fly.checkOnSave`/`fly.proxy`；未装 fly 的降级提示
-6. 手动验证清单：高亮、报错面板、跳转、命令
+1. `internal/lsp`：零依赖 JSON-RPC over stdio 服务器（Content-Length 帧、请求/通知分发、错误聚合）
+2. 能力：initialize/initialized/shutdown/exit、didOpen/didChange(full)/didSave/didClose、publishDiagnostics（`compile.CheckSource` 内存编译，120ms 防抖）、hover（8 关键字文档 + 所在行）、自定义 `fly/forceCheck`
+3. `cmd/fly` 新增 `lsp` 子命令（stdio）
+4. `editor/vscode-fly/` 插件：vscode-languageclient v10 连接 `fly lsp`，TextMate 高亮保留，命令（Build/Run/Update/ForceCheck）
+5. 配置 `fly.path`/`fly.proxy`；`fly.checkOnSave` 移除（LSP 常驻）
+6. 验证：lsp 单测（管道模拟完整会话）+ `vsce package` + `code --install-extension`
 
-验收：F5 调试下对 testdata 文件检查出全部反例错误，高亮正确。
+验收：F5 调试下 .fly 文件实时诊断（与 `fly check` 同管线）；hover 出关键字说明；`fly lsp` 冒烟会话（initialize/didOpen/shutdown/exit）通过。
 
 ### P5.5 发布生态（CI 打包 + 自更新 + 图标）
 

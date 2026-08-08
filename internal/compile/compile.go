@@ -31,6 +31,15 @@ func ParseFile(path string) (*ast.Module, []ast.Diagnostic) {
 	return m, nil
 }
 
+func CheckSource(src string) []ast.Diagnostic {
+	p := parser.New(src)
+	p.ParseModule()
+	if d := p.Error(); d != nil {
+		return []ast.Diagnostic{*d}
+	}
+	return nil
+}
+
 func CheckFile(path string) ([]ast.Diagnostic, error) {
 	_, errs := ParseFile(path)
 	if len(errs) > 0 {
