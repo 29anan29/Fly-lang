@@ -120,12 +120,17 @@ EOF
             $env:CGO_ENABLED = '0'
             $env:GOOS = 'windows'
             $env:GOARCH = $arch
-            go build -trimpath -ldflags $ldflags -o dist\fly-$arch.exe .\cmd\fly
-            Compress-Archive -Path dist\fly-$arch.exe -DestinationPath dist\fly-windows-$arch.zip
+            go build -trimpath -ldflags $ldflags -o dist\fly.exe .\cmd\fly
+            Compress-Archive -Path dist\fly.exe -DestinationPath dist\fly-windows-$arch.zip
+            if ($arch -eq 'amd64') {
+              Move-Item dist\fly.exe dist\fly-installer.exe
+            } else {
+              Remove-Item dist\fly.exe
+            }
           }
           # SFX 自解压安装包（amd64）
-          & 'C:\Program Files\7-Zip\7z.exe' a -t7z -sfx -mx9 dist\fly-windows-amd64-installer.exe dist\fly-amd64.exe | Out-Null
-          Remove-Item dist\fly-amd64.exe, dist\fly-arm64.exe
+          & 'C:\Program Files\7-Zip\7z.exe' a -t7z -sfx -mx9 dist\fly-windows-amd64-installer.exe dist\fly-installer.exe | Out-Null
+          Remove-Item dist\fly-installer.exe
           Get-ChildItem dist
       - uses: actions/upload-artifact@v4
         with:
