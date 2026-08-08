@@ -28,6 +28,7 @@ type Asset struct {
 
 type Release struct {
 	TagName string `json:"tag_name"`
+	Body    string `json:"body"`
 	Assets  []struct {
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
@@ -118,6 +119,16 @@ func (u *Updater) IsOutdated(latest string) bool {
 }
 
 func (u *Updater) Install(a *Asset) error {
+	return u.InstallVerbose(a, nil)
+}
+
+func (u *Updater) InstallVerbose(a *Asset, logf func(step string)) error {
+	log := func(s string) {
+		if logf != nil {
+			logf(s)
+		}
+	}
+	log("下载 " + a.Name)
 	req, err := http.NewRequest(http.MethodGet, a.URL, nil)
 	if err != nil {
 		return err
@@ -143,7 +154,7 @@ func (u *Updater) Install(a *Asset) error {
 	}
 	tmp.Close()
 
-	exe, err := u.executable()
+	exe, err := u.Executable()
 	if err != nil {
 		return err
 	}
@@ -151,6 +162,7 @@ func (u *Updater) Install(a *Asset) error {
 	if err != nil {
 		exeReal = exe
 	}
+	log("解包校验")
 	data, err := extractBinary(tmpPath, a.Name)
 	if err != nil {
 		return err
@@ -161,9 +173,11 @@ func (u *Updater) Install(a *Asset) error {
 	}
 	dir := filepath.Dir(exeReal)
 	newPath := filepath.Join(dir, "."+binName+".new")
+	log("写入 " + newPath)
 	if err := os.WriteFile(newPath, data, 0755); err != nil {
 		return fmt.Errorf("写入新版本失败: %w", err)
 	}
+	log("原子替换 " + exeReal)
 	if err := os.Rename(newPath, exeReal); err != nil {
 		os.Remove(newPath)
 		if runtime.GOOS == "windows" {
@@ -174,7 +188,18 @@ func (u *Updater) Install(a *Asset) error {
 	return nil
 }
 
-func (u *Updater) executable() (string, error) {
+func (u *Updater) CheckWritable(dir string) error {
+	probe := filepath.Join(dir, fmt.Sprintf(".fly-wtest-%d", os.Getpid()))
+	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("安装目录 %s 不可写: %v", dir, err)
+	}
+	f.Close()
+	os.Remove(probe)
+	return nil
+}
+
+func (u *Updater) Executable() (string, error) {
 	if u.ExecPath != "" {
 		return u.ExecPath, nil
 	}

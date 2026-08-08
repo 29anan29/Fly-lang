@@ -177,9 +177,6 @@ func cmdUpdate(args []string) int {
 	}
 	if !u.IsOutdated(rel.TagName) && !force {
 		fmt.Printf("当前已是最新版本 %s\n", version.String())
-		if checkOnly {
-			return 0
-		}
 		return 0
 	}
 	if checkOnly {
@@ -191,14 +188,93 @@ func cmdUpdate(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	fmt.Printf("下载 %s（%s）...\n", asset.Name, rel.TagName)
-	if err := u.Install(asset); err != nil {
+
+	exe, err := u.Executable()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	fmt.Printf("已更新到 %s，请重启后生效\n", rel.TagName)
+	exeReal, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		exeReal = exe
+	}
+	installDir := filepath.Dir(exeReal)
+	if err := u.CheckWritable(installDir); err != nil {
+		fmt.Fprintln(os.Stderr, red(err.Error()))
+		fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("建议：sudo %s update%s 重试（或把 fly 安装到用户可写目录）",
+			exe, proxyArg(proxy))))
+		return 1
+	}
+
+	fmt.Println(yellow(fmt.Sprintf("发现新版本 %s（当前 %s）", rel.TagName, version.String())))
+	if strings.TrimSpace(rel.Body) != "" {
+		fmt.Println(cyan("更新内容："))
+		for _, line := range strings.Split(rel.Body, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				fmt.Println("  " + line)
+			}
+		}
+		fmt.Println()
+	}
+	fmt.Print("是否安装？[Y/n] ")
+	yes, err := update.Confirm(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if !yes {
+		fmt.Println(green("bye"))
+		return 0
+	}
+	fmt.Println(green("开始安装..."))
+	if err := u.InstallVerbose(asset, func(step string) {
+		fmt.Println(yellow("  " + step))
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", red(err.Error()))
+		return 1
+	}
+	fmt.Println(green(bold(fmt.Sprintf("已更新到 %s，请重启后生效", rel.TagName))))
 	return 0
 }
+
+func proxyArg(proxy string) string {
+	if proxy == "" {
+		return ""
+	}
+	return " --proxy " + proxy
+}
+
+const (
+	ansiRed    = "31"
+	ansiGreen  = "32"
+	ansiYellow = "33"
+	ansiCyan   = "36"
+	ansiBold   = "1"
+)
+
+var colorOn = isTTY(os.Stdout) && os.Getenv("NO_COLOR") == ""
+
+func isTTY(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
+func paint(code, s string) string {
+	if !colorOn {
+		return s
+	}
+	return "\x1b[" + code + "m" + s + "\x1b[0m"
+}
+
+func red(s string) string    { return paint(ansiRed, s) }
+func green(s string) string  { return paint(ansiGreen, s) }
+func yellow(s string) string { return paint(ansiYellow, s) }
+func cyan(s string) string   { return paint(ansiCyan, s) }
+func bold(s string) string   { return paint(ansiBold, s) }
 
 func cmdRun(args []string) int {
 	if len(args) != 1 {
