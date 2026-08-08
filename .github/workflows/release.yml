@@ -130,9 +130,33 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  vsix:
+    name: vscode extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editor/vscode-fly/package-lock.json
+      - name: Package extension
+        working-directory: editor/vscode-fly
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          npm ci
+          mkdir -p ../../dist
+          npx --yes @vscode/vsce package --out ../../dist/fly-lang-${VERSION#v}.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-pkgs
+          path: dist/*.vsix
+          if-no-files-found: error
+
   release:
     name: publish release
-    needs: [linux, macos, windows]
+    needs: [linux, macos, windows, vsix]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -156,4 +180,5 @@ jobs:
             - Linux: .deb（amd64/arm64）、tar.gz
             - macOS: .pkg + .dmg（universal）、tar.gz
             - Windows: .zip（amd64/arm64）、自解压 exe
+            - VSCode 插件：fly-lang-*.vsix（LSP 编译期诊断，v0.2.0+ 要求）
             更新命令：\`fly update\`（支持 --proxy socks5://）"
