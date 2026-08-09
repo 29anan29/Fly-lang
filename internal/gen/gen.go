@@ -5,11 +5,25 @@ import (
 	"strings"
 
 	"flylang/internal/ast"
+	"flylang/internal/runtime"
 )
 
 type Gen struct {
-	buf    bytes.Buffer
-	indent int
+	buf       bytes.Buffer
+	indent    int
+	onlyUsed  bool
+	sealUsed  bool
+	traceUsed bool
+	traceCtx  *traceCtx
+	sealInit  bool
+	nc        int
+}
+
+type traceCtx struct {
+	level string
+	args  bool
+	ret   bool
+	name  string
 }
 
 func Generate(m *ast.Module) string {
@@ -23,16 +37,31 @@ func Generate(m *ast.Module) string {
 		}
 	}
 	guard := needsGuard(m.Stmts)
+	only := needsOnly(m.Stmts)
+	trace := needsTrace(m.Stmts)
 	for i, s := range m.Stmts {
-		if i == docEnd && guard {
+		if i == docEnd && (guard || only || trace) {
 			if docEnd == 1 {
 				g.w("\n")
 			}
-			g.guardPrelude()
+			g.runtimePrelude(guard, only, trace)
 		}
 		g.stmt(s)
 	}
 	return g.buf.String()
+}
+
+func (g *Gen) runtimePrelude(guard, only, trace bool) {
+	for _, n := range []string{"guard", "only", "trace"} {
+		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace)
+		if !need {
+			continue
+		}
+		if sec := runtime.Section(n); sec != "" {
+			g.w(sec)
+			g.w("\n")
+		}
+	}
 }
 
 func needsGuard(stmts []ast.Stmt) bool {
@@ -74,18 +103,77 @@ func needsGuard(stmts []ast.Stmt) bool {
 					return true
 				}
 			}
+		case *ast.OnlyStmt:
+			if needsOnly(t.Body) {
+				return true
+			}
+		case *ast.TraceStmt:
+			if needsTrace(t.Body) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func (g *Gen) guardPrelude() {
-	g.w(`class GuardError(Exception):
-    """Fly guard 断言失败"""
+func needsOnly(stmts []ast.Stmt) bool {
+	for _, s := range stmts {
+		if _, ok := s.(*ast.OnlyStmt); ok {
+			return true
+		}
+		if needStmt(needsOnly, s) {
+			return true
+		}
+	}
+	return false
+}
 
-    pass
+func needsTrace(stmts []ast.Stmt) bool {
+	for _, s := range stmts {
+		if _, ok := s.(*ast.TraceStmt); ok {
+			return true
+		}
+		if needStmt(needsTrace, s) {
+			return true
+		}
+	}
+	return false
+}
 
-`)
+func needStmt(scan func([]ast.Stmt) bool, s ast.Stmt) bool {
+	switch t := s.(type) {
+	case *ast.FuncDef:
+		return scan(t.Body)
+	case *ast.ClassDef:
+		return scan(t.Body)
+	case *ast.IfStmt:
+		if scan(t.Then) || scan(t.Else) {
+			return true
+		}
+		for _, el := range t.Elifs {
+			if scan(el.Body) {
+				return true
+			}
+		}
+	case *ast.ForStmt:
+		return scan(t.Body) || scan(t.Else)
+	case *ast.WhileStmt:
+		return scan(t.Body) || scan(t.Else)
+	case *ast.TryStmt:
+		if scan(t.Body) || scan(t.Else) || scan(t.Finally) {
+			return true
+		}
+		for _, h := range t.Handlers {
+			if scan(h.Body) {
+				return true
+			}
+		}
+	case *ast.OnlyStmt:
+		return scan(t.Body)
+	case *ast.TraceStmt:
+		return scan(t.Body)
+	}
+	return false
 }
 
 func (g *Gen) indentLine() {
@@ -204,22 +292,7 @@ func (g *Gen) stmt(s ast.Stmt) {
 		g.expr(t.X, precLowest)
 		g.w("\n")
 	case *ast.FuncDef:
-		for _, d := range t.Decorators {
-			g.indentLine()
-			g.w("@")
-			g.expr(d, precLowest)
-			g.w("\n")
-		}
-		g.indentLine()
-		g.w("def " + t.Name + "(")
-		g.params(t.Params)
-		g.w(")")
-		if t.ReturnType != nil {
-			g.w(" -> ")
-			g.expr(t.ReturnType, precLowest)
-		}
-		g.w(":")
-		g.suite(t.Body)
+		g.funcDef(t)
 	case *ast.ClassDef:
 		for _, d := range t.Decorators {
 			g.indentLine()
@@ -240,7 +313,15 @@ func (g *Gen) stmt(s ast.Stmt) {
 			g.w(")")
 		}
 		g.w(":")
-		g.suite(t.Body)
+		if t.Seal {
+			g.sealSuite(t)
+		} else {
+			g.suite(t.Body)
+		}
+	case *ast.OnlyStmt:
+		g.onlyStmt(t)
+	case *ast.TraceStmt:
+		g.traceStmt(t)
 	case *ast.IfStmt:
 		g.indentLine()
 		g.w("if ")
@@ -375,6 +456,228 @@ func (g *Gen) params(params []ast.Param) {
 			g.expr(p.Default, precLowest)
 		}
 	}
+}
+
+func (g *Gen) funcDef(t *ast.FuncDef) {
+	for _, d := range t.Decorators {
+		g.indentLine()
+		g.w("@")
+		g.expr(d, precLowest)
+		g.w("\n")
+	}
+	g.indentLine()
+	g.w("def " + t.Name + "(")
+	g.params(t.Params)
+	g.w(")")
+	if t.ReturnType != nil {
+		g.w(" -> ")
+		g.expr(t.ReturnType, precLowest)
+	}
+	g.w(":")
+	if g.sealInit && t.Name == "__init__" {
+		g.w("\n")
+		g.indent++
+		g.indentLine()
+		g.w("object.__setattr__(self, '_fly_seal_initializing', True)\n")
+		for _, s := range t.Body {
+			g.stmt(s)
+		}
+		g.indentLine()
+		g.w("object.__setattr__(self, '_fly_seal_initializing', False)\n")
+		g.indent--
+		return
+	}
+	g.suite(t.Body)
+}
+
+func (g *Gen) sealSuite(t *ast.ClassDef) {
+	if len(t.Body) == 0 {
+		g.w(" pass\n")
+		g.indentLine()
+		g.setattrMethod(false)
+		g.indentLine()
+		g.setattrMethod(true)
+		return
+	}
+	g.w("\n")
+	g.indent++
+	old := g.sealInit
+	g.sealInit = true
+	for _, s := range t.Body {
+		g.stmt(s)
+	}
+	g.sealInit = old
+	g.setattrMethod(false)
+	g.setattrMethod(true)
+	g.indent--
+}
+
+func (g *Gen) setattrMethod(del bool) {
+	m := "setattr"
+	raise := `raise AttributeError("seal 类 %s 的属性 %s 不可修改" % (type(self).__name__, name))`
+	sig := "(self, name, value)"
+	if del {
+		m = "delattr"
+		raise = `raise AttributeError("seal 类 %s 的属性 %s 不可删除" % (type(self).__name__, name))`
+		sig = "(self, name)"
+	}
+	g.indentLine()
+	g.w("def __" + m + "__" + sig + ":\n")
+	g.indent++
+	g.indentLine()
+	g.w(`if getattr(self, "_fly_seal_initializing", False):` + "\n")
+	g.indent++
+	g.indentLine()
+	g.w("object.__" + m + "__" + "(self, name")
+	if !del {
+		g.w(", value")
+	}
+	g.w(")\n")
+	g.indent--
+	g.indentLine()
+	g.w("else:\n")
+	g.indent++
+	g.indentLine()
+	g.w(raise + "\n")
+	g.indent--
+	g.indent--
+}
+
+func (g *Gen) onlyStmt(t *ast.OnlyStmt) {
+	for _, m := range t.Modules {
+		g.indentLine()
+		g.w("import " + m + "\n")
+	}
+	g.nc++
+	saved := "_fly_ob_" + string(rune('a'+g.nc))
+	g.indentLine()
+	g.w(saved + " = globals().get(\"__builtins__\", _fly_builtins)\n")
+	g.indentLine()
+	g.w("__builtins__ = _FlyOnly(" + modsLit(t.Modules) + ")\n")
+	for _, s := range t.Body {
+		g.stmt(s)
+		if f, ok := s.(*ast.FuncDef); ok {
+			g.indentLine()
+			g.w(f.Name + " = _fly_patch_builtins(" + f.Name + ", " + modsLit(t.Modules) + ")\n")
+		}
+	}
+	g.indentLine()
+	g.w("__builtins__ = " + saved + "\n")
+}
+
+func (g *Gen) traceStmt(t *ast.TraceStmt) {
+	level := t.Level
+	if level == "WARN" {
+		level = "WARNING"
+	}
+	for _, s := range t.Body {
+		g.traceBody(s, level, t.Args, t.Ret)
+	}
+}
+
+func (g *Gen) traceBody(s ast.Stmt, level string, args, ret bool) {
+	f, ok := s.(*ast.FuncDef)
+	if !ok {
+		g.stmt(s)
+		return
+	}
+	g.traceFunc(f, level, args, ret)
+}
+
+func (g *Gen) traceFunc(f *ast.FuncDef, level string, args, ret bool) {
+	g.nc++
+	rt := "_fly_ret_" + string(rune('a'+g.nc))
+	er := "_fly_err_" + string(rune('a'+g.nc))
+	for _, d := range f.Decorators {
+		g.indentLine()
+		g.w("@")
+		g.expr(d, precLowest)
+		g.w("\n")
+	}
+	g.indentLine()
+	g.w("def " + f.Name + "(")
+	g.params(f.Params)
+	g.w("):\n")
+	g.indent++
+	g.indentLine()
+	if args {
+		names := make([]string, 0, len(f.Params))
+		for _, p := range f.Params {
+			if p.Name != "" && !p.Star && !p.DblStar {
+				names = append(names, p.Name)
+			}
+		}
+		if len(names) > 0 {
+			msg := "enter " + f.Name
+			for _, n := range names {
+				msg += ", " + n + "=%r"
+			}
+			g.w(`_fly_log.log(_fly_log.` + level + `, "` + msg + `", ` + strings.Join(names, ", ") + ")\n")
+		} else {
+			g.w(`_fly_log.log(_fly_log.` + level + `, "enter ` + f.Name + `")` + "\n")
+		}
+	} else {
+		g.w(`_fly_log.log(_fly_log.` + level + `, "enter ` + f.Name + `")` + "\n")
+	}
+	g.indentLine()
+	g.w("try:\n")
+	g.indent++
+	g.indentLine()
+	g.w(rt + " = _fly_trace_impl_" + f.Name + "(")
+	g.callArgs(f.Params)
+	g.w(")\n")
+	g.indent--
+	g.indentLine()
+	g.w("except BaseException as " + er + ":\n")
+	g.indent++
+	g.indentLine()
+	g.w(`_fly_log.log(_fly_log.` + level + `, "exit ` + f.Name + `: raise %r", ` + er + ")\n")
+	g.indentLine()
+	g.w("raise\n")
+	g.indent--
+	if ret {
+		g.indentLine()
+		g.w(`_fly_log.log(_fly_log.` + level + `, "exit ` + f.Name + `: ret=%r", ` + rt + ")\n")
+	} else {
+		g.indentLine()
+		g.w(`_fly_log.log(_fly_log.` + level + `, "exit ` + f.Name + `")` + "\n")
+	}
+	g.indentLine()
+	g.w("return " + rt + "\n")
+	g.indent--
+	g.indentLine()
+	g.w("def _fly_trace_impl_" + f.Name + "(")
+	g.params(f.Params)
+	g.w("):")
+	g.suite(f.Body)
+}
+
+func (g *Gen) callArgs(params []ast.Param) {
+	first := true
+	for _, p := range params {
+		if p.Name == "" {
+			continue
+		}
+		if !first {
+			g.w(", ")
+		}
+		first = false
+		if p.Star {
+			g.w("*")
+		}
+		if p.DblStar {
+			g.w("**")
+		}
+		g.w(p.Name)
+	}
+}
+
+func modsLit(mods []string) string {
+	q := make([]string, len(mods))
+	for i, m := range mods {
+		q[i] = "'" + m + "'"
+	}
+	return "(" + strings.Join(q, ", ") + ")"
 }
 
 func (g *Gen) suite(body []ast.Stmt) {

@@ -17,6 +17,7 @@ type Symbol struct {
 	Pos   ast.Position
 	Anno  ast.Expr
 	Taint Taint
+	Seal  bool
 }
 
 type Scope struct {

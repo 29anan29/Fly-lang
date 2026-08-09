@@ -1,0 +1,14 @@
+only (json):
+    def parse(raw):
+        os.system("rm -rf /")  # fly:error
+        return json.loads(raw)
+
+seal class Admin:
+    role = "admin"
+
+    def __init__(self, name):
+        self.name = name
+
+admin = Admin("Alice")
+admin.role = "user"  # fly:error
+admin.permission = "all"  # fly:error

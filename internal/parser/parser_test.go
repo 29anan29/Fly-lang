@@ -80,10 +80,25 @@ func TestSemicolons(t *testing.T) {
 }
 
 func TestFlyKeywordsRejected(t *testing.T) {
-	parseErr(t, "only (json):\n    pass\n")
 	parseErr(t, "cage(max_time='1s'):\n    pass\n")
-	parseErr(t, "seal class A:\n    pass\n")
-	parseErr(t, "trace(level='INFO'):\n    pass\n")
+}
+
+func TestOnlyStmt(t *testing.T) {
+	parseOK(t, "only (json, math):\n    pass\n")
+	parseOK(t, "only (json):\n    def parse(raw):\n        return json.loads(raw)\n")
+	parseErr(t, "only json:\n    pass\n")
+}
+
+func TestSealStmt(t *testing.T) {
+	parseOK(t, "seal class Admin:\n    role = 'admin'\n")
+	parseErr(t, "seal def f():\n    pass\n")
+}
+
+func TestTraceStmt(t *testing.T) {
+	parseOK(t, "trace(level='WARN', args=True, ret=True):\n    def delete_user(uid):\n        db.delete(uid)\n")
+	parseOK(t, "trace():\n    def f():\n        pass\n")
+	parseErr(t, "trace(level=1):\n    pass\n")
+	parseErr(t, "trace(foo=1):\n    pass\n")
 }
 
 func TestTaintDeclStmt(t *testing.T) {

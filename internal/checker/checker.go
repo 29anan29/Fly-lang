@@ -67,6 +67,14 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 		for _, n := range t.Names {
 			c.cur.Define(n, &Symbol{Kind: KVar, Pos: t.Pos_})
 		}
+	case *ast.OnlyStmt:
+		for _, st := range t.Body {
+			c.collectStmt(st)
+		}
+	case *ast.TraceStmt:
+		for _, st := range t.Body {
+			c.collectStmt(st)
+		}
 	case *ast.FuncDef:
 		c.cur.Define(t.Name, &Symbol{Kind: KFunc, Pos: t.Pos_})
 		fn := NewScope(c.cur)
@@ -82,7 +90,7 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 		}
 		c.cur = old
 	case *ast.ClassDef:
-		c.cur.Define(t.Name, &Symbol{Kind: KClass, Pos: t.Pos_})
+		c.cur.Define(t.Name, &Symbol{Kind: KClass, Pos: t.Pos_, Seal: t.Seal})
 		cl := NewScope(c.cur)
 		old := c.cur
 		c.cur = cl
@@ -192,6 +200,9 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 		}
 		for _, l := range t.Left {
 			c.defineTarget(l)
+		}
+		c.markSealInstances(t.Left, t.Right)
+		for _, l := range t.Left {
 			c.propagateTaint(l, rt)
 		}
 	case *ast.DeleteStmt:
@@ -201,6 +212,7 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 					c.errorf(pos, "lock 变量 %s 不可删除", n.Name)
 				}
 			}
+			c.checkSealInstanceAssign(tg)
 		}
 	case *ast.FuncDef:
 		c.checkFunc(t)
@@ -208,10 +220,17 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 		cl := NewScope(c.cur)
 		old := c.cur
 		c.cur = cl
+		if s, ok := c.cur.Lookup(t.Name); ok {
+			s.Seal = t.Seal
+		}
 		for _, st := range t.Body {
 			c.checkStmt(st)
 		}
 		c.cur = old
+	case *ast.OnlyStmt:
+		c.checkOnly(t)
+	case *ast.TraceStmt:
+		c.checkTrace(t)
 	case *ast.IfStmt:
 		c.exprTaint(t.Cond)
 		for _, st := range t.Then {
@@ -352,6 +371,7 @@ func (c *Checker) checkTarget(e ast.Expr) {
 		}
 	case *ast.AttrExpr:
 		c.exprTaint(t.X)
+		c.checkSealInstanceAssign(e)
 	}
 }
 

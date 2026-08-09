@@ -143,18 +143,18 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 验收：文档示例 1（safe）与 4（mask）的注释行全部编译报错，正文行全部通过。
 
-### P3 注入型关键字（only / seal / trace）
+### P3 注入型关键字（only / seal / trace）✅ 完成
 
 **目标**：代码生成开始"改写"——白名单块、类冻结、审计日志。
 
 任务：
-1. `only (mods):` 块：解析白名单、块内名字/import 比对（os/subprocess/eval 等→报错）；gen 重写块内 import + 注入 `__builtins__` 白名单代理
-2. `seal class`：收集类属性；gen 在类体注入 `__setattr__`/`__delattr__`（非 `__init__` 阶段增删改抛错）；实例属性赋值（`admin.role = "user"`）编译期可静态识别则直接报错
-3. `trace(level=, args=, ret=)`：函数入口/出口插入 logging 调用（参数与返回值）
-4. 反例：only 块内 `os.system` 报错、seal 类实例赋值报错；正例：合法模块调用通过
-5. fly_runtime.py 起步：GuardError 等异常类型
+1. `only (mods):` 块：解析白名单、块内名字/import 比对（os/subprocess/eval 等→报错）；gen 重写块内 import + 注入 `__builtins__` 白名单代理 ✅（checker/only.go 黑名单 + gen `_FlyOnly` 代理 + `_fly_patch_builtins` 函数包装）
+2. `seal class`：收集类属性；gen 在类体注入 `__setattr__`/`__delattr__`（非 `__init__` 阶段增删改抛错）；实例属性赋值（`admin.role = "user"`）编译期可静态识别则直接报错 ✅（checker 静态拦截 + 运行时 `_fly_seal_initializing` 门控）
+3. `trace(level=, args=, ret=)`：函数入口/出口插入 logging 调用（参数与返回值）✅（gen 包装函数 + `_fly_trace_impl_` 原函数保留）
+4. 反例：only 块内 `os.system` 报错、seal 类实例赋值报错；正例：合法模块调用通过 ✅（testdata/errors/only_seal.fly、testdata/golden/p3.fly）
+5. fly_runtime.py 起步：GuardError 等异常类型 ✅（internal/runtime/fly_runtime.py go:embed，按 `# fly:section:` 标记提取注入 guard/only/trace 三节）
 
-验收：文档示例 2/7/8 的注释行全部报错；生成的 .py 结构正确且 Python 3.10 语法合法。
+验收：文档示例 2/7/8 的注释行全部报错；生成的 .py 结构正确且 Python 3.10 语法合法。✅
 
 ### P4 资源约束（cage + runtime 库）
 

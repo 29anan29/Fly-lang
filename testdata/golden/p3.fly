@@ -1,0 +1,18 @@
+only (json):
+    def parse(raw):
+        return json.loads(raw)
+
+seal class Admin:
+    role = "admin"
+
+    def __init__(self, name):
+        self.name = name
+
+admin = Admin("Alice")
+print(parse('{"x": 9}'), admin.name)
+
+trace(level="INFO", args=True, ret=True):
+    def twice(uid):
+        return uid * 2
+
+print(twice(3))

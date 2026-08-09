@@ -88,7 +88,7 @@ func (p *Parser) statement() ast.Stmt {
 	case lexer.DEF:
 		return p.funcDef(nil)
 	case lexer.CLASS:
-		return p.classDef(nil)
+		return p.classDef(nil, false)
 	case lexer.IF:
 		return p.ifStmt()
 	case lexer.FOR:
@@ -162,7 +162,13 @@ func (p *Parser) statement() ast.Stmt {
 		return p.guardStmt()
 	case lexer.SAFE, lexer.MASK:
 		return p.taintDeclStmt(p.tok.Type == lexer.SAFE)
-	case lexer.ONLY, lexer.CAGE, lexer.SEAL, lexer.TRACE:
+	case lexer.ONLY:
+		return p.onlyStmt()
+	case lexer.SEAL:
+		return p.sealStmt()
+	case lexer.TRACE:
+		return p.traceStmt()
+	case lexer.CAGE:
 		p.errorf(p.tok.Pos, "关键字 %s 将在后续阶段支持", p.tok.Lit)
 		return nil
 	default:
@@ -411,11 +417,88 @@ func (p *Parser) params() []ast.Param {
 	return params
 }
 
-func (p *Parser) classDef(decorators []ast.Expr) ast.Stmt {
+func (p *Parser) onlyStmt() ast.Stmt {
+	pos := p.tok.Pos
+	p.next()
+	s := &ast.OnlyStmt{Pos_: pos}
+	p.expect(lexer.LPAREN)
+	for p.tok.Type != lexer.RPAREN {
+		s.Modules = append(s.Modules, p.expect(lexer.IDENT).Lit)
+		if p.tok.Type != lexer.COMMA {
+			break
+		}
+		p.next()
+	}
+	p.expect(lexer.RPAREN)
+	s.Body = p.suite()
+	return s
+}
+
+func (p *Parser) sealStmt() ast.Stmt {
+	p.next()
+	if p.tok.Type != lexer.CLASS {
+		p.errorf(p.tok.Pos, "seal 后必须跟随 class 定义")
+		return nil
+	}
+	return p.classDef(nil, true)
+}
+
+func (p *Parser) traceStmt() ast.Stmt {
+	pos := p.tok.Pos
+	p.next()
+	s := &ast.TraceStmt{Pos_: pos, Level: "WARNING", Args: true, Ret: true}
+	p.expect(lexer.LPAREN)
+	for p.tok.Type != lexer.RPAREN {
+		name := p.expect(lexer.IDENT).Lit
+		p.expect(lexer.ASSIGN)
+		switch name {
+		case "level":
+			if p.tok.Type != lexer.STRING {
+				p.errorf(p.tok.Pos, "level 必须是字符串（如 \"WARN\"）")
+				return nil
+			}
+			s.Level = unquoteStr(p.tok.Lit)
+			p.next()
+		case "args":
+			if p.tok.Type != lexer.TRUE && p.tok.Type != lexer.FALSE {
+				p.errorf(p.tok.Pos, "args 必须是 True 或 False")
+				return nil
+			}
+			s.Args = p.tok.Type == lexer.TRUE
+			p.next()
+		case "ret":
+			if p.tok.Type != lexer.TRUE && p.tok.Type != lexer.FALSE {
+				p.errorf(p.tok.Pos, "ret 必须是 True 或 False")
+				return nil
+			}
+			s.Ret = p.tok.Type == lexer.TRUE
+			p.next()
+		default:
+			p.errorf(p.tok.Pos, "trace 参数 %s 未知（支持 level/args/ret）", name)
+			return nil
+		}
+		if p.tok.Type != lexer.COMMA {
+			break
+		}
+		p.next()
+	}
+	p.expect(lexer.RPAREN)
+	s.Body = p.suite()
+	return s
+}
+
+func unquoteStr(s string) string {
+	if len(s) >= 2 && (s[0] == '"' || s[0] == '\'') && s[len(s)-1] == s[0] {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+func (p *Parser) classDef(decorators []ast.Expr, seal bool) ast.Stmt {
 	pos := p.tok.Pos
 	p.next()
 	name := p.expect(lexer.IDENT)
-	c := &ast.ClassDef{Pos_: pos, Name: name.Lit, Decorators: decorators}
+	c := &ast.ClassDef{Pos_: pos, Name: name.Lit, Decorators: decorators, Seal: seal}
 	if p.tok.Type == lexer.LPAREN {
 		p.next()
 		if p.tok.Type != lexer.RPAREN {
@@ -598,7 +681,7 @@ func (p *Parser) decoratedStmt() ast.Stmt {
 	case lexer.DEF:
 		return p.funcDef(decs)
 	case lexer.CLASS:
-		return p.classDef(decs)
+		return p.classDef(decs, false)
 	}
 	p.errorf(p.tok.Pos, "装饰器后必须跟随 def 或 class")
 	return nil

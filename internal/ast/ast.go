@@ -108,10 +108,31 @@ type ClassDef struct {
 	Bases      []Expr
 	Body       []Stmt
 	Decorators []Expr
+	Seal       bool
 }
 
 func (s *ClassDef) Pos() Position { return s.Pos_ }
 func (*ClassDef) stmtNode()       {}
+
+type OnlyStmt struct {
+	Pos_    Position
+	Modules []string
+	Body    []Stmt
+}
+
+func (s *OnlyStmt) Pos() Position { return s.Pos_ }
+func (*OnlyStmt) stmtNode()       {}
+
+type TraceStmt struct {
+	Pos_  Position
+	Level string
+	Args  bool
+	Ret   bool
+	Body  []Stmt
+}
+
+func (s *TraceStmt) Pos() Position { return s.Pos_ }
+func (*TraceStmt) stmtNode()       {}
 
 type ElifClause struct {
 	Pos_ Position
