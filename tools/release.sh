@@ -1,18 +1,46 @@
 #!/usr/bin/env bash
 # Fly-Lang 一键发布：打 tag → 推远程 → 触发 CI → 可选轮询等待 Release 发布
-# 用法:
-#   tools/release.sh 0.3.0          # 正式版 → v0.3.0，发 release
-#   tools/release.sh 0.3.0-dev      # dev 版 → v0.3.0-dev，发 prerelease
-#   tools/release.sh 0.3.0 --wait   # 推送后轮询 Actions 结果（最多 10 分钟）
+# 用法（版本号自动按最新正式版 patch+1，如 v0.2.0 → v0.2.1）:
+#   tools/release.sh            # 自动发正式版（0.2.0 → v0.2.1，release）
+#   tools/release.sh dev        # 自动发 dev 版（0.2.0 → v0.2.1-dev，prerelease）
+#   tools/release.sh 0.2.1      # 显式版本发正式版 → v0.2.1
+#   tools/release.sh 0.2.1-dev  # 显式版本发 dev 版 → v0.2.1-dev
+# 任意模式加 --wait 轮询等待发布完成（最多 10 分钟）
 set -euo pipefail
 
-VER="${1:?用法: release.sh <版本> [--wait]，如 release.sh 0.3.0 或 0.3.0-dev}"
+ARG1="${1:-}"
 WAIT=0
-if [ "${2:-}" = "--wait" ]; then
+if [ "$ARG1" = "--wait" ] || [ "${2:-}" = "--wait" ]; then
 	WAIT=1
 fi
-TAG="v${VER#v}"
+[ "$ARG1" = "--wait" ] && ARG1=""
 REPO="29anan29/Fly-lang"
+
+case "$ARG1" in
+	"" | dev | release)
+		LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+		BASE=${LATEST#v}
+		if [[ "$BASE" != [0-9]*.[0-9]*.[0-9]* ]]; then
+			echo "无法从最新 Release 解析版本号（latest=$LATEST）"; exit 1
+		fi
+		MAJ=${BASE%%.*}
+		REST=${BASE#*.}
+		MIN=${REST%%.*}
+		PAT=${REST#*.}
+		PAT=$((PAT + 1))
+		VER="$MAJ.$MIN.$PAT"
+		if [ "$ARG1" = "dev" ]; then
+			VER="$VER-dev"
+			echo "最新正式版 $LATEST → 自动生成 dev 版 $VER"
+		else
+			echo "最新正式版 $LATEST → 自动生成正式版 v$VER"
+		fi
+		;;
+	*)
+		VER="$ARG1"
+		;;
+esac
+TAG="v${VER#v}"
 case "$TAG" in
 	v[0-9]*.[0-9]*.[0-9]*-dev*) ;;
 	v[0-9]*.[0-9]*.[0-9]*) ;;
@@ -55,3 +83,4 @@ if [ "$WAIT" = 1 ]; then
 	done
 	echo "等待超时（10 分钟），请到 Actions 查看结果"; exit 1
 fi
+
