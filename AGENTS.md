@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Fly-Lang 是用 Go 实现的 Python 安全超集转译器。核心文件是 Plan.md（实现方案）和 方案.md（语言设计）。
+Fly-Lang 是用 Go 实现的 Python 安全超集转译器。核心文件是 Plan.md（实现方案）、方案.md（语言设计）、docs/长期规划.md（L0-L5 生态路线，含自举体系）、docs/Rust迁移方案.md（R0-R5 迁移）。
 
 ## 构建与测试命令
 

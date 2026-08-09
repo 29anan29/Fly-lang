@@ -191,6 +191,7 @@ internal/update/   自更新 + SOCKS5 代理
 tools/icon/        图标生成器
 assets/            logo.svg + icon.png
 editor/vscode-fly/ VSCode 插件
+docs/              长期规划（L0-L5 生态路线）、Rust 迁移方案
 example/            示例：Web 版（http.server）与 PyQt6 桌面版 FlyToDos 复刻
 testdata/          正反例测试文件
 ```
