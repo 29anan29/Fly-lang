@@ -26,8 +26,16 @@ push_tag() {
 
 case "$ARG1" in
 	"" | dev | release)
-		LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+		if [ "$ARG1" = "dev" ]; then
+			LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases?per_page=100" | tr -d ' \n' | grep -o '"tag_name":"v[0-9]*\.[0-9]*\.[0-9]*-dev"[^}]*"prerelease":true' | grep -o 'v[0-9]*\.[0-9]*\.[0-9]*-dev' | head -1)
+			[ -z "$LATEST" ] && LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+			KIND="dev"
+		else
+			LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+			KIND="正式版"
+		fi
 		BASE=${LATEST#v}
+		[ "$KIND" = "dev" ] && BASE=${BASE%-dev}
 		if [[ "$BASE" != [0-9]*.[0-9]*.[0-9]* ]]; then
 			echo "无法从最新 Release 解析版本号（latest=$LATEST）"; exit 1
 		fi
@@ -37,9 +45,9 @@ case "$ARG1" in
 		PAT=${REST#*.}
 		PAT=$((PAT + 1))
 		VER="$MAJ.$MIN.$PAT"
-		if [ "$ARG1" = "dev" ]; then
+		if [ "$KIND" = "dev" ]; then
 			VER="$VER-dev"
-			echo "最新正式版 $LATEST → 自动生成 dev 版 $VER"
+			echo "最新 dev 版 $LATEST → 自动生成 dev 版 $VER"
 		else
 			echo "最新正式版 $LATEST → 自动生成正式版 v$VER"
 		fi
