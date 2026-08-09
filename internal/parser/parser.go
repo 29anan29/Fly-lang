@@ -9,9 +9,10 @@ import (
 )
 
 type Parser struct {
-	lex *lexer.Lexer
-	tok lexer.Token
-	err *ast.Diagnostic
+	lex    *lexer.Lexer
+	tok    lexer.Token
+	peeked *lexer.Token
+	err    *ast.Diagnostic
 }
 
 func New(src string) *Parser {
@@ -21,7 +22,21 @@ func New(src string) *Parser {
 }
 
 func (p *Parser) next() {
+	if p.peeked != nil {
+		p.tok = *p.peeked
+		p.peeked = nil
+		return
+	}
 	p.tok = p.lex.Next()
+}
+
+func (p *Parser) peek() lexer.Token {
+	if p.peeked != nil {
+		return *p.peeked
+	}
+	t := p.lex.Next()
+	p.peeked = &t
+	return t
 }
 
 func (p *Parser) errorf(pos ast.Position, format string, args ...interface{}) {
@@ -141,7 +156,11 @@ func (p *Parser) statement() ast.Stmt {
 	case lexer.ASSERT, lexer.WITH, lexer.YIELD, lexer.GLOBAL, lexer.NONLOCAL, lexer.LAMBDA, lexer.ASYNC, lexer.AWAIT:
 		p.errorf(p.tok.Pos, "关键字 %s 暂不支持", p.tok.Lit)
 		return nil
-	case lexer.SAFE, lexer.ONLY, lexer.LOCK, lexer.MASK, lexer.CAGE, lexer.GUARD, lexer.SEAL, lexer.TRACE:
+	case lexer.LOCK:
+		return p.lockStmt()
+	case lexer.GUARD:
+		return p.guardStmt()
+	case lexer.SAFE, lexer.ONLY, lexer.MASK, lexer.CAGE, lexer.SEAL, lexer.TRACE:
 		p.errorf(p.tok.Pos, "关键字 %s 将在后续阶段支持", p.tok.Lit)
 		return nil
 	default:
@@ -256,6 +275,53 @@ func (p *Parser) posOf(e ast.Expr) ast.Position {
 		return p.tok.Pos
 	}
 	return e.Pos()
+}
+
+func (p *Parser) lockStmt() ast.Stmt {
+	pos := p.tok.Pos
+	p.next()
+	s := &ast.LockStmt{Pos_: pos}
+	if p.tok.Type == lexer.IDENT {
+		s.Name = p.tok.Lit
+		p.next()
+	}
+	if p.tok.Type == lexer.ASSIGN {
+		p.next()
+		s.Value = p.parseTestList()
+		if s.Name == "" {
+			p.errorf(pos, "lock 需要一个变量名")
+		}
+	} else if s.Name == "" {
+		p.errorf(pos, "lock 需要一个变量名")
+	}
+	p.stmtEnd()
+	return s
+}
+
+func (p *Parser) guardStmt() ast.Stmt {
+	pos := p.tok.Pos
+	p.next()
+	s := &ast.GuardStmt{Pos_: pos}
+	if p.tok.Type == lexer.IDENT && p.peek().Type == lexer.COLON {
+		s.Name = p.tok.Lit
+		p.next()
+		p.next()
+		s.Type = p.parseTest()
+		for p.tok.Type == lexer.COMMA {
+			p.next()
+			s.Conds = append(s.Conds, p.parseTest())
+		}
+		p.stmtEnd()
+		return s
+	}
+	exprs := p.parseTestList()
+	if tup, ok := exprs.(*ast.TupleLit); ok {
+		s.Conds = tup.Elems
+	} else {
+		s.Conds = []ast.Expr{exprs}
+	}
+	p.stmtEnd()
+	return s
 }
 
 func (p *Parser) funcDef(decorators []ast.Expr) ast.Stmt {

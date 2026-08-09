@@ -208,4 +208,8 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 ## 里程碑（与阶段对应）
 
-P0 基础设施 → P1 lock/guard → P2 safe/mask → P3 only/seal/trace → P4 cage+runtime → P5 VSCode 插件 → P5.5 发布生态 → P6 打磨
+P0 基础设施 ✅ → P1 lock/guard ✅ → P2 safe/mask → P3 only/seal/trace → P4 cage+runtime → P5 VSCode 插件 → P5.5 发布生态 → P6 打磨
+
+### 当前进度
+
+- P1（已完成）：`internal/checker/`（symbol.go 作用域符号表 + lock.go 冻结常量拦截 + guard.go 条件验证）、parser 支持 `lock`/`guard` 语法（含 `guard x > 0` 纯条件形式）、gen 展开 guard 为 `if not (...): raise GuardError(...)` 并注入 `GuardError` 类、错误聚合上限 20 条、LSP 诊断同步；golden（lock/guard）+ 9 个 errors 反例 + checker 单测全绿

@@ -1,0 +1,2 @@
+def f():
+    guard age: int, 0 < age < 150

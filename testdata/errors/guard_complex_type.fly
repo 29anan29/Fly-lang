@@ -1,0 +1,2 @@
+def f(age):
+    guard age: list[int]

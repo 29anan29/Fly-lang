@@ -1,0 +1,2 @@
+def f(age):
+    guard age: int, 0 < age < limit

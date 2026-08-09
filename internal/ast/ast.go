@@ -29,6 +29,25 @@ type FromImportStmt struct {
 func (s *FromImportStmt) Pos() Position { return s.Pos_ }
 func (*FromImportStmt) stmtNode()       {}
 
+type LockStmt struct {
+	Pos_  Position
+	Name  string
+	Value Expr
+}
+
+func (s *LockStmt) Pos() Position { return s.Pos_ }
+func (*LockStmt) stmtNode()       {}
+
+type GuardStmt struct {
+	Pos_  Position
+	Name  string
+	Type  Expr
+	Conds []Expr
+}
+
+func (s *GuardStmt) Pos() Position { return s.Pos_ }
+func (*GuardStmt) stmtNode()       {}
+
 type AssignStmt struct {
 	Pos_  Position
 	Left  []Expr

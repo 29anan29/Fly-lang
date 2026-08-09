@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"flylang/internal/ast"
+	"flylang/internal/checker"
 	"flylang/internal/gen"
 	"flylang/internal/parser"
 )
@@ -28,16 +29,19 @@ func ParseFile(path string) (*ast.Module, []ast.Diagnostic) {
 	if d := p.Error(); d != nil {
 		return nil, []ast.Diagnostic{*d}
 	}
+	if errs := checker.Check(m); len(errs) > 0 {
+		return nil, errs
+	}
 	return m, nil
 }
 
 func CheckSource(src string) []ast.Diagnostic {
 	p := parser.New(src)
-	p.ParseModule()
+	m := p.ParseModule()
 	if d := p.Error(); d != nil {
 		return []ast.Diagnostic{*d}
 	}
-	return nil
+	return checker.Check(m)
 }
 
 func CheckFile(path string) ([]ast.Diagnostic, error) {

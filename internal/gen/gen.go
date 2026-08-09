@@ -14,14 +14,113 @@ type Gen struct {
 
 func Generate(m *ast.Module) string {
 	g := &Gen{}
-	for _, s := range m.Stmts {
+	docEnd := 0
+	if len(m.Stmts) > 0 {
+		if es, ok := m.Stmts[0].(*ast.ExprStmt); ok {
+			if _, ok := es.X.(*ast.StringLit); ok {
+				docEnd = 1
+			}
+		}
+	}
+	guard := needsGuard(m.Stmts)
+	for i, s := range m.Stmts {
+		if i == docEnd && guard {
+			if docEnd == 1 {
+				g.w("\n")
+			}
+			g.guardPrelude()
+		}
 		g.stmt(s)
 	}
 	return g.buf.String()
 }
 
+func needsGuard(stmts []ast.Stmt) bool {
+	for _, s := range stmts {
+		switch t := s.(type) {
+		case *ast.GuardStmt:
+			return true
+		case *ast.FuncDef:
+			if needsGuard(t.Body) {
+				return true
+			}
+		case *ast.ClassDef:
+			if needsGuard(t.Body) {
+				return true
+			}
+		case *ast.IfStmt:
+			if needsGuard(t.Then) || needsGuard(t.Else) {
+				return true
+			}
+			for _, el := range t.Elifs {
+				if needsGuard(el.Body) {
+					return true
+				}
+			}
+		case *ast.ForStmt:
+			if needsGuard(t.Body) || needsGuard(t.Else) {
+				return true
+			}
+		case *ast.WhileStmt:
+			if needsGuard(t.Body) || needsGuard(t.Else) {
+				return true
+			}
+		case *ast.TryStmt:
+			if needsGuard(t.Body) || needsGuard(t.Else) || needsGuard(t.Finally) {
+				return true
+			}
+			for _, h := range t.Handlers {
+				if needsGuard(h.Body) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (g *Gen) guardPrelude() {
+	g.w(`class GuardError(Exception):
+    """Fly guard 断言失败"""
+
+    pass
+
+`)
+}
+
 func (g *Gen) indentLine() {
 	g.buf.WriteString(strings.Repeat("    ", g.indent))
+}
+
+func (g *Gen) render(e ast.Expr) string {
+	if e == nil {
+		return ""
+	}
+	sub := &Gen{}
+	sub.expr(e, precLowest)
+	return strings.TrimSpace(sub.buf.String())
+}
+
+func (g *Gen) guardMsg(t *ast.GuardStmt) string {
+	var sb strings.Builder
+	sb.WriteString("guard")
+	parts := 0
+	if t.Name != "" {
+		sb.WriteString(" " + t.Name)
+		parts++
+	}
+	if t.Type != nil {
+		sb.WriteString(": " + g.render(t.Type))
+		parts++
+	}
+	for _, cond := range t.Conds {
+		if parts > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(" " + g.render(cond))
+		parts++
+	}
+	return sb.String()
 }
 
 func (g *Gen) w(s string) {
@@ -67,6 +166,38 @@ func (g *Gen) stmt(s ast.Stmt) {
 		g.w(" " + t.Op + " ")
 		g.expr(t.Right, precLowest)
 		g.w("\n")
+	case *ast.LockStmt:
+		if t.Value != nil {
+			g.indentLine()
+			g.w(t.Name)
+			g.w(" = ")
+			g.expr(t.Value, precLowest)
+			g.w("\n")
+		}
+	case *ast.GuardStmt:
+		g.indentLine()
+		g.w("if not (")
+		first := true
+		if t.Name != "" && t.Type != nil {
+			g.w("isinstance(" + t.Name + ", ")
+			g.expr(t.Type, precLowest)
+			g.w(")")
+			first = false
+		}
+		for _, cond := range t.Conds {
+			if !first {
+				g.w(" and ")
+			}
+			g.w("(")
+			g.expr(cond, precLowest)
+			g.w(")")
+			first = false
+		}
+		g.w("):\n")
+		g.indent++
+		g.indentLine()
+		g.w(`raise GuardError("` + g.guardMsg(t) + `")` + "\n")
+		g.indent--
 	case *ast.ExprStmt:
 		g.indentLine()
 		g.expr(t.X, precLowest)

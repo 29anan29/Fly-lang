@@ -1,0 +1,14 @@
+"""Fly 安全输入验证示例。"""
+
+def create_user(username, age):
+    guard username: str, len(username) > 0, len(username) <= 20
+    guard age: int, 0 < age < 150
+    return username + str(age)
+
+def ratio(b):
+    guard b != 0
+    return 1 / b
+
+def is_admin(flag):
+    guard flag
+    return flag

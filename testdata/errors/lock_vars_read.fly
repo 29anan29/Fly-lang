@@ -1,0 +1,2 @@
+lock SECRET = "abc"
+x = vars()['SECRET']

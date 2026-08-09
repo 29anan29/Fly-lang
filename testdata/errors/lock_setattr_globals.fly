@@ -1,0 +1,2 @@
+lock SECRET = "abc"
+setattr(globals(), 'SECRET', 'new')

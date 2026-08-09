@@ -1,0 +1,8 @@
+lock SECRET_KEY = "abc-123"
+x = 42
+lock x
+
+def read():
+    return SECRET_KEY + str(x)
+
+print(read())
