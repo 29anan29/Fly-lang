@@ -110,3 +110,59 @@ func TestErrorAggregationCap(t *testing.T) {
 		t.Fatalf("期望错误数 = %d，实际 %d", maxErrs, len(msgs))
 	}
 }
+
+func TestSafeTaint(t *testing.T) {
+	wantErr(t, "safe uid\neval(uid)\n", "未净化的外部输入 uid 流入 eval")
+	wantErr(t, "safe uid\nexec(uid)\n", "未净化的外部输入 uid 流入 exec")
+	wantErr(t, "safe uid\nos.system(uid)\n", "未净化的外部输入 uid 流入 os.system")
+	wantErr(t, "safe cmd\nsubprocess.run(cmd)\n", "未净化的外部输入 cmd 流入 subprocess.run")
+	wantErr(t, "safe sql\ncursor.execute(sql)\n", "未净化的外部输入 sql 流入 execute")
+	wantErr(t, "safe q\ndb.execute(q)\n", "未净化的外部输入 q 流入 execute")
+}
+
+func TestSafeSanitize(t *testing.T) {
+	noErr(t, "safe uid\nclean = int(uid)\neval(clean)\n")
+	noErr(t, "safe uid\nclean = float(uid)\nreturn clean\n")
+	noErr(t, "uid = request.args.get('id')\nsafe uid\nclean = int(uid)\ndb.query(clean)\n")
+}
+
+func TestSafeFlow(t *testing.T) {
+	wantErr(t, "safe uid\na = uid\nb = a\neval(b)\n", "未净化的外部输入")
+	wantErr(t, "safe uid\na = [uid]\nb = a[0]\neval(b)\n", "未净化的外部输入")
+	wantErr(t, "safe x\ns = x + 'y'\neval(s)\n", "未净化的外部输入")
+}
+
+func TestMaskTaint(t *testing.T) {
+	wantErr(t, "mask pw\nprint(pw)\n", "敏感数据 pw 不可流入 print")
+	wantErr(t, "def login(password):\n    mask password\n    print(password)\n", "敏感数据 password 不可流入 print")
+	wantErr(t, "mask token\nlogging.info(token)\n", "敏感数据 token 不可流入 logging")
+	wantErr(t, "mask pw\nlogging.error('bad %s', pw)\n", "敏感数据 pw 不可流入 logging")
+}
+
+func TestMaskAllowed(t *testing.T) {
+	noErr(t, "def login(password):\n    mask password\n    hashed = hash(password)\n    return hashed\n")
+	noErr(t, "def login(password):\n    mask password\n    if password == 'secret':\n        return True\n    return False\n")
+	noErr(t, "def login(password):\n    mask password\n    return len(password) > 8\n")
+}
+
+func TestMaskFlow(t *testing.T) {
+	wantErr(t, "mask pw\nmsg = 'pw: ' + pw\nprint(msg)\n", "敏感数据")
+	wantErr(t, "def login(pw):\n    mask pw\n    user = pw\n    print(user)\n", "敏感数据")
+}
+
+func TestFStringMask(t *testing.T) {
+	wantErr(t, "mask pw\nprint(f'密码: {pw}')\n", "敏感数据 pw 不可流入 print")
+	wantErr(t, "def login(password):\n    mask password\n    print(f'密码: {password}')\n", "敏感数据 password 不可流入 print")
+	noErr(t, "def f(n):\n    print(f'count: {n}')\n")
+}
+
+func TestFunctionReturnTaint(t *testing.T) {
+	wantErr(t, "def get_input():\n    safe uid\n    return uid\neval(get_input())\n", "未净化的外部输入")
+	noErr(t, "def get_input():\n    safe uid\n    return int(uid)\neval(get_input())\n")
+}
+
+func TestTaintSourceInput(t *testing.T) {
+	wantErr(t, "x = input()\neval(x)\n", "未净化的外部输入")
+	noErr(t, "x = input()\nx = int(x)\neval(x)\n")
+	wantErr(t, "s = os.environ['HOME']\neval(s)\n", "未净化的外部输入")
+}

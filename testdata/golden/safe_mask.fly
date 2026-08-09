@@ -1,0 +1,9 @@
+def login(password):
+    mask password
+    hashed = hash(password)
+    return hashed
+
+def handle():
+    safe uid
+    clean = int(uid)
+    return db.query(clean)

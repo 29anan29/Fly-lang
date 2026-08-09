@@ -80,12 +80,19 @@ func TestSemicolons(t *testing.T) {
 }
 
 func TestFlyKeywordsRejected(t *testing.T) {
-	parseErr(t, "safe x\n")
 	parseErr(t, "only (json):\n    pass\n")
-	parseErr(t, "mask pw\n")
 	parseErr(t, "cage(max_time='1s'):\n    pass\n")
 	parseErr(t, "seal class A:\n    pass\n")
 	parseErr(t, "trace(level='INFO'):\n    pass\n")
+}
+
+func TestTaintDeclStmt(t *testing.T) {
+	parseOK(t, "safe uid\n")
+	parseOK(t, "safe uid, name\n")
+	parseOK(t, "def f():\n    mask password\n")
+	parseOK(t, "mask token, key\n")
+	parseErr(t, "safe 123\n")
+	parseErr(t, "mask\n")
 }
 
 func TestLockStmt(t *testing.T) {

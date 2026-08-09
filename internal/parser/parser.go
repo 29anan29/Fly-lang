@@ -160,7 +160,9 @@ func (p *Parser) statement() ast.Stmt {
 		return p.lockStmt()
 	case lexer.GUARD:
 		return p.guardStmt()
-	case lexer.SAFE, lexer.ONLY, lexer.MASK, lexer.CAGE, lexer.SEAL, lexer.TRACE:
+	case lexer.SAFE, lexer.MASK:
+		return p.taintDeclStmt(p.tok.Type == lexer.SAFE)
+	case lexer.ONLY, lexer.CAGE, lexer.SEAL, lexer.TRACE:
 		p.errorf(p.tok.Pos, "关键字 %s 将在后续阶段支持", p.tok.Lit)
 		return nil
 	default:
@@ -293,6 +295,33 @@ func (p *Parser) lockStmt() ast.Stmt {
 		}
 	} else if s.Name == "" {
 		p.errorf(pos, "lock 需要一个变量名")
+	}
+	p.stmtEnd()
+	return s
+}
+
+func (p *Parser) taintDeclStmt(safe bool) ast.Stmt {
+	pos := p.tok.Pos
+	p.next()
+	if safe {
+		s := &ast.SafeStmt{Pos_: pos}
+		for {
+			s.Names = append(s.Names, p.expect(lexer.IDENT).Lit)
+			if p.tok.Type != lexer.COMMA {
+				break
+			}
+			p.next()
+		}
+		p.stmtEnd()
+		return s
+	}
+	s := &ast.MaskStmt{Pos_: pos}
+	for {
+		s.Names = append(s.Names, p.expect(lexer.IDENT).Lit)
+		if p.tok.Type != lexer.COMMA {
+			break
+		}
+		p.next()
 	}
 	p.stmtEnd()
 	return s

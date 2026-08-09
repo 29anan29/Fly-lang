@@ -13,9 +13,10 @@ const (
 )
 
 type Symbol struct {
-	Kind Kind
-	Pos  ast.Position
-	Anno ast.Expr
+	Kind  Kind
+	Pos   ast.Position
+	Anno  ast.Expr
+	Taint Taint
 }
 
 type Scope struct {

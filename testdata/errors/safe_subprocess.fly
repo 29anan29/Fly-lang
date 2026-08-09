@@ -1,0 +1,2 @@
+safe cmd
+subprocess.run(cmd)

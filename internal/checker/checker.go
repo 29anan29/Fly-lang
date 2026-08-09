@@ -12,6 +12,7 @@ type Checker struct {
 	global *Scope
 	cur    *Scope
 	locked map[string]ast.Position
+	fnSym  *Symbol
 	errs   []ast.Diagnostic
 }
 
@@ -57,6 +58,14 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 	case *ast.LockStmt:
 		if t.Value != nil {
 			c.cur.Define(t.Name, &Symbol{Kind: KVar, Pos: t.Pos_})
+		}
+	case *ast.SafeStmt:
+		for _, n := range t.Names {
+			c.cur.Define(n, &Symbol{Kind: KVar, Pos: t.Pos_})
+		}
+	case *ast.MaskStmt:
+		for _, n := range t.Names {
+			c.cur.Define(n, &Symbol{Kind: KVar, Pos: t.Pos_})
 		}
 	case *ast.FuncDef:
 		c.cur.Define(t.Name, &Symbol{Kind: KFunc, Pos: t.Pos_})
@@ -163,14 +172,28 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 		c.checkLock(t)
 	case *ast.GuardStmt:
 		c.checkGuard(t)
+	case *ast.SafeStmt:
+		c.checkTaintDecl(t.Names, true)
+	case *ast.MaskStmt:
+		c.checkTaintDecl(t.Names, false)
 	case *ast.AssignStmt:
 		for _, l := range t.Left {
 			c.checkTarget(l)
 		}
+		rt, _ := c.exprTaint(t.Right)
+		if t.Op != "=" {
+			for _, l := range t.Left {
+				if n, ok := l.(*ast.Name); ok {
+					if sym, ok := c.cur.Lookup(n.Name); ok {
+						rt = rt.union(sym.Taint)
+					}
+				}
+			}
+		}
 		for _, l := range t.Left {
 			c.defineTarget(l)
+			c.propagateTaint(l, rt)
 		}
-		c.walkExpr(t.Right)
 	case *ast.DeleteStmt:
 		for _, tg := range t.Targets {
 			if n, ok := tg.(*ast.Name); ok {
@@ -190,12 +213,12 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 		}
 		c.cur = old
 	case *ast.IfStmt:
-		c.walkExpr(t.Cond)
+		c.exprTaint(t.Cond)
 		for _, st := range t.Then {
 			c.checkStmt(st)
 		}
 		for _, el := range t.Elifs {
-			c.walkExpr(el.Cond)
+			c.exprTaint(el.Cond)
 			for _, st := range el.Body {
 				c.checkStmt(st)
 			}
@@ -204,7 +227,7 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 			c.checkStmt(st)
 		}
 	case *ast.ForStmt:
-		c.walkExpr(t.Iter)
+		c.exprTaint(t.Iter)
 		c.checkTarget(t.Target)
 		c.defineTarget(t.Target)
 		for _, st := range t.Body {
@@ -214,7 +237,7 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 			c.checkStmt(st)
 		}
 	case *ast.WhileStmt:
-		c.walkExpr(t.Cond)
+		c.exprTaint(t.Cond)
 		for _, st := range t.Body {
 			c.checkStmt(st)
 		}
@@ -226,7 +249,7 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 			c.checkStmt(st)
 		}
 		for _, h := range t.Handlers {
-			c.walkExpr(h.Type)
+			c.exprTaint(h.Type)
 			if h.Name != "" {
 				c.cur.Define(h.Name, &Symbol{Kind: KVar, Pos: h.Pos_})
 			}
@@ -241,19 +264,60 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 			c.checkStmt(st)
 		}
 	case *ast.ReturnStmt:
-		c.walkExpr(t.Value)
+		rt, _ := c.exprTaint(t.Value)
+		if c.fnSym != nil {
+			c.fnSym.Taint = c.fnSym.Taint.union(rt)
+		}
 	case *ast.RaiseStmt:
-		c.walkExpr(t.Exc)
-		c.walkExpr(t.From)
+		c.exprTaint(t.Exc)
+		c.exprTaint(t.From)
 	case *ast.ExprStmt:
-		c.walkExpr(t.X)
+		c.exprTaint(t.X)
+	}
+}
+
+func (c *Checker) propagateTaint(l ast.Expr, rt Taint) {
+	switch n := l.(type) {
+	case *ast.Name:
+		if sym, ok := c.cur.Lookup(n.Name); ok {
+			sym.Taint = rt
+		}
+	case *ast.TupleLit:
+		for _, el := range n.Elems {
+			c.propagateTaint(el, rt)
+		}
+	case *ast.ListLit:
+		for _, el := range n.Elems {
+			c.propagateTaint(el, rt)
+		}
+	case *ast.AttrExpr:
+		c.taintObject(n.X, rt)
+	case *ast.SubscriptExpr:
+		c.taintObject(n.X, rt)
+	}
+}
+
+func (c *Checker) taintObject(e ast.Expr, rt Taint) {
+	if n, ok := e.(*ast.Name); ok {
+		if sym, ok := c.cur.Lookup(n.Name); ok {
+			sym.Taint = sym.Taint.union(rt)
+		}
 	}
 }
 
 func (c *Checker) checkFunc(t *ast.FuncDef) {
 	fn := NewScope(c.cur)
 	old := c.cur
+	oldFn := c.fnSym
 	c.cur = fn
+	var fnSym *Symbol
+	if s, ok := c.cur.Lookup(t.Name); ok {
+		fnSym = s
+	} else {
+		fnSym = &Symbol{Kind: KFunc, Pos: t.Pos_}
+		c.cur.Define(t.Name, fnSym)
+	}
+	c.fnSym = fnSym
 	for _, p := range t.Params {
 		if p.Name != "" {
 			fn.Define(p.Name, &Symbol{Kind: KParam, Pos: t.Pos_, Anno: p.Anno})
@@ -262,6 +326,7 @@ func (c *Checker) checkFunc(t *ast.FuncDef) {
 	for _, st := range t.Body {
 		c.checkStmt(st)
 	}
+	c.fnSym = oldFn
 	c.cur = old
 }
 
@@ -280,85 +345,13 @@ func (c *Checker) checkTarget(e ast.Expr) {
 			c.checkTarget(el)
 		}
 	case *ast.SubscriptExpr:
-		c.walkExpr(t.X)
-		c.walkExpr(t.Index)
+		c.exprTaint(t.X)
+		c.exprTaint(t.Index)
 		if name := c.reflectReadName(t); name != "" {
 			c.errorf(c.locked[name], "lock 变量 %s 不可通过反射修改", name)
 		}
 	case *ast.AttrExpr:
-		c.walkExpr(t.X)
-	}
-}
-
-func (c *Checker) walkExpr(e ast.Expr) {
-	switch t := e.(type) {
-	case *ast.Name, *ast.IntLit, *ast.FloatLit, *ast.StringLit, *ast.EllipsisLit:
-	case *ast.ListLit:
-		for _, el := range t.Elems {
-			c.walkExpr(el)
-		}
-	case *ast.TupleLit:
-		for _, el := range t.Elems {
-			c.walkExpr(el)
-		}
-	case *ast.DictLit:
-		for i := range t.Keys {
-			c.walkExpr(t.Keys[i])
-			c.walkExpr(t.Vals[i])
-		}
-	case *ast.SetLit:
-		for _, el := range t.Elems {
-			c.walkExpr(el)
-		}
-	case *ast.CallExpr:
-		c.walkExpr(t.Func)
-		for _, a := range t.Args {
-			c.walkExpr(a)
-		}
-		c.walkExpr(t.Star)
-		c.walkExpr(t.DblStar)
-		for _, kw := range t.Kwargs {
-			c.walkExpr(kw.Value)
-		}
-		c.checkReflectCall(t)
-	case *ast.AttrExpr:
-		c.walkExpr(t.X)
-	case *ast.SubscriptExpr:
-		c.walkExpr(t.X)
-		c.walkExpr(t.Index)
-		if name := c.reflectReadName(t); name != "" {
-			c.errorf(c.locked[name], "lock 变量 %s 不可通过 %s() 反射读取", name, reflectCallName(t.X))
-		}
-	case *ast.SliceExpr:
-		c.walkExpr(t.Lo)
-		c.walkExpr(t.Hi)
-		c.walkExpr(t.Step)
-	case *ast.BinOpExpr:
-		c.walkExpr(t.X)
-		c.walkExpr(t.Y)
-	case *ast.UnaryOpExpr:
-		c.walkExpr(t.X)
-	case *ast.BoolOpExpr:
-		c.walkExpr(t.X)
-		c.walkExpr(t.Y)
-	case *ast.CompareExpr:
-		c.walkExpr(t.X)
-		for _, y := range t.Ys {
-			c.walkExpr(y)
-		}
-	case *ast.CondExpr:
-		c.walkExpr(t.Cond)
-		c.walkExpr(t.Then)
-		c.walkExpr(t.Else)
-	case *ast.ListComp:
-		c.walkExpr(t.Elem)
-		for _, cl := range t.Clauses {
-			c.walkExpr(cl.Target)
-			c.walkExpr(cl.Iter)
-			for _, f := range cl.Ifs {
-				c.walkExpr(f)
-			}
-		}
+		c.exprTaint(t.X)
 	}
 }
 

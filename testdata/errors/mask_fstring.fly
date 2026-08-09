@@ -1,0 +1,2 @@
+mask pw
+print(f'密码: {pw}')

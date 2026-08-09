@@ -174,6 +174,7 @@ func (g *Gen) stmt(s ast.Stmt) {
 			g.expr(t.Value, precLowest)
 			g.w("\n")
 		}
+	case *ast.SafeStmt, *ast.MaskStmt:
 	case *ast.GuardStmt:
 		g.indentLine()
 		g.w("if not (")

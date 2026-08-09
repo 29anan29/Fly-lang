@@ -38,6 +38,22 @@ type LockStmt struct {
 func (s *LockStmt) Pos() Position { return s.Pos_ }
 func (*LockStmt) stmtNode()       {}
 
+type SafeStmt struct {
+	Pos_  Position
+	Names []string
+}
+
+func (s *SafeStmt) Pos() Position { return s.Pos_ }
+func (*SafeStmt) stmtNode()       {}
+
+type MaskStmt struct {
+	Pos_  Position
+	Names []string
+}
+
+func (s *MaskStmt) Pos() Position { return s.Pos_ }
+func (*MaskStmt) stmtNode()       {}
+
 type GuardStmt struct {
 	Pos_  Position
 	Name  string

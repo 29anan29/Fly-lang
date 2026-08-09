@@ -1,0 +1,2 @@
+safe cmd
+os.system(cmd)
