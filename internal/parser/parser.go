@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"flylang/internal/ast"
@@ -169,8 +170,7 @@ func (p *Parser) statement() ast.Stmt {
 	case lexer.TRACE:
 		return p.traceStmt()
 	case lexer.CAGE:
-		p.errorf(p.tok.Pos, "关键字 %s 将在后续阶段支持", p.tok.Lit)
-		return nil
+		return p.cageStmt()
 	default:
 		return p.simpleStmt()
 	}
@@ -492,6 +492,119 @@ func unquoteStr(s string) string {
 		return s[1 : len(s)-1]
 	}
 	return s
+}
+
+func (p *Parser) cageStmt() ast.Stmt {
+	pos := p.tok.Pos
+	p.next()
+	s := &ast.CageStmt{Pos_: pos}
+	p.expect(lexer.LPAREN)
+	for p.tok.Type != lexer.RPAREN {
+		name := p.expect(lexer.IDENT).Lit
+		p.expect(lexer.ASSIGN)
+		if p.tok.Type != lexer.STRING {
+			p.errorf(p.tok.Pos, "cage 参数 %s 必须是字符串（如 max_time=\"5s\"）", name)
+			return nil
+		}
+		val := unquoteStr(p.tok.Lit)
+		p.next()
+		switch name {
+		case "max_time":
+			secs, ok := parseTimeSpec(val)
+			if !ok {
+				p.errorf(p.tok.Pos, "max_time 格式非法：%q（支持 500ms/5s/2m/1h）", val)
+				return nil
+			}
+			s.HasTime = true
+			s.MaxTime = secs
+		case "max_memory":
+			bytes, ok := parseMemSpec(val)
+			if !ok {
+				p.errorf(p.tok.Pos, "max_memory 格式非法：%q（支持 64KB/100MB/2GB）", val)
+				return nil
+			}
+			s.HasMem = true
+			s.MaxMemory = bytes
+		default:
+			p.errorf(p.tok.Pos, "cage 参数 %s 未知（支持 max_time/max_memory）", name)
+			return nil
+		}
+		if p.tok.Type != lexer.COMMA {
+			break
+		}
+		p.next()
+	}
+	p.expect(lexer.RPAREN)
+	if !s.HasTime && !s.HasMem {
+		p.errorf(pos, "cage 需至少指定 max_time 或 max_memory 之一")
+		return nil
+	}
+	s.Body = p.suite()
+	return s
+}
+
+func parseTimeSpec(v string) (float64, bool) {
+	i := 0
+	for i < len(v) && (v[i] >= '0' && v[i] <= '9' || v[i] == '.') {
+		i++
+	}
+	if i == 0 {
+		return 0, false
+	}
+	num, err := strconv.ParseFloat(v[:i], 64)
+	if err != nil {
+		return 0, false
+	}
+	var mult float64
+	switch v[i:] {
+	case "":
+		mult = 1
+	case "ms":
+		mult = 0.001
+	case "s":
+		mult = 1
+	case "m":
+		mult = 60
+	case "h":
+		mult = 3600
+	default:
+		return 0, false
+	}
+	secs := num * mult
+	if secs <= 0 {
+		return 0, false
+	}
+	return secs, true
+}
+
+func parseMemSpec(v string) (int64, bool) {
+	i := 0
+	for i < len(v) && v[i] >= '0' && v[i] <= '9' {
+		i++
+	}
+	if i == 0 {
+		return 0, false
+	}
+	num, err := strconv.ParseInt(v[:i], 10, 64)
+	if err != nil || num <= 0 {
+		return 0, false
+	}
+	var mult int64
+	switch v[i:] {
+	case "":
+		mult = 1
+	case "B":
+		mult = 1
+	case "KB", "KiB":
+		mult = 1 << 10
+	case "MB", "MiB":
+		mult = 1 << 20
+	case "GB", "GiB":
+		mult = 1 << 30
+	default:
+		return 0, false
+	}
+	return num * mult, true
 }
 
 func (p *Parser) classDef(decorators []ast.Expr, seal bool) ast.Stmt {

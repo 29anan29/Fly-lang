@@ -79,8 +79,15 @@ func TestSemicolons(t *testing.T) {
 	parseOK(t, "a = 1;\n")
 }
 
-func TestFlyKeywordsRejected(t *testing.T) {
-	parseErr(t, "cage(max_time='1s'):\n    pass\n")
+func TestCageStmt(t *testing.T) {
+	parseOK(t, "cage(max_time='5s', max_memory='100MB'):\n    def heavy():\n        pass\n")
+	parseOK(t, "cage(max_memory='50MB'):\n    def f():\n        pass\n")
+	parseOK(t, "cage(max_time='500ms'):\n    def f():\n        pass\n")
+	parseOK(t, "cage(max_time='2m', max_memory='1GB'):\n    def f():\n        pass\n")
+	parseErr(t, "cage(max_time='5x'):\n    pass\n")
+	parseErr(t, "cage(foo=1):\n    pass\n")
+	parseErr(t, "cage():\n    pass\n")
+	parseErr(t, "cage(max_memory='-1MB'):\n    pass\n")
 }
 
 func TestOnlyStmt(t *testing.T) {

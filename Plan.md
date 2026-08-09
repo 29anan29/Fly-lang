@@ -156,17 +156,17 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 验收：文档示例 2/7/8 的注释行全部报错；生成的 .py 结构正确且 Python 3.10 语法合法。✅
 
-### P4 资源约束（cage + runtime 库）
+### P4 资源约束（cage + runtime 库）✅ 完成
 
 **目标**：运行时防御闭环，`cage` 限制时间/内存并抛规范异常。
 
 任务：
-1. `cage(max_time=, max_memory=):` 解析参数（"5s"/"100MB" 单位换算）
-2. gen 包装：装饰器生成（`signal.SIGALRM` 超时 + `resource.setrlimit` 限内存 + 清理恢复）
-3. fly_runtime.py 完善：`TimeoutError`/`ResourceExhaustedError` 包装、资源恢复逻辑
-4. 行为测试：`while True` 超时抛错、大数组分配抛 ResourceExhaustedError（python3 实跑）
+1. `cage(max_time=, max_memory=):` 解析参数（"5s"/"100MB" 单位换算）✅（parser 解析 max_time: ms/s/m/h、max_memory: B/KB/MB/GB(+iB)，运行前换算为秒/字节）
+2. gen 包装：装饰器生成（`signal.SIGALRM` 超时 + `resource.setrlimit` 限内存 + 清理恢复）✅（`@_fly_cage(...)` 装饰器注入 cage 块内函数；setitimer 计时 + RLIMIT_AS 软限压降，finally 恢复）
+3. fly_runtime.py 完善：`TimeoutError`/`ResourceExhaustedError` 包装、资源恢复逻辑 ✅（cage 节：`_fly_cage` 装饰器 + `ResourceExhaustedError` + `_fly_timeout_handler`；MemoryError→ResourceExhaustedError 转换；只降软限避免无权限硬限恢复失败）
+4. 行为测试：`while True` 超时抛错、大数组分配抛 ResourceExhaustedError（python3 实跑）✅（testdata/p4_cage.fly 双场景触发 + 嵌套 cage/重复调用/正常快路径验证）
 
-验收：文档示例 5 转译后实跑，超时与超内存两种场景均触发并抛对应异常。
+验收：文档示例 5 转译后实跑，超时与超内存两种场景均触发并抛对应异常。✅
 
 ### P5 VSCode 插件（已升级为 LSP 版）
 

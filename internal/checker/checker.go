@@ -75,6 +75,10 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 		for _, st := range t.Body {
 			c.collectStmt(st)
 		}
+	case *ast.CageStmt:
+		for _, st := range t.Body {
+			c.collectStmt(st)
+		}
 	case *ast.FuncDef:
 		c.cur.Define(t.Name, &Symbol{Kind: KFunc, Pos: t.Pos_})
 		fn := NewScope(c.cur)
@@ -231,6 +235,10 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 		c.checkOnly(t)
 	case *ast.TraceStmt:
 		c.checkTrace(t)
+	case *ast.CageStmt:
+		for _, st := range t.Body {
+			c.checkStmt(st)
+		}
 	case *ast.IfStmt:
 		c.exprTaint(t.Cond)
 		for _, st := range t.Then {

@@ -1,0 +1,23 @@
+"""方案.md P4 验收：示例 5 cage 超时/超内存"""
+
+import time
+
+cage(max_time="2s", max_memory="50MB"):
+    def heavy():
+        data = [0] * 100_000_000  # 超内存则抛 ResourceExhaustedError
+        return len(data)
+
+    def busy():
+        while True:
+            time.sleep(0.01)  # 超时则抛 TimeoutError
+
+try:
+    print(heavy())
+except ResourceExhaustedError as e:
+    print("MEM-OK:", e)
+try:
+    busy()
+except TimeoutError as e:
+    print("TIME-OK:", e)
+
+print("done")

@@ -134,6 +134,18 @@ type TraceStmt struct {
 func (s *TraceStmt) Pos() Position { return s.Pos_ }
 func (*TraceStmt) stmtNode()       {}
 
+type CageStmt struct {
+	Pos_      Position
+	HasTime   bool
+	MaxTime   float64
+	HasMem    bool
+	MaxMemory int64
+	Body      []Stmt
+}
+
+func (s *CageStmt) Pos() Position { return s.Pos_ }
+func (*CageStmt) stmtNode()       {}
+
 type ElifClause struct {
 	Pos_ Position
 	Cond Expr

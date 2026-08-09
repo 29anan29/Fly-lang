@@ -2,6 +2,7 @@ package gen
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 
 	"flylang/internal/ast"
@@ -39,21 +40,22 @@ func Generate(m *ast.Module) string {
 	guard := needsGuard(m.Stmts)
 	only := needsOnly(m.Stmts)
 	trace := needsTrace(m.Stmts)
+	cage := needsCage(m.Stmts)
 	for i, s := range m.Stmts {
-		if i == docEnd && (guard || only || trace) {
+		if i == docEnd && (guard || only || trace || cage) {
 			if docEnd == 1 {
 				g.w("\n")
 			}
-			g.runtimePrelude(guard, only, trace)
+			g.runtimePrelude(guard, only, trace, cage)
 		}
 		g.stmt(s)
 	}
 	return g.buf.String()
 }
 
-func (g *Gen) runtimePrelude(guard, only, trace bool) {
-	for _, n := range []string{"guard", "only", "trace"} {
-		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace)
+func (g *Gen) runtimePrelude(guard, only, trace, cage bool) {
+	for _, n := range []string{"guard", "only", "trace", "cage"} {
+		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace) || (n == "cage" && cage)
 		if !need {
 			continue
 		}
@@ -140,6 +142,18 @@ func needsTrace(stmts []ast.Stmt) bool {
 	return false
 }
 
+func needsCage(stmts []ast.Stmt) bool {
+	for _, s := range stmts {
+		if _, ok := s.(*ast.CageStmt); ok {
+			return true
+		}
+		if needStmt(needsCage, s) {
+			return true
+		}
+	}
+	return false
+}
+
 func needStmt(scan func([]ast.Stmt) bool, s ast.Stmt) bool {
 	switch t := s.(type) {
 	case *ast.FuncDef:
@@ -171,6 +185,8 @@ func needStmt(scan func([]ast.Stmt) bool, s ast.Stmt) bool {
 	case *ast.OnlyStmt:
 		return scan(t.Body)
 	case *ast.TraceStmt:
+		return scan(t.Body)
+	case *ast.CageStmt:
 		return scan(t.Body)
 	}
 	return false
@@ -322,6 +338,8 @@ func (g *Gen) stmt(s ast.Stmt) {
 		g.onlyStmt(t)
 	case *ast.TraceStmt:
 		g.traceStmt(t)
+	case *ast.CageStmt:
+		g.cageStmt(t)
 	case *ast.IfStmt:
 		g.indentLine()
 		g.w("if ")
@@ -563,6 +581,23 @@ func (g *Gen) onlyStmt(t *ast.OnlyStmt) {
 	}
 	g.indentLine()
 	g.w("__builtins__ = " + saved + "\n")
+}
+
+func (g *Gen) cageStmt(t *ast.CageStmt) {
+	args := []string{}
+	if t.HasTime {
+		args = append(args, strconv.FormatFloat(t.MaxTime, 'f', -1, 64))
+	}
+	if t.HasMem {
+		args = append(args, strconv.FormatInt(t.MaxMemory, 10))
+	}
+	for _, s := range t.Body {
+		if _, ok := s.(*ast.FuncDef); ok {
+			g.indentLine()
+			g.w("@_fly_cage(" + strings.Join(args, ", ") + ")\n")
+		}
+		g.stmt(s)
+	}
 }
 
 func (g *Gen) traceStmt(t *ast.TraceStmt) {

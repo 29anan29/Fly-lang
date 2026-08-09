@@ -1,0 +1,16 @@
+import time
+
+cage(max_time="2s", max_memory="50MB"):
+    def heavy():
+        data = [0] * 100_000_000
+        return len(data)
+
+    def busy():
+        while True:
+            time.sleep(0.01)
+
+cage(max_time="500ms"):
+    def quick():
+        return 1
+
+print("cage-ready")
