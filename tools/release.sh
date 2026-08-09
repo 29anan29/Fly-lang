@@ -15,6 +15,14 @@ if [ "$ARG1" = "--wait" ] || [ "${2:-}" = "--wait" ]; then
 fi
 [ "$ARG1" = "--wait" ] && ARG1=""
 REPO="29anan29/Fly-lang"
+PUSH_URL="origin"
+if [ -n "${GH_TOKEN:-}" ]; then
+	PUSH_URL="https://x-access-token:${GH_TOKEN}@github.com/$REPO.git"
+fi
+
+push_tag() {
+	git push "$PUSH_URL" "$TAG"
+}
 
 case "$ARG1" in
 	"" | dev | release)
@@ -56,10 +64,10 @@ if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
 	echo "tag $TAG 已在远程，复用"
 else
 	if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-		git push origin "$TAG"
+		push_tag
 	else
 		git tag "$TAG"
-		git push origin "$TAG"
+		push_tag
 	fi
 	echo "tag $TAG 已推送，CI 已触发"
 fi
