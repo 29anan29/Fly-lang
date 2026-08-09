@@ -68,13 +68,14 @@ fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 build 选项：
 
 ```
--o <out.py>   指定输出文件（默认与源文件同名 .py）
+-o <out.py>   指定输出文件（默认输出到根目录 build/，保留相对路径）
 ```
 
 示例：
 
 ```bash
-./fly build testdata/golden/hello.fly -o out.py
+./fly build testdata/golden/hello.fly    # 输出到 build/testdata/golden/hello.py（保留相对路径）
+./fly build testdata/golden/hello.fly -o out.py   # 或指定输出
 python3 out.py
 ./fly check app.fly
 ./fly run testdata/golden/basic.fly

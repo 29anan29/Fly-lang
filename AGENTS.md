@@ -7,7 +7,7 @@ Fly-Lang 是用 Go 实现的 Python 安全超集转译器。核心文件是 Plan
 - 构建 CLI：`go build -o fly ./cmd/fly`
 - 测试：`go test ./...`
 - 静态检查：`go vet ./...`
-- 手动验证：`./fly build testdata/xxx.fly`（可加 `-o out.py`，用 `python3 out.py` 实跑行为测试）
+- 手动验证：`./fly build testdata/xxx.fly`（默认输出到根目录 `build/` 并保留相对路径；可加 `-o out.py` 指定，用 `python3` 实跑行为测试）
 - VSCode 插件编译：`cd editor/vscode-fly && npm run compile`（改 src/ 后必须重编译）
 
 ## 架构概览

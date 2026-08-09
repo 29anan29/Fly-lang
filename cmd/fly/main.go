@@ -36,7 +36,7 @@ const usage = `Fly-Lang 编译器
   fly update [选项]             检查/更新到最新版本
 
 build 选项:
-  -o <out.py>   指定输出文件（默认与源文件同名 .py）
+  -o <out.py>   指定输出文件（默认输出到 build/ 目录，保留相对路径）
 
 update 选项:
   --check       仅检查新版本（有新版退出码 2）
@@ -131,8 +131,11 @@ func cmdBuild(args []string) int {
 		return 1
 	}
 	if out == "" {
-		base := strings.TrimSuffix(filepath.Base(file), ".fly")
-		out = filepath.Join(filepath.Dir(file), base+".py")
+		out = defaultOutPath(file)
+	}
+	if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "error: 创建目录 %s 失败: %v\n", filepath.Dir(out), err)
+		return 1
 	}
 	if err := os.WriteFile(out, []byte(code), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "error: 写入 %s 失败: %v\n", out, err)
@@ -140,6 +143,23 @@ func cmdBuild(args []string) int {
 	}
 	fmt.Printf("ok: %s -> %s\n", file, out)
 	return 0
+}
+
+func defaultOutPath(file string) string {
+	rel := ""
+	if filepath.IsAbs(file) {
+		if cwd, err := os.Getwd(); err == nil {
+			if r, err := filepath.Rel(cwd, file); err == nil && !strings.HasPrefix(r, "..") {
+				rel = r
+			}
+		}
+	} else {
+		rel = file
+	}
+	if rel == "" {
+		rel = filepath.Base(file)
+	}
+	return filepath.Join("build", strings.TrimSuffix(rel, filepath.Ext(rel))+".py")
 }
 
 func cmdUpdate(args []string) int {
