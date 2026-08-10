@@ -35,7 +35,7 @@ case "$ARG1" in
 			KIND="正式版"
 		fi
 		BASE=${LATEST#v}
-		[ "$KIND" = "dev" ] && BASE=${BASE%-dev}
+		BASE=${BASE%-dev}
 		if [[ "$BASE" != [0-9]*.[0-9]*.[0-9]* ]]; then
 			echo "无法从最新 Release 解析版本号（latest=$LATEST）"; exit 1
 		fi
