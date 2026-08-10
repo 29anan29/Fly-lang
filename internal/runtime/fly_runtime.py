@@ -32,6 +32,8 @@ class _FlyOnly:
     def __getattr__(self, name):
         if name.startswith("__") and name.endswith("__"):
             return getattr(_fly_builtins, name)
+        if name.startswith("_fly_") or name in ("FlyRuntimeError", "GuardError"):
+            return globals()[name]
         if name in self._mods:
             if name in _fly_sys.modules:
                 return _fly_sys.modules[name]
@@ -107,3 +109,104 @@ def _fly_cage(max_time=None, max_memory=None):
         return wrapped
 
     return deco
+
+# fly:section:runtime
+import operator as _fly_op
+
+
+class FlyRuntimeError(RuntimeError):
+    """Fly 运行时兜底：动态错误统一携带源码行列号"""
+
+    pass
+
+
+_FLY_SAFE_ERRORS = (
+    ZeroDivisionError, TypeError, OverflowError, IndexError,
+    KeyError, AttributeError, ValueError,
+)
+
+
+def _fly_loc(line, col):
+    return "src:%d:%d" % (line, col)
+
+
+def _fly_binop(a, b, op, line, col):
+    try:
+        return getattr(_fly_op, op)(a, b)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 运算 %s 失败: %s" % (_fly_loc(line, col), op, e)
+        ) from None
+
+
+def _fly_unary(x, op, line, col):
+    try:
+        return getattr(_fly_op, op)(x)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 运算 %s 失败: %s" % (_fly_loc(line, col), op, e)
+        ) from None
+
+
+def _fly_get(x, k, line, col):
+    try:
+        return x[k]
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 下标访问失败: %s" % (_fly_loc(line, col), e)
+        ) from None
+
+
+def _fly_set(x, k, v, line, col):
+    try:
+        x[k] = v
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 下标赋值失败: %s" % (_fly_loc(line, col), e)
+        ) from None
+
+
+def _fly_attr(x, name, line, col):
+    try:
+        return getattr(x, name)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 属性访问 %s 失败: %s" % (_fly_loc(line, col), name, e)
+        ) from None
+
+
+def _fly_setattr(x, name, v, line, col):
+    try:
+        setattr(x, name, v)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 属性赋值 %s 失败: %s" % (_fly_loc(line, col), name, e)
+        ) from None
+
+
+def _fly_cmp(a, b, op, line, col):
+    x, y = a(), b()
+    try:
+        return getattr(_fly_op, op)(x, y)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 比较失败: %s" % (_fly_loc(line, col), e)
+        ) from None
+
+
+def _fly_iter(x, line, col):
+    try:
+        return iter(x)
+    except TypeError as e:
+        raise FlyRuntimeError(
+            "%s: 不可迭代: %s" % (_fly_loc(line, col), e)
+        ) from None
+
+
+def _fly_cast(fn, *args, line, col):
+    try:
+        return fn(*args)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 类型转换失败: %s" % (_fly_loc(line, col), e)
+        ) from None

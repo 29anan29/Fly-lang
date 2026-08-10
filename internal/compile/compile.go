@@ -44,6 +44,18 @@ func CheckSource(src string) []ast.Diagnostic {
 	return checker.Check(m)
 }
 
+func BuildSource(src string) (string, []ast.Diagnostic, error) {
+	p := parser.New(src)
+	m := p.ParseModule()
+	if d := p.Error(); d != nil {
+		return "", []ast.Diagnostic{*d}, nil
+	}
+	if errs := checker.Check(m); len(errs) > 0 {
+		return "", errs, nil
+	}
+	return gen.Generate(m), nil, nil
+}
+
 func CheckFile(path string) ([]ast.Diagnostic, error) {
 	_, errs := ParseFile(path)
 	if len(errs) > 0 {

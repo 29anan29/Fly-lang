@@ -208,9 +208,27 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 里程碑：P0-P6 全部完成，发布 v0.3.0（正式版 release 渠道）。
 
+### P7 编译期完备检查（check 通过 = 无原生运行时崩溃）✅ 完成
+
+编辑器 check 优化 + 编译前检查强化，两阶段保证：
+
+1. **静态检查扩展**（checker/runtime.go）：
+   - 未定义名称：模块级顺序敏感（引用须先赋值/import），函数体宽松（参数+局部+外层+内置）
+   - 本地函数参数个数：不足/过多/未知关键字/重复传值
+   - 常量除零：`/`、`//`、`%` 字面量 0
+   - 重复定义：同作用域函数/类/import 撞名、参数重复
+   - 字面量类型操作：二元运算/一元/下标/in 的类型兼容表
+2. **运行时兜底**（gen 注入 `_fly_*` 护栏 + FlyRuntimeError）：
+   - `_fly_binop`（含除零）/`_fly_unary`/`_fly_get`/`_fly_set`/`_fly_attr`/`_fly_setattr`/`_fly_cmp`/`_fly_iter`/`_fly_cast`（int/float）
+   - 动态错误统一 `FlyRuntimeError: src:行:列: 描述`，不再裸抛 Python 异常
+   - only 代理放行 `_fly_` 前缀 + FlyRuntimeError/GuardError
+3. 编辑器同步：LSP 与 `fly check` 同一 CheckSource 管线，新检查自动生效；`fly build` 编译前检查本就同管线
+
+验收：新增 undefined_name/dup_def/literal_type/arg_count 反例 + 快照；golden 全量（含转译注入回归）；TestRuntimeCatch 实跑验证 5 类动态错误全部转 FlyRuntimeError；`go test ./... && go vet ./...` 全绿。
+
 ## 里程碑（与阶段对应）
 
-P0 基础设施 ✅ → P1 lock/guard ✅ → P2 safe/mask ✅ → P3 only/seal/trace → P4 cage+runtime → P5 VSCode 插件 → P5.5 发布生态 → P6 打磨
+P0 基础设施 ✅ → P1 lock/guard ✅ → P2 safe/mask ✅ → P3 only/seal/trace → P4 cage+runtime → P5 VSCode 插件 → P5.5 发布生态 → P6 打磨 → P7 编译期完备检查
 
 ### 当前进度
 

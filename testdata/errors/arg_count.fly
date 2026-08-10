@@ -1,0 +1,15 @@
+"""参数个数不匹配（本地函数）"""
+
+
+def two(a, b):
+    return a + b
+
+
+def one(a, b=1):
+    return a
+
+
+x1 = two(1)
+x2 = two(1, 2, 3)
+x3 = two(1, 2, c=3)
+x4 = one(1, a=2)

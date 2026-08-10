@@ -2,6 +2,7 @@ package compile
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -50,6 +51,57 @@ func TestErrors(t *testing.T) {
 			}
 			if len(errs) == 0 {
 				t.Errorf("%s 期望编译报错，实际通过", f)
+			}
+		})
+	}
+}
+
+// TestRuntimeGuard 验证 gen 注入的运行时兜底：通过 check 的代码，动态错误
+// 以 FlyRuntimeError（携带源码行列号）统一抛出，而非裸 Python 异常。
+func TestRuntimeGuard(t *testing.T) {
+	src := `d = {}
+k = "missing"
+print(d[k])
+`
+	errs := CheckSource(src)
+	if len(errs) > 0 {
+		t.Fatalf("期望 check 通过: %v", errs)
+	}
+	code, errs, err := BuildSource(src)
+	if len(errs) > 0 || err != nil {
+		t.Fatalf("期望 build 通过: %v %v", errs, err)
+	}
+	if !strings.Contains(code, "_fly_get(d") {
+		t.Fatalf("期望注入 _fly_get 兜底:\n%s", code)
+	}
+}
+
+// TestRuntimeCatch 转译后实跑，验证动态错误转 FlyRuntimeError 且带行列号。
+func TestRuntimeCatch(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 不可用")
+	}
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"divzero", "x = 0\nprint(1 / x)\n", "FlyRuntimeError: src:2:9: 运算 truediv 失败"},
+		{"keyerr", "d = {}\nprint(d['x'])\n", "FlyRuntimeError: src:2:8: 下标访问失败"},
+		{"attrerr", "s = 'a'\nprint(s.missing)\n", "FlyRuntimeError: src:2:9: 属性访问 missing 失败"},
+		{"cast", "print(int('xx'))\n", "FlyRuntimeError: src:1:10: 类型转换失败"},
+		{"iter", "n = None\nfor x in n:\n    pass\n", "FlyRuntimeError: src:2:1: 不可迭代"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			code, errs, err := BuildSource(c.src)
+			if len(errs) > 0 || err != nil {
+				t.Fatalf("build 失败: %v %v", errs, err)
+			}
+			cmd := exec.Command("python3", "-c", code)
+			out, _ := cmd.CombinedOutput()
+			if !strings.Contains(string(out), c.want) {
+				t.Fatalf("期望输出含 %q，实际:\n%s", c.want, out)
 			}
 		})
 	}

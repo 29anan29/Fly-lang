@@ -2,6 +2,7 @@ package gen
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,7 @@ type Gen struct {
 	onlyUsed  bool
 	sealUsed  bool
 	traceUsed bool
+	plain     bool // 纯文本模式（guard 消息等）：不注入 _fly_* 兜底
 	traceCtx  *traceCtx
 	sealInit  bool
 	nc        int
@@ -41,21 +43,22 @@ func Generate(m *ast.Module) string {
 	only := needsOnly(m.Stmts)
 	trace := needsTrace(m.Stmts)
 	cage := needsCage(m.Stmts)
+	rt := needsRuntime(m.Stmts)
 	for i, s := range m.Stmts {
-		if i == docEnd && (guard || only || trace || cage) {
+		if i == docEnd && (guard || only || trace || cage || rt) {
 			if docEnd == 1 {
 				g.w("\n")
 			}
-			g.runtimePrelude(guard, only, trace, cage)
+			g.runtimePrelude(guard, only, trace, cage, rt)
 		}
 		g.stmt(s)
 	}
 	return g.buf.String()
 }
 
-func (g *Gen) runtimePrelude(guard, only, trace, cage bool) {
-	for _, n := range []string{"guard", "only", "trace", "cage"} {
-		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace) || (n == "cage" && cage)
+func (g *Gen) runtimePrelude(guard, only, trace, cage, rt bool) {
+	for _, n := range []string{"guard", "only", "trace", "cage", "runtime"} {
+		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace) || (n == "cage" && cage) || (n == "runtime" && rt)
 		if !need {
 			continue
 		}
@@ -64,6 +67,165 @@ func (g *Gen) runtimePrelude(guard, only, trace, cage bool) {
 			g.w("\n")
 		}
 	}
+}
+
+// needsRuntime 判断是否需要注入运行时兜底（_fly_binop/_fly_get 等）。
+func needsRuntime(stmts []ast.Stmt) bool {
+	found := false
+	var walkExpr func(e ast.Expr)
+	var walkStmt func(s ast.Stmt)
+	walkExpr = func(e ast.Expr) {
+		if e == nil || found {
+			return
+		}
+		switch t := e.(type) {
+		case *ast.Name, *ast.IntLit, *ast.FloatLit, *ast.StringLit, *ast.EllipsisLit:
+		case *ast.ListLit:
+			for _, el := range t.Elems {
+				walkExpr(el)
+			}
+		case *ast.TupleLit:
+			for _, el := range t.Elems {
+				walkExpr(el)
+			}
+		case *ast.DictLit:
+			for i := range t.Keys {
+				walkExpr(t.Keys[i])
+				walkExpr(t.Vals[i])
+			}
+		case *ast.SetLit:
+			for _, el := range t.Elems {
+				walkExpr(el)
+			}
+		case *ast.CallExpr:
+			if n, ok := t.Func.(*ast.Name); ok && (n.Name == "int" || n.Name == "float") {
+				found = true
+				return
+			}
+			walkExpr(t.Func)
+			for _, a := range t.Args {
+				walkExpr(a)
+			}
+			walkExpr(t.Star)
+			walkExpr(t.DblStar)
+			for _, kw := range t.Kwargs {
+				walkExpr(kw.Value)
+			}
+		case *ast.AttrExpr:
+			found = true
+		case *ast.SubscriptExpr:
+			found = true
+		case *ast.BinOpExpr:
+			found = true
+		case *ast.UnaryOpExpr:
+			if t.Op != "not" {
+				found = true
+			}
+		case *ast.CompareExpr:
+			found = true
+		case *ast.CondExpr:
+			walkExpr(t.Cond)
+			walkExpr(t.Then)
+			walkExpr(t.Else)
+		case *ast.SliceExpr:
+			walkExpr(t.Lo)
+			walkExpr(t.Hi)
+			walkExpr(t.Step)
+		case *ast.ListComp:
+			found = true
+		}
+	}
+	walkStmt = func(s ast.Stmt) {
+		if found {
+			return
+		}
+		switch t := s.(type) {
+		case *ast.AssignStmt:
+			walkExpr(t.Right)
+		case *ast.LockStmt:
+			walkExpr(t.Value)
+		case *ast.ExprStmt:
+			walkExpr(t.X)
+		case *ast.FuncDef:
+			for _, d := range t.Decorators {
+				walkExpr(d)
+			}
+			for _, p := range t.Params {
+				if p.Default != nil {
+					walkExpr(p.Default)
+				}
+			}
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.ClassDef:
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.OnlyStmt:
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.TraceStmt:
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.CageStmt:
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.IfStmt:
+			walkExpr(t.Cond)
+			for _, st := range t.Then {
+				walkStmt(st)
+			}
+			for _, el := range t.Elifs {
+				walkExpr(el.Cond)
+				for _, st := range el.Body {
+					walkStmt(st)
+				}
+			}
+			for _, st := range t.Else {
+				walkStmt(st)
+			}
+		case *ast.ForStmt:
+			found = true
+			walkExpr(t.Iter)
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.WhileStmt:
+			walkExpr(t.Cond)
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+		case *ast.TryStmt:
+			for _, st := range t.Body {
+				walkStmt(st)
+			}
+			for _, h := range t.Handlers {
+				for _, st := range h.Body {
+					walkStmt(st)
+				}
+			}
+		case *ast.ReturnStmt:
+			walkExpr(t.Value)
+		case *ast.RaiseStmt:
+			walkExpr(t.Exc)
+		case *ast.GuardStmt:
+			walkExpr(t.Type)
+			for _, c := range t.Conds {
+				walkExpr(c)
+			}
+		}
+	}
+	for _, s := range stmts {
+		walkStmt(s)
+		if found {
+			return true
+		}
+	}
+	return found
 }
 
 func needsGuard(stmts []ast.Stmt) bool {
@@ -200,7 +362,7 @@ func (g *Gen) render(e ast.Expr) string {
 	if e == nil {
 		return ""
 	}
-	sub := &Gen{}
+	sub := &Gen{plain: true}
 	sub.expr(e, precLowest)
 	return strings.TrimSpace(sub.buf.String())
 }
@@ -260,6 +422,34 @@ func (g *Gen) stmt(s ast.Stmt) {
 		}
 		g.w("\n")
 	case *ast.AssignStmt:
+		if t.Op != "=" {
+			g.augAssign(t)
+			break
+		}
+		if len(t.Left) == 1 {
+			if l, ok := t.Left[0].(*ast.SubscriptExpr); ok {
+				g.indentLine()
+				g.w("_fly_set(")
+				g.expr(l.X, precCond)
+				g.w(", ")
+				g.indexArg(l.Index)
+				g.w(", ")
+				g.expr(t.Right, precCond)
+				g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
+				g.w("\n")
+				break
+			}
+			if l, ok := t.Left[0].(*ast.AttrExpr); ok {
+				g.indentLine()
+				g.w("_fly_setattr(")
+				g.expr(l.X, precCond)
+				g.w(fmt.Sprintf(", %q, ", l.Name))
+				g.expr(t.Right, precCond)
+				g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
+				g.w("\n")
+				break
+			}
+		}
 		g.indentLine()
 		for i, l := range t.Left {
 			if i > 0 {
@@ -362,9 +552,9 @@ func (g *Gen) stmt(s ast.Stmt) {
 		g.indentLine()
 		g.w("for ")
 		g.expr(t.Target, precLowest)
-		g.w(" in ")
-		g.expr(t.Iter, precLowest)
-		g.w(":")
+		g.w(" in _fly_iter(")
+		g.expr(t.Iter, precCond)
+		g.w(fmt.Sprintf(", %d, %d):", t.Pos_.Line, t.Pos_.Col))
 		g.suite(t.Body)
 		if len(t.Else) > 0 {
 			g.indentLine()
@@ -715,6 +905,69 @@ func modsLit(mods []string) string {
 	return "(" + strings.Join(q, ", ") + ")"
 }
 
+func (g *Gen) slicePart(e ast.Expr) {
+	if e == nil {
+		g.w("None")
+		return
+	}
+	g.expr(e, precCond)
+}
+
+func (g *Gen) indexArg(e ast.Expr) {
+	if sl, ok := e.(*ast.SliceExpr); ok {
+		g.w("slice(")
+		g.slicePart(sl.Lo)
+		g.w(", ")
+		g.slicePart(sl.Hi)
+		if sl.Step != nil {
+			g.w(", ")
+			g.slicePart(sl.Step)
+		}
+		g.w(")")
+		return
+	}
+	g.expr(e, precCond)
+}
+
+func (g *Gen) augAssign(t *ast.AssignStmt) {
+	op := strings.TrimSuffix(t.Op, "=")
+	if len(t.Left) == 1 {
+		if l, ok := t.Left[0].(*ast.SubscriptExpr); ok {
+			g.indentLine()
+			g.w("_fly_set(")
+			g.expr(l.X, precCond)
+			g.w(", ")
+			g.indexArg(l.Index)
+			g.w(", _fly_binop(_fly_get(")
+			g.expr(l.X, precCond)
+			g.w(", ")
+			g.indexArg(l.Index)
+			g.w(fmt.Sprintf(", %d, %d), ", t.Pos_.Line, t.Pos_.Col))
+			g.expr(t.Right, precCond)
+			g.w(fmt.Sprintf(", %q, %d, %d), %d, %d)", opName(op), t.Pos_.Line, t.Pos_.Col, t.Pos_.Line, t.Pos_.Col))
+			g.w("\n")
+			return
+		}
+		if l, ok := t.Left[0].(*ast.AttrExpr); ok {
+			g.indentLine()
+			g.w("_fly_setattr(")
+			g.expr(l.X, precCond)
+			g.w(fmt.Sprintf(", %q, _fly_binop(_fly_attr(", l.Name))
+			g.expr(l.X, precCond)
+			g.w(fmt.Sprintf(", %q, %d, %d), ", l.Name, t.Pos_.Line, t.Pos_.Col))
+			g.expr(t.Right, precCond)
+			g.w(fmt.Sprintf(", %q, %d, %d), %d, %d)", opName(op), t.Pos_.Line, t.Pos_.Col, t.Pos_.Line, t.Pos_.Col))
+			g.w("\n")
+			return
+		}
+	}
+	g.indentLine()
+	g.expr(t.Left[0], precLowest)
+	g.w(" " + t.Op + " ")
+	g.expr(t.Right, precLowest)
+	g.w("\n")
+}
+
 func (g *Gen) suite(body []ast.Stmt) {
 	if len(body) == 0 {
 		g.w(" pass\n")
@@ -765,6 +1018,37 @@ func binPrec(op string) int {
 		return precPower
 	}
 	return precAtom
+}
+
+func opName(op string) string {
+	m := map[string]string{
+		"+": "add", "-": "sub", "*": "mul", "/": "truediv", "//": "floordiv",
+		"%": "mod", "**": "pow", "<<": "lshift", ">>": "rshift",
+		"&": "and_", "|": "or_", "^": "xor", "@": "matmul",
+	}
+	return m[op]
+}
+
+func unaryName(op string) string {
+	if op == "-" {
+		return "neg"
+	}
+	if op == "+" {
+		return "pos"
+	}
+	return "invert"
+}
+
+func cmpName(op string) string {
+	m := map[string]string{
+		"<": "lt", "<=": "le", ">": "gt", ">=": "ge",
+		"in": "contains", "not in": "contains",
+	}
+	name := m[op]
+	if op == "not in" {
+		name = "contains"
+	}
+	return name
 }
 
 func precOf(e ast.Expr) int {
@@ -870,6 +1154,17 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 		}
 		g.w("}")
 	case *ast.CallExpr:
+		if !g.plain {
+			if n, ok := t.Func.(*ast.Name); ok && (n.Name == "int" || n.Name == "float") {
+				g.w("_fly_cast(" + n.Name)
+				for _, a := range t.Args {
+					g.w(", ")
+					g.expr(a, precCond)
+				}
+				g.w(fmt.Sprintf(", line=%d, col=%d)", t.Pos_.Line, t.Pos_.Col))
+				return
+			}
+		}
 		g.expr(t.Func, precPost)
 		g.w("(")
 		first := true
@@ -906,13 +1201,39 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 		}
 		g.w(")")
 	case *ast.AttrExpr:
-		g.expr(t.X, precPost)
-		g.w("." + t.Name)
+		if g.plain {
+			g.expr(t.X, precPost)
+			g.w("." + t.Name)
+			break
+		}
+		g.w("_fly_attr(")
+		g.expr(t.X, precCond)
+		g.w(fmt.Sprintf(", %q, %d, %d)", t.Name, t.Pos_.Line, t.Pos_.Col))
 	case *ast.SubscriptExpr:
-		g.expr(t.X, precPost)
-		g.w("[")
-		g.expr(t.Index, precLowest)
-		g.w("]")
+		if g.plain {
+			g.expr(t.X, precPost)
+			g.w("[")
+			g.expr(t.Index, precLowest)
+			g.w("]")
+			break
+		}
+		g.w("_fly_get(")
+		g.expr(t.X, precCond)
+		g.w(", ")
+		if sl, ok := t.Index.(*ast.SliceExpr); ok {
+			g.w("slice(")
+			g.slicePart(sl.Lo)
+			g.w(", ")
+			g.slicePart(sl.Hi)
+			if sl.Step != nil {
+				g.w(", ")
+				g.slicePart(sl.Step)
+			}
+			g.w(")")
+		} else {
+			g.expr(t.Index, precCond)
+		}
+		g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
 	case *ast.SliceExpr:
 		if t.Lo != nil {
 			g.expr(t.Lo, precCond)
@@ -926,23 +1247,38 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 			g.expr(t.Step, precCond)
 		}
 	case *ast.BinOpExpr:
-		if t.Op == "**" {
-			g.expr(t.X, precPower+1)
-			g.w("**")
-			g.expr(t.Y, precPower)
-			return
+		if g.plain {
+			if t.Op == "**" {
+				g.expr(t.X, precPower+1)
+				g.w("**")
+				g.expr(t.Y, precPower)
+				break
+			}
+			p := binPrec(t.Op)
+			g.expr(t.X, p)
+			g.w(" " + t.Op + " ")
+			g.expr(t.Y, p+1)
+			break
 		}
-		p := binPrec(t.Op)
-		g.expr(t.X, p)
-		g.w(" " + t.Op + " ")
-		g.expr(t.Y, p+1)
+		g.w("_fly_binop(")
+		g.expr(t.X, precCond)
+		g.w(", ")
+		g.expr(t.Y, precCond)
+		g.w(fmt.Sprintf(", %q, %d, %d)", opName(t.Op), t.Pos_.Line, t.Pos_.Col))
 	case *ast.UnaryOpExpr:
-		g.w(t.Op + " ")
-		if t.Op == "not" {
-			g.expr(t.X, precCompare)
-		} else {
+		if g.plain || t.Op == "not" {
+			if t.Op == "not" {
+				g.w("not ")
+				g.expr(t.X, precCompare)
+				break
+			}
+			g.w(t.Op + " ")
 			g.expr(t.X, precUnary)
+			break
 		}
+		g.w("_fly_unary(")
+		g.expr(t.X, precCond)
+		g.w(fmt.Sprintf(", %q, %d, %d)", unaryName(t.Op), t.Pos_.Line, t.Pos_.Col))
 	case *ast.BoolOpExpr:
 		p := precOrBool
 		if t.Op == "and" {
@@ -952,10 +1288,43 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 		g.w(" " + t.Op + " ")
 		g.expr(t.Y, p)
 	case *ast.CompareExpr:
-		g.expr(t.X, precCompare)
+		if g.plain {
+			g.expr(t.X, precCompare)
+			for i, op := range t.Ops {
+				g.w(" " + op + " ")
+				g.expr(t.Ys[i], precCompare)
+			}
+			break
+		}
 		for i, op := range t.Ops {
-			g.w(" " + op + " ")
-			g.expr(t.Ys[i], precCompare)
+			if i > 0 {
+				g.w(" and ")
+			}
+			left := t.X
+			if i > 0 {
+				left = t.Ys[i-1]
+			}
+			if op == "==" || op == "!=" || op == "is" || op == "is not" {
+				g.expr(left, precCompare)
+				g.w(" " + op + " ")
+				g.expr(t.Ys[i], precCompare)
+			} else if op == "in" || op == "not in" {
+				if op == "not in" {
+					g.w("not ")
+				}
+				// operator.contains(a, b) 语义为 b in a，交换参数
+				g.w("_fly_cmp(lambda: ")
+				g.expr(t.Ys[i], precLowest)
+				g.w(", lambda: ")
+				g.expr(left, precLowest)
+				g.w(fmt.Sprintf(", %q, %d, %d)", "contains", t.Pos_.Line, t.Pos_.Col))
+			} else {
+				g.w("_fly_cmp(lambda: ")
+				g.expr(left, precLowest)
+				g.w(", lambda: ")
+				g.expr(t.Ys[i], precLowest)
+				g.w(fmt.Sprintf(", %q, %d, %d)", cmpName(op), t.Pos_.Line, t.Pos_.Col))
+			}
 		}
 	case *ast.CondExpr:
 		g.expr(t.Then, precCond+1)
@@ -969,8 +1338,14 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 		for _, cl := range t.Clauses {
 			g.w(" for ")
 			g.expr(cl.Target, precCond)
-			g.w(" in ")
-			g.expr(cl.Iter, precCond)
+			if g.plain {
+				g.w(" in ")
+				g.expr(cl.Iter, precCond)
+			} else {
+				g.w(" in _fly_iter(")
+				g.expr(cl.Iter, precCond)
+				g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
+			}
 			for _, f := range cl.Ifs {
 				g.w(" if ")
 				g.expr(f, precCond)

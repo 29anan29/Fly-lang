@@ -1,0 +1,13 @@
+"""未定义名称检查（模块级顺序敏感 + 函数体宽松）"""
+
+
+def early():
+    return later()
+
+
+def later():
+    return 1
+
+
+def missing():
+    return nope

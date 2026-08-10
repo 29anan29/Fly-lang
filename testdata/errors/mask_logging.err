@@ -1,1 +1,2 @@
 mask_logging.fly:3:17: 敏感数据 password 不可流入 logging（输出上下文）
+mask_logging.fly:3:5: 未定义的名字 logging

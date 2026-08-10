@@ -1,0 +1,4 @@
+arg_count.fly:12:9: 函数 two 需要至少 2 个参数（实际 1 个）
+arg_count.fly:13:9: 函数 two 最多接受 2 个位置参数（实际 3 个）
+arg_count.fly:14:9: 函数 two 没有名为 c 的参数
+arg_count.fly:15:9: 函数 one 参数 a 重复传值

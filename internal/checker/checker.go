@@ -22,9 +22,38 @@ func Check(m *ast.Module) []ast.Diagnostic {
 	c.collectModule(m)
 	c.cur = c.global
 	c.checkModule(m)
+	c.runtimeCheck(m)
 	return c.errs
 }
 
+// define 注册名字并检测同作用域重复定义（函数/类定义撞名是高概率 bug）。
+func (c *Checker) define(kind Kind, name string, pos ast.Position) {
+	if name == "" {
+		return
+	}
+	if sym, ok := c.cur.Names[name]; ok {
+		if kind == KFunc || kind == KClass {
+			if sym.Kind == KFunc || sym.Kind == KClass {
+				c.errorf(pos, "名字 %s 重复定义（第一次在第 %d 行）", name, sym.Pos.Line)
+			}
+			return
+		}
+		if kind == KImport {
+			if sym.Kind == KFunc || sym.Kind == KClass {
+				c.errorf(pos, "名字 %s 重复定义（第一次在第 %d 行）", name, sym.Pos.Line)
+			}
+			return
+		}
+		if kind == KParam {
+			if sym.Kind == KParam {
+				c.errorf(pos, "函数参数 %s 重复定义", name)
+			}
+			return
+		}
+		return
+	}
+	c.cur.Define(name, &Symbol{Kind: kind, Pos: pos})
+}
 func (c *Checker) errorf(pos ast.Position, format string, args ...interface{}) {
 	if len(c.errs) >= maxErrs {
 		return
@@ -42,14 +71,14 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 	switch t := s.(type) {
 	case *ast.ImportStmt:
 		for _, it := range t.Items {
-			c.cur.Define(importedName(it), &Symbol{Kind: KImport, Pos: s.Pos()})
+			c.define(KImport, importedName(it), s.Pos())
 		}
 	case *ast.FromImportStmt:
 		for _, it := range t.Items {
 			if it.Name == "*" {
 				continue
 			}
-			c.cur.Define(importedName(it), &Symbol{Kind: KImport, Pos: s.Pos()})
+			c.define(KImport, importedName(it), s.Pos())
 		}
 	case *ast.AssignStmt:
 		for _, l := range t.Left {
@@ -80,12 +109,16 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 			c.collectStmt(st)
 		}
 	case *ast.FuncDef:
-		c.cur.Define(t.Name, &Symbol{Kind: KFunc, Pos: t.Pos_})
+		c.define(KFunc, t.Name, t.Pos_)
+		if sym, ok := c.cur.Names[t.Name]; ok {
+			sym.Func = t
+		}
 		fn := NewScope(c.cur)
 		old := c.cur
 		c.cur = fn
 		for _, p := range t.Params {
 			if p.Name != "" {
+				c.define(KParam, p.Name, t.Pos_)
 				fn.Define(p.Name, &Symbol{Kind: KParam, Pos: t.Pos_, Anno: p.Anno})
 			}
 		}
@@ -94,7 +127,7 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 		}
 		c.cur = old
 	case *ast.ClassDef:
-		c.cur.Define(t.Name, &Symbol{Kind: KClass, Pos: t.Pos_, Seal: t.Seal})
+		c.define(KClass, t.Name, t.Pos_)
 		cl := NewScope(c.cur)
 		old := c.cur
 		c.cur = cl

@@ -18,6 +18,7 @@ type Symbol struct {
 	Anno  ast.Expr
 	Taint Taint
 	Seal  bool
+	Func  *ast.FuncDef
 }
 
 type Scope struct {
@@ -60,4 +61,14 @@ var builtins = map[string]bool{
 	"set": true, "setattr": true, "slice": true, "sorted": true,
 	"staticmethod": true, "str": true, "sum": true, "super": true, "tuple": true,
 	"type": true, "vars": true, "zip": true,
+	"Exception": true, "BaseException": true, "ValueError": true, "TypeError": true,
+	"KeyError": true, "RuntimeError": true, "AttributeError": true, "IndexError": true,
+	"ZeroDivisionError": true, "StopIteration": true, "AssertionError": true,
+	"NameError": true, "ImportError": true, "KeyboardInterrupt": true,
+	"NotImplemented": true, "OverflowError": true, "ArithmeticError": true,
+	"LookupError": true, "OSError": true, "FileNotFoundError": true,
+	"IOError": true, "MemoryError": true, "UnicodeError": true, "SystemExit": true,
+	"GeneratorExit": true, "EOFError": true, "FloatingPointError": true,
+	"IndentationError": true, "SyntaxError": true, "NotImplementedError": true,
+	"RecursionError": true, "UnboundLocalError": true, "EnvironmentError": true,
 }

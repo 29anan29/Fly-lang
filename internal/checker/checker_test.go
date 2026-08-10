@@ -123,7 +123,7 @@ func TestSafeTaint(t *testing.T) {
 func TestSafeSanitize(t *testing.T) {
 	noErr(t, "safe uid\nclean = int(uid)\neval(clean)\n")
 	noErr(t, "safe uid\nclean = float(uid)\nreturn clean\n")
-	noErr(t, "uid = request.args.get('id')\nsafe uid\nclean = int(uid)\ndb.query(clean)\n")
+	noErr(t, "request = {}\ndb = []\nuid = request.args.get('id')\nsafe uid\nclean = int(uid)\ndb.query(clean)\n")
 }
 
 func TestSafeFlow(t *testing.T) {

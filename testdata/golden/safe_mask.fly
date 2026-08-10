@@ -3,6 +3,15 @@ def login(password):
     hashed = hash(password)
     return hashed
 
+
+class _DB:
+    def query(self, v):
+        return ("q", v)
+
+
+db = _DB()
+
+
 def handle():
     safe uid
     clean = int(uid)

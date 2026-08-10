@@ -1,0 +1,21 @@
+"""重复定义检查（函数/类撞名）"""
+
+
+def dup():
+    pass
+
+
+def dup():
+    return 1
+
+
+class Cls:
+    pass
+
+
+class Cls:
+    pass
+
+
+def f(a, a):
+    return a

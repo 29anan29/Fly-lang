@@ -1,0 +1,3 @@
+dup_def.fly:8:1: 名字 dup 重复定义（第一次在第 4 行）
+dup_def.fly:16:1: 名字 Cls 重复定义（第一次在第 12 行）
+dup_def.fly:20:1: 函数参数 a 重复定义
