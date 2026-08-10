@@ -1,0 +1,69 @@
+"""P6 边界用例：嵌套作用域/闭包/递归/only 嵌套（全部应为正例）"""
+
+def outer(a):
+    x = a * 2
+
+    def inner(b):
+        x = b + 1
+        return x
+
+    return inner(10) + x
+
+
+def counter():
+    count = 0
+
+    def inc():
+        return count + 1
+
+    def setc(n):
+        count = n
+        return count
+
+    return inc, setc
+
+
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+only (json):
+    def parse(raw):
+        return json.loads(raw)
+
+    only (math):
+        def sq(x):
+            return math.sqrt(x)
+
+        data = sq(4.0)
+
+    def double(raw):
+        return json.dumps(raw)
+
+
+uid = "42"
+safe uid
+
+
+def use_taint():
+    clean = int(uid)
+    return clean
+
+
+def secret():
+    password = "s3cr3t"
+    mask password
+    hashed = hash(password)
+    return hashed
+
+
+print(outer(5))
+inc, setc = counter()
+print(inc(), setc(3))
+print(fib(10))
+print(parse('{"a": 1}'))
+print(sq is None or sq(9.0))
+print(use_taint())
+print(secret())

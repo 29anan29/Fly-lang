@@ -1,0 +1,4 @@
+edge_nesting.fly:6:14: 敏感数据 token 不可流入 print（输出上下文）
+edge_nesting.fly:14:17: only 块禁止访问 os（不在白名单 [json]）
+edge_nesting.fly:14:17: only 块禁止访问 os（不在白名单 [math]）
+edge_nesting.fly:28:22: 敏感数据 x 不可流入 print（输出上下文）

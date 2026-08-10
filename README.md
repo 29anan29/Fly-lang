@@ -118,6 +118,8 @@ Fly 的检查全部发生在**编译期**（lexer → parser → checker），�
 error: <file>.fly:12:5: <消息>
 ```
 
+全部错误消息清单见 [docs/报错清单.md](docs/报错清单.md)。
+
 ## LSP（编辑器编译期诊断）
 
 `fly lsp` 内置 LSP 服务器（JSON-RPC over stdio，零第三方依赖）：

@@ -1,0 +1,9 @@
+all8_err.fly:8:16: 未净化的外部输入 uid 流入 eval（危险汇点）
+all8_err.fly:14:9: only 块禁止访问 os（不在白名单 [json math]）
+all8_err.fly:18:1: lock 变量 SECRET_KEY 不可再赋值
+all8_err.fly:18:1: lock 变量 SECRET_KEY 不可通过 globals() 反射读取
+all8_err.fly:32:10: 敏感数据 password 不可流入 print（输出上下文）
+all8_err.fly:37:17: 敏感数据 password 不可流入 logging（输出上下文）
+all8_err.fly:54:8: seal 类实例 admin7 的属性 role 不可修改
+all8_err.fly:55:8: seal 类实例 admin7 的属性 permission 不可修改
+all8_err.fly:59:1: trace 级别 BOGUS 非法（支持 DEBUG/INFO/WARNING/ERROR/CRITICAL）

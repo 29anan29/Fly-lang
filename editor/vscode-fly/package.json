@@ -2,7 +2,7 @@
   "name": "fly-lang",
   "displayName": "Fly Lang",
   "description": "Fly 语言支持：Python 3.10+ 安全增强超集。LSP 编译期诊断（safe/only/lock/mask/cage/guard/seal/trace）+ 语法高亮",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "29anan29",
   "license": "MIT",
   "icon": "media/icon.png",

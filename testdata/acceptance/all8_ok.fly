@@ -1,0 +1,79 @@
+"""P6 最终回归：方案.md 全部 8 个示例（正例行，全部应通过）"""
+
+
+# ========== 1. safe ==========
+class _Request:
+    def get(self, key, default=None):
+        return "42"
+
+
+request = _Request()
+
+
+def handle():
+    uid = request.get('id')
+    safe uid
+    clean = int(uid)
+    return clean
+
+
+# ========== 2. only ==========
+only (json, math):
+    def parse(raw):
+        data = json.loads(raw)
+        return math.sqrt(data["x"])
+
+
+# ========== 3. lock ==========
+lock SECRET_KEY = "abc-123"
+
+hashed = hash(SECRET_KEY)
+
+
+# ========== 4. mask ==========
+def login(password):
+    mask password
+    hashed = hash(password)
+    return hashed
+
+
+# ========== 5. cage ==========
+cage(max_time="2s", max_memory="50MB"):
+    def heavy():
+        data = [0] * 1000
+        return len(data)
+
+
+# ========== 6. guard ==========
+def create_user(username, age):
+    guard username: str, len(username) > 0, len(username) <= 20
+    guard age: int, 0 < age < 150
+    return (username, age)
+
+
+# ========== 7. seal ==========
+seal class Admin:
+    role = "admin"
+
+    def __init__(self, name):
+        self.name = name
+
+
+admin = Admin("Alice")
+
+
+# ========== 8. trace ==========
+trace(level="WARN", args=True, ret=True):
+    def delete_user(uid):
+        db.append(uid)
+        return uid
+
+
+db = []
+print(parse('{"x": 9}'))
+print(hashed is not None)
+print(login("pw"))
+print(heavy())
+print(create_user("alice", 30))
+print(admin.name, admin.role)
+print(delete_user(7))

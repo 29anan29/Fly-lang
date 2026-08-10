@@ -1,6 +1,6 @@
 # Fly Lang for VSCode
 
-[Fly](https://github.com/29anan29/Fly-lang) 语言支持插件（v0.2.0+）：Python 3.10+ 安全增强超集的 LSP 编译期诊断 + 语法高亮。
+[Fly](https://github.com/29anan29/Fly-lang) 语言支持插件（v0.3.0+）：Python 3.10+ 安全增强超集的 LSP 编译期诊断 + 语法高亮。
 
 ## 功能
 
@@ -17,7 +17,7 @@
 
 ## 依赖
 
-需要已安装 **v0.2.0+** 的 fly 编译器（含 `fly lsp` 子命令）。安装：
+需要已安装 **v0.3.0+** 的 fly 编译器（含 `fly lsp` 子命令）。安装：
 
 ```bash
 # 本地构建

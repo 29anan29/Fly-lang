@@ -1,0 +1,1 @@
+safe_sql.fly:2:15: 未净化的外部输入 sql 流入 execute（危险汇点）

@@ -1,0 +1,61 @@
+"""P6 最终回归：方案.md 全部 8 个示例（注释反例行，全部应报错）"""
+
+
+# ========== 1. safe ==========
+def handle1():
+    uid = input()
+    safe uid
+    data = eval(f"get_user({uid})")
+
+
+# ========== 2. only ==========
+only (json, math):
+    def parse2():
+        os.system("rm -rf /")
+
+
+# ========== 3. lock ==========
+lock SECRET_KEY = "abc-123"
+
+
+def hack3():
+    SECRET_KEY = "new"
+
+
+def hack3b():
+    print(globals()['SECRET_KEY'])
+
+
+# ========== 4. mask ==========
+def login4(password):
+    mask password
+    print(f"密码: {password}")
+
+
+def login4b(password):
+    mask password
+    logging.info(password)
+
+
+# ========== 5. cage（无编译期反例，运行时见 testdata/p4_cage.fly） ==========
+
+
+# ========== 6. guard ==========
+def create_user6(username):
+    guard username: str, len(username) > 0, len(username) <= 20
+
+
+# ========== 7. seal ==========
+seal class Admin7:
+    role = "admin"
+
+
+admin7 = Admin7()
+admin7.role = "user"
+admin7.permission = "all"
+
+
+# ========== 8. trace（无编译期反例；非法级别见下） ==========
+trace(level="BOGUS"):
+    def f8():
+        pass

@@ -1,0 +1,1 @@
+safe_os_system.fly:2:10: 未净化的外部输入 cmd 流入 os.system（危险汇点）

@@ -196,15 +196,17 @@ error: <file>.fly:12:5: lock 变量 SECRET_KEY 不可再赋值
 
 验收：本地 dpkg-deb 冒烟打包通过；`go test ./...` 全绿。
 
-### P6 打磨与收尾
+### P6 打磨与收尾 ✅ 完成
 
 任务：
-1. golden 测试全量覆盖 + 错误消息快照测试
-2. 边界用例：嵌套作用域、闭包、递归、f-string 内 mask 变量、only 嵌套
-3. 文档：README（安装/用法/8 关键字速查）、报错清单整理
-4. `go vet`、gofmt 全绿；`vsce package` 产出 .vsix
+1. golden 测试全量覆盖 + 错误消息快照测试 ✅（TestErrorSnapshots：24 个 errors 反例的 `.err` 快照逐行比对，与 LSP 同一 FormatError 管线）
+2. 边界用例：嵌套作用域、闭包、递归、f-string 内 mask 变量、only 嵌套 ✅（golden/edge.fly 正例防误报：shadowing/闭包/递归/嵌套 only/safe 清洗；errors/edge_nesting.fly 反例：闭包内 mask 泄露、嵌套 only 内 os、深层嵌套 mask）
+3. 文档：README（安装/用法/8 关键字速查）、报错清单整理 ✅（docs/报错清单.md：全部错误消息 + 运行时异常表；README 链接）
+4. `go vet`、gofmt 全绿；`vsce package` 产出 .vsix ✅（插件 v0.3.0，本地打包 12.56 KB 通过）
 
-验收：CI 式一键命令 `go test ./... && go vet ./...` 全绿；对方案.md 全部 8 个示例做最终回归。
+验收：CI 式一键命令 `go test ./... && go vet ./...` 全绿；对方案.md 全部 8 个示例做最终回归。✅（testdata/acceptance/all8_ok.fly 正例全部通过并 python3 实跑；errors/all8_err.fly 反例 9 条错误全部命中）
+
+里程碑：P0-P6 全部完成，发布 v0.3.0（正式版 release 渠道）。
 
 ## 里程碑（与阶段对应）
 

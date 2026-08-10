@@ -1,0 +1,31 @@
+def build_logger():
+    token = "t0k3n"
+    mask token
+    # fly:error: 闭包内 mask 变量仍受保护
+    def leak():
+        print(token)
+
+
+only (json):
+    def outer():
+        only (math):
+            def inner():
+                # fly:error: 嵌套 only 块仍受限
+                os.system("ls")
+                return math.sqrt(4)
+
+
+def depth():
+    def a():
+        x = 1
+
+        def b():
+            x = 2
+            mask x
+
+            def c():
+                # fly:error: 任意深度嵌套内 mask 仍拦截
+                print(x)
+            c()
+        b()
+    a()

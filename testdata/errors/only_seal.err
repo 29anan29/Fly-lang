@@ -1,0 +1,3 @@
+only_seal.fly:3:9: only 块禁止访问 os（不在白名单 [json]）
+only_seal.fly:13:7: seal 类实例 admin 的属性 role 不可修改
+only_seal.fly:14:7: seal 类实例 admin 的属性 permission 不可修改

@@ -1,0 +1,1 @@
+lock_setattr_globals.fly:1:1: lock 变量 SECRET 不可通过 setattr 修改

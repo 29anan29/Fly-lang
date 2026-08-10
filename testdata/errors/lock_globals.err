@@ -1,0 +1,1 @@
+lock_globals.fly:1:1: lock 变量 SECRET 不可通过 globals() 反射读取
