@@ -1,0 +1,21 @@
+"""pickle 反序列化 RCE 拦截（污点汇点 + 别名溯源）"""
+
+import pickle
+import pickle as pk
+from pickle import loads as l
+
+
+def process(data):
+    safe data
+    obj = pickle.loads(data)
+    return obj
+
+
+def process2(data):
+    safe data
+    return pk.load(data)
+
+
+def process3(payload):
+    safe payload
+    return l(payload)

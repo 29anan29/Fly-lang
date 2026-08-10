@@ -1,0 +1,18 @@
+"""基准 1：递归 fib(32)——函数调用与算术运算。"""
+
+
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+if __name__ == "__main__":
+    import time
+    best = 1e9
+    for _ in range(3):
+        t0 = time.perf_counter()
+        r = fib(32)
+        dt = time.perf_counter() - t0
+        best = min(best, dt)
+    print(f"{best:.6f} {r}")

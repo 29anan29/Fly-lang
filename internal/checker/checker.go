@@ -54,6 +54,14 @@ func (c *Checker) define(kind Kind, name string, pos ast.Position) {
 	}
 	c.cur.Define(name, &Symbol{Kind: kind, Pos: pos})
 }
+
+// defineMod 注册带来源模块的导入符号（import pickle as p → Module=pickle）。
+func (c *Checker) defineMod(kind Kind, name string, pos ast.Position, module, orig string) {
+	if _, ok := c.cur.Names[name]; ok {
+		return
+	}
+	c.cur.Define(name, &Symbol{Kind: kind, Pos: pos, Module: module, Orig: orig})
+}
 func (c *Checker) errorf(pos ast.Position, format string, args ...interface{}) {
 	if len(c.errs) >= maxErrs {
 		return
@@ -71,14 +79,14 @@ func (c *Checker) collectStmt(s ast.Stmt) {
 	switch t := s.(type) {
 	case *ast.ImportStmt:
 		for _, it := range t.Items {
-			c.define(KImport, importedName(it), s.Pos())
+			c.defineMod(KImport, it.TopName(), s.Pos(), it.Module(), "")
 		}
 	case *ast.FromImportStmt:
 		for _, it := range t.Items {
 			if it.Name == "*" {
 				continue
 			}
-			c.define(KImport, importedName(it), s.Pos())
+			c.defineMod(KImport, importedName(it), s.Pos(), t.Module, it.Name)
 		}
 	case *ast.AssignStmt:
 		for _, l := range t.Left {

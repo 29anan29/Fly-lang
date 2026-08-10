@@ -1,0 +1,19 @@
+"""基准 5：纯算术热循环 200 万次——binop 护栏热点。"""
+
+
+def hot_loop():
+    s = 0
+    for i in range(2000000):
+        s = s + i
+    return s
+
+
+if __name__ == "__main__":
+    import time
+    best = 1e9
+    for _ in range(3):
+        t0 = time.perf_counter()
+        r = hot_loop()
+        dt = time.perf_counter() - t0
+        best = min(best, dt)
+    print(f"{best:.6f} {r}")

@@ -1,0 +1,19 @@
+"""基准 3：字符串拼接 5 万次——字符串操作（binop 护栏热点）。"""
+
+
+def str_join():
+    s = ""
+    for i in range(50000):
+        s = s + str(i)
+    return len(s)
+
+
+if __name__ == "__main__":
+    import time
+    best = 1e9
+    for _ in range(3):
+        t0 = time.perf_counter()
+        r = str_join()
+        dt = time.perf_counter() - t0
+        best = min(best, dt)
+    print(f"{best:.6f} {r}")

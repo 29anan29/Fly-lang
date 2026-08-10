@@ -1,0 +1,19 @@
+"""基准 2：列表推导 + append 10 万次——容器操作。"""
+
+
+def list_op():
+    out = []
+    for i in range(100000):
+        out.append(i * 2)
+    return [x + 1 for x in out if x % 3 == 0]
+
+
+if __name__ == "__main__":
+    import time
+    best = 1e9
+    for _ in range(3):
+        t0 = time.perf_counter()
+        r = list_op()
+        dt = time.perf_counter() - t0
+        best = min(best, dt)
+    print(f"{best:.6f} {len(r)}")

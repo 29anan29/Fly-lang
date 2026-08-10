@@ -139,8 +139,14 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 		}
 	}
 
-	name, mod := callName(t.Func)
+	name, mod := c.callName(t.Func)
 	switch mod {
+	case "pickle":
+		switch name {
+		case "loads", "load", "Unpickler":
+			c.checkSafeSink(t, argTaint, argHint, "pickle."+name)
+		}
+		return Taint{}, ""
 	case "logging":
 		c.checkMaskSink(t, argTaint, argHint, "logging")
 		return Taint{}, ""
@@ -180,13 +186,22 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 	return Taint{}, ""
 }
 
-func callName(f ast.Expr) (name, mod string) {
+func (c *Checker) callName(f ast.Expr) (name, mod string) {
 	switch t := f.(type) {
 	case *ast.Name:
+		if sym, ok := c.cur.Lookup(t.Name); ok && sym.Module != "" {
+			if sym.Orig != "" {
+				return sym.Orig, sym.Module
+			}
+			return t.Name, sym.Module
+		}
 		return t.Name, ""
 	case *ast.AttrExpr:
 		name = t.Name
 		if m, ok := t.X.(*ast.Name); ok {
+			if sym, ok := c.cur.Lookup(m.Name); ok && sym.Module != "" {
+				return name, sym.Module
+			}
 			return name, m.Name
 		}
 		return name, ""

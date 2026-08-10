@@ -12,6 +12,26 @@ type ImportItem struct {
 	Alias string
 }
 
+// Module 返回导入的顶层模块名（import os.path → "os"）。
+func (it ImportItem) Module() string {
+	if i := indexByte(it.Name, '.'); i > 0 {
+		return it.Name[:i]
+	}
+	return it.Name
+}
+
+// TopName 返回绑定名（import os.path → "os"；import os.path as p → "p"）。
+func (it ImportItem) TopName() string {
+	n := it.Name
+	if it.Alias != "" {
+		n = it.Alias
+	}
+	if i := indexByte(n, '.'); i > 0 {
+		return n[:i]
+	}
+	return n
+}
+
 type ImportStmt struct {
 	Pos_  Position
 	Items []ImportItem
@@ -19,6 +39,15 @@ type ImportStmt struct {
 
 func (s *ImportStmt) Pos() Position { return s.Pos_ }
 func (*ImportStmt) stmtNode()       {}
+
+func indexByte(s string, b byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
+}
 
 type FromImportStmt struct {
 	Pos_   Position

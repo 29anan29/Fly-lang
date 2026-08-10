@@ -103,6 +103,10 @@ python3 out.py
 | `seal` | 冻结对象，禁止增删改属性 | 对象属性被篡改（编译期生成 `__setattr__` 拦截） |
 | `trace` | 强制审计日志 | 关键操作无记录（编译期插入 logging） |
 
+安全模型与威胁分析：**[SECURITY.md](SECURITY.md)** · **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**
+CVE 对照演示：**[pickle RCE——Python 被打穿 vs Fly 编译期拦截](docs/demo/cve-pickle.md)**（`bash examples/cve-pickle/run-demo.sh`）
+性能基准：**[docs/bench/bench.md](docs/bench/bench.md)**（`bash bench/run.sh`）
+
 ## 编译期完备检查（可信产物）
 
 Fly 的检查全部发生在**编译期**（lexer → parser → checker），通过检查的代码**不会产生原生 Python 运行时崩溃**：

@@ -1,0 +1,3 @@
+pickle_rce.fly:10:23: 未净化的外部输入 data 流入 pickle.loads（危险汇点）
+pickle_rce.fly:16:19: 未净化的外部输入 data 流入 pickle.load（危险汇点）
+pickle_rce.fly:21:13: 未净化的外部输入 payload 流入 pickle.loads（危险汇点）

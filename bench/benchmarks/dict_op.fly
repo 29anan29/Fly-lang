@@ -1,0 +1,22 @@
+"""基准 4：dict 读写 10 万次——哈希与下标操作。"""
+
+
+def dict_op():
+    d = {}
+    for i in range(100000):
+        d[i] = i + 1
+    s = 0
+    for k in d:
+        s += d[k]
+    return s
+
+
+if __name__ == "__main__":
+    import time
+    best = 1e9
+    for _ in range(3):
+        t0 = time.perf_counter()
+        r = dict_op()
+        dt = time.perf_counter() - t0
+        best = min(best, dt)
+    print(f"{best:.6f} {r}")

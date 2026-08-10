@@ -76,6 +76,45 @@ def _fly_loc(line, col):
 
 
 def _fly_binop(a, b, op, line, col):
+    if op == "add":
+        if isinstance(a, int) and isinstance(b, int):
+            return a + b
+        if isinstance(a, str) and isinstance(b, str):
+            return a + b
+        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+            return a + b
+    elif op == "sub":
+        if isinstance(a, int) and isinstance(b, int):
+            return a - b
+    elif op == "mul":
+        if isinstance(a, int) and isinstance(b, int):
+            return a * b
+    elif op == "mod":
+        if isinstance(a, int) and isinstance(b, int) and b != 0:
+            return a % b
+    elif op == "floordiv":
+        if isinstance(a, int) and isinstance(b, int) and b != 0:
+            return a // b
+    elif op == "lt":
+        if isinstance(a, int) and isinstance(b, int):
+            return a < b
+        if isinstance(a, str) and isinstance(b, str):
+            return a < b
+    elif op == "le":
+        if isinstance(a, int) and isinstance(b, int):
+            return a <= b
+    elif op == "gt":
+        if isinstance(a, int) and isinstance(b, int):
+            return a > b
+    elif op == "ge":
+        if isinstance(a, int) and isinstance(b, int):
+            return a >= b
+    elif op == "eq":
+        if isinstance(a, int) and isinstance(b, int):
+            return a == b
+    elif op == "ne":
+        if isinstance(a, int) and isinstance(b, int):
+            return a != b
     try:
         return getattr(_fly_op, op)(a, b)
     except _FLY_SAFE_ERRORS as e:

@@ -13,12 +13,14 @@ const (
 )
 
 type Symbol struct {
-	Kind  Kind
-	Pos   ast.Position
-	Anno  ast.Expr
-	Taint Taint
-	Seal  bool
-	Func  *ast.FuncDef
+	Kind   Kind
+	Pos    ast.Position
+	Anno   ast.Expr
+	Taint  Taint
+	Seal   bool
+	Func   *ast.FuncDef
+	Module string // KImport：顶层模块名（import pickle → "pickle"）
+	Orig   string // KImport：模块内原名（from pickle import loads as l → "loads"）
 }
 
 type Scope struct {
@@ -71,4 +73,5 @@ var builtins = map[string]bool{
 	"GeneratorExit": true, "EOFError": true, "FloatingPointError": true,
 	"IndentationError": true, "SyntaxError": true, "NotImplementedError": true,
 	"RecursionError": true, "UnboundLocalError": true, "EnvironmentError": true,
+	"__name__": true, "__file__": true, "__doc__": true, "__builtins__": true,
 }
