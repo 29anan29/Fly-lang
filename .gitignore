@@ -8,3 +8,8 @@ dist/
 # VSCode 插件
 node_modules/
 *.vsix
+
+/docs
+
+# 个人规划（不入库）
+/plan
