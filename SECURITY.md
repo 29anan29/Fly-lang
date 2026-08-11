@@ -53,21 +53,25 @@ Fly-Lang 的目标是编译期阻止不安全代码（注入、篡改、泄露�
 
 ## 威胁模型与边界
 
-完整威胁模型见 [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)。
+完整威胁模型（含污点规则 R1-R5 形式化、对抗实测表、与 Bandit/Semgrep/Ruff
+定位差异）见 [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)。
 
 - **防御目标**：外部输入引发的注入/RCE/泄漏（pickle、eval、shell、SQL）；
   敏感数据外泄（mask）；资源滥用（cage）。
-- **诚实边界**：
-  - 跨文件污点流不跟踪（单文件编译模型）；`from x import *` 引入的名字不检查
-  - 第三方模块**内部**代码是正常 Python（供应链信任问题，超出转译器范围）
-  - 业务逻辑漏洞（如鉴权遗漏）不是安全关键字的责任范围
-  - 运行时兜底保证"统一报错"而非"不报错"；cage 超限仍会抛异常
-  - 转译后的 `.py` 是最终执行产物，代码在用户本机运行，编译期检查无法防御所有运行时攻击。涉及安全边界绕过的问题请按上文上报。
-- **性能成本**：转译注入的 `_fly_*` 护栏在热循环有 2-10 倍开销（见
-  [docs/bench/bench.md](docs/bench/bench.md)），安全与性能的取舍明确公开。
+- **诚实边界**（完整清单见 THREAT-MODEL §6，B1-B8）：
+  - B1 跨文件污点流不跟踪（单文件编译模型）；B2 `from x import *` 不检查
+  - B3 第三方模块**内部**代码是正常 Python（供应链信任，超出转译器范围）
+  - B4 动态反射（`getattr(obj, 动态名)`）、B7 一等函数间接引用（`obj = pickle.loads; obj(x)`）
+    不溯源——用 `only` 白名单 + fly-sandbox 兜底
+  - B5 业务逻辑漏洞（如鉴权遗漏）不是安全关键字的责任范围
+  - B6 运行时兜底保证"统一报错"而非"不报错"；cage 超限仍会抛异常
+  - 转译后的 `.py` 是最终执行产物，代码在用户本机运行，编译期检查无法防御
+    所有运行时攻击。涉及安全边界绕过的问题请按上文上报。
+- **性能成本**：转译注入的 `_fly_*` 护栏在热循环有约 1-3 倍开销（vs CPython，
+  见 [docs/bench/bench.md](docs/bench/bench.md)），安全与性能的取舍明确公开。
 
 ## 验证
 
 - 反例测试：`testdata/errors/*.fly`（编译期必须报错的全部场景）
 - 快照锁定：错误消息与转译产物 golden 对比（`go test ./...`）
-- CVE 对照演示：`bash examples/cve-pickle/run-demo.sh`
+- CVE 对照演示：`bash examples/cve-pickle/run-demo.sh`（5 幕：编译期 + 沙箱双层）

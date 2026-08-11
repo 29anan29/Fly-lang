@@ -5,6 +5,9 @@
 //! - 其余一律 KILL_PROCESS（绝对防逃逸：exec/网络/写文件/提权/逃逸原语全禁）
 //! - 默认 KILL 而非 ERRNO：恶意代码触发即进程终止，不给任何旁路机会
 
+const SYS_SETITIMER: u32 = 38;
+const SYS_GETITIMER: u32 = 36;
+const SYS_ALARM: u32 = 37;
 const SYS_SOCKET: u32 = 41;
 const AF_INET: u32 = 2;
 const AF_INET6: u32 = 10;
@@ -264,7 +267,7 @@ pub fn build_program() -> Vec<SockFilter> {
     };
 
     // 白名单（放行）
-    let base: [u32; 101] = [
+    let base: [u32; 104] = [
         SYS_READ, SYS_WRITE, SYS_CLOSE, SYS_STAT, SYS_FSTAT, SYS_LSTAT, SYS_POLL, SYS_LSEEK,
         SYS_MMAP, SYS_MPROTECT, SYS_MUNMAP, SYS_BRK, SYS_RT_SIGACTION, SYS_RT_SIGPROCMASK,
         SYS_RT_SIGRETURN, SYS_IOCTL, SYS_PREAD64, SYS_PWRITE64, SYS_READV, SYS_WRITEV, SYS_ACCESS,
@@ -282,6 +285,7 @@ pub fn build_program() -> Vec<SockFilter> {
         SYS_PSELECT6, SYS_PPOLL, SYS_MEMFD_CREATE, SYS_GETRESUID, SYS_GETRESGID,
         SYS_EXECVE, SYS_EXIT_GROUP, SYS_RSEQ, SYS_SCHED_GETAFFINITY, SYS_STATX,
         SYS_CLONE3, // python subprocess 用它创建子进程
+        SYS_SETITIMER, SYS_GETITIMER, SYS_ALARM, // cage 的 signal.setitimer/alarm 依赖
     ];
     // 高危（命中即 KILL_PROCESS）
     // 注：SYS_CONNECT 不在其中——inet socket 创建已被 socket() domain 检查拦截，

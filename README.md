@@ -103,9 +103,22 @@ python3 out.py
 | `seal` | 冻结对象，禁止增删改属性 | 对象属性被篡改（编译期生成 `__setattr__` 拦截） |
 | `trace` | 强制审计日志 | 关键操作无记录（编译期插入 logging） |
 
-安全模型与威胁分析：**[SECURITY.md](SECURITY.md)** · **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**
-CVE 对照演示：**[pickle RCE——Python 被打穿 vs Fly 编译期拦截](docs/demo/cve-pickle.md)**（`bash examples/cve-pickle/run-demo.sh`）
-性能基准：**[docs/bench/bench.md](docs/bench/bench.md)**（`bash bench/run.sh`）
+安全模型与威胁分析：**[SECURITY.md](SECURITY.md)** · **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**（含污点规则 R1-R5 形式化、对抗实测表、与 Bandit/Semgrep/Ruff 定位差异）
+CVE 对照演示：**[pickle RCE——Python 被打穿 vs Fly 编译期拦截](docs/demo/cve-pickle.md)**（`bash examples/cve-pickle/run-demo.sh`，5 幕含 fly-sandbox 运行时兜底）
+性能基准：**[docs/bench/bench.md](docs/bench/bench.md)**（CPython / PyPy / Fly 转译三列对比，`bash bench/run.sh`）
+语法兼容矩阵：**[docs/compat.md](docs/compat.md)**（Python 3.10+ 语法实测，当前 74%）
+
+## CVE 演示：pickle 反序列化 RCE（实机截图）
+
+同一段反序列化恶意载荷的代码：原生 Python 上线即被打穿，Fly-Lang 在编译期拦截，即使绕过编译期也有 fly-sandbox seccomp 兜底：
+
+![pickle RCE 演示：Python 被打穿 vs Fly-Lang 编译期拦截](docs/demo/img/cve-pickle-demo.png)
+
+- **原生 Python**：`pickle.loads(payload)` → `os.system("touch /tmp/pwned_by_pickle")` 任意命令执行成功
+- **Fly-Lang**：`safe` 污点追踪在编译期报错 `未净化的外部输入 data 流入 pickle.loads（危险汇点）`，含 RCE 的版本无法部署
+- **纵深防御**：即使攻击者绕过编译期直接部署原生代码，`fly-sandbox`（seccomp 白名单）也会拦截 `openat` 写操作（SIGSYS），攻击命令失败
+
+完整 5 幕演示与"为什么运行时检测拦不住"分析见 [docs/demo/cve-pickle.md](docs/demo/cve-pickle.md)。
 
 ## 编译期完备检查（可信产物）
 

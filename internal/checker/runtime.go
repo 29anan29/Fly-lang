@@ -506,8 +506,18 @@ func (u *uCheck) checkArgs(t *ast.CallExpr) {
 		}
 	}
 	if len(t.Args) < req {
-		u.errorf(t.Pos_, "函数 %s 需要至少 %d 个参数（实际 %d 个）", n.Name, req, len(t.Args))
-		return
+		provided := len(t.Args)
+		for _, kw := range t.Kwargs {
+			for _, p := range fn.Params {
+				if p.Name == kw.Name && p.Default == nil && !p.Star && !p.DblStar {
+					provided++
+				}
+			}
+		}
+		if provided < req {
+			u.errorf(t.Pos_, "函数 %s 需要至少 %d 个参数（实际 %d 个）", n.Name, req, len(t.Args))
+			return
+		}
 	}
 	if len(t.Args) > len(names) {
 		u.errorf(t.Pos_, "函数 %s 最多接受 %d 个位置参数（实际 %d 个）", n.Name, len(names), len(t.Args))
