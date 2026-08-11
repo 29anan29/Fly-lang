@@ -178,6 +178,9 @@ jobs:
     name: npm package
     needs: [linux, macos, windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
@@ -213,6 +216,14 @@ jobs:
         run: |
           npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
           npm publish --access public
+      - name: Publish to GitHub Packages
+        working-directory: npm/fly-lang
+        env:
+          GH_NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.name='@29anan29/fly-lang';fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+          echo "//npm.pkg.github.com/:_authToken=${GH_NPM_TOKEN}" > .npmrc
+          npm publish --registry=https://npm.pkg.github.com
 
   release:
     name: publish release
