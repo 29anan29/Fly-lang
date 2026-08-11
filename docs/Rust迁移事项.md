@@ -18,7 +18,7 @@
 
 - [ ] 建 `Cargo.toml` + `build.rs`（commit/repo 注入，对齐 ldflags 语义）
 - [ ] `src/main.rs` CLI 框架：build/check/run/version/update 子命令分发 + 退出码契约
-- [ ] `src/diagnostic.rs`：Position/Diagnostic/Report + `error: <file>.fly:L:C: msg` 输出
+- [ ] `src/diagnostic.rs`：Position/Diagnostic/Report + Rust 风格 `error[E<CODE>]: <标题>` + 源码行高亮 + help/note 输出
 - [ ] golden 测试框架：`cargo test` 加载 `testdata/golden/*` 并对比 `.py`
 - [ ] 反例测试框架：`# fly:error` 表驱动断言
 - [ ] `rust-toolchain.toml`（固定 channel）+ `.cargo/config.toml`（release strip/lto）
@@ -28,7 +28,7 @@
 
 1. **行为冻结**：R0-R4 期间 Go 版只修 bug，不新增语言功能；语言语义以 方案.md 为准，测试以 testdata 为准
 2. **golden 先行**：任何模块移植完成 = 对应 golden/反例全绿，否则不算完成
-3. **错误消息冻结**：`error: <file>.fly:L:C: msg` 逐字节不变，改消息必须先改 testdata 快照并双版本同步
+3. **错误消息冻结**：Rust 风格错误块逐字节不变（首行 `error[E<CODE>]:`、下划线行、`= help:`/`= note:`），改消息必须先改 testdata 快照并双版本同步
 4. **产物命名冻结**：`fly-<os>-<arch>.tar.gz|.zip` 与包内 `fly`/`fly.exe` 不变（`update.AssetFor` 契约）
 5. **零 C 依赖**：crate 白名单（见方案 §11-13），PR 引入新 crate 需评审
 6. **双版本对照**：迁移期每次合入跑 `scripts/diff_golden.sh`，输出差异即 bug，不允许"Rust 版先修"

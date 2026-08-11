@@ -1,13 +1,117 @@
-literal_type.fly:3:8: 常量表达式除数为零
-literal_type.fly:4:7: 常量表达式除数为零
-literal_type.fly:5:7: 常量表达式除数为零
-literal_type.fly:6:9: 运算符 + 不支持 str 与 int
-literal_type.fly:7:7: 运算符 - 不支持 int 与 str
-literal_type.fly:8:9: 运算符 * 不支持 list 与 str
-literal_type.fly:9:9: 运算符 << 不支持 str 与 int
-literal_type.fly:10:5: 运算符 < 不支持 int 与 str
-literal_type.fly:11:12: in 右侧不支持 int
-literal_type.fly:12:6: int 不可下标访问
-literal_type.fly:13:9: none 不可下标访问
-literal_type.fly:14:5: 运算符 - 不支持 str
-literal_type.fly:15:8: str 不可下标访问
+error[E0057]: 常量表达式除零
+  --> literal_type.fly:3:8
+   |
+   3 | a = 10 / 0
+   |        ^
+   |
+   = help: 常量表达式除数为零。修正除数，避免除零
+   = note: docs/报错清单.md#E0057
+
+error[E0057]: 常量表达式除零
+  --> literal_type.fly:4:7
+   |
+   4 | b = 1 // 0
+   |       ^^
+   |
+   = help: 常量表达式除数为零。修正除数，避免除零
+   = note: docs/报错清单.md#E0057
+
+error[E0057]: 常量表达式除零
+  --> literal_type.fly:5:7
+   |
+   5 | c = 8 % 0
+   |       ^
+   |
+   = help: 常量表达式除数为零。修正除数，避免除零
+   = note: docs/报错清单.md#E0057
+
+error[E0058]: 运算符类型不支持
+  --> literal_type.fly:6:9
+   |
+   6 | d = "x" + 1
+   |         ^
+   |
+   = help: 运算符 + 不支持 str 与 int。确保操作数类型匹配运算符
+   = note: docs/报错清单.md#E0058
+
+error[E0058]: 运算符类型不支持
+  --> literal_type.fly:7:7
+   |
+   7 | e = 1 - "a"
+   |       ^
+   |
+   = help: 运算符 - 不支持 int 与 str。确保操作数类型匹配运算符
+   = note: docs/报错清单.md#E0058
+
+error[E0058]: 运算符类型不支持
+  --> literal_type.fly:8:9
+   |
+   8 | f = [1] * "a"
+   |         ^
+   |
+   = help: 运算符 * 不支持 list 与 str。确保操作数类型匹配运算符
+   = note: docs/报错清单.md#E0058
+
+error[E0058]: 运算符类型不支持
+  --> literal_type.fly:9:9
+   |
+   9 | g = "a" << 1
+   |         ^^
+   |
+   = help: 运算符 << 不支持 str 与 int。确保操作数类型匹配运算符
+   = note: docs/报错清单.md#E0058
+
+error[E0058]: 运算符类型不支持
+  --> literal_type.fly:10:5
+   |
+  10 | h = 1 < "a"
+   |     ^
+   |
+   = help: 运算符 < 不支持 int 与 str。确保操作数类型匹配运算符
+   = note: docs/报错清单.md#E0058
+
+error[E0061]: in 右侧类型不支持
+  --> literal_type.fly:11:12
+   |
+  11 | i = "a" in 1
+   |            ^
+   |
+   = help: in 右侧不支持 int。in 右侧必须是可迭代容器
+   = note: docs/报错清单.md#E0061
+
+error[E0062]: 类型不可下标访问
+  --> literal_type.fly:12:6
+   |
+  12 | j = 1[0]
+   |      ^^^
+   |
+   = help: int 不可下标访问。仅列表/字典/字符串等容器支持下标
+   = note: docs/报错清单.md#E0062
+
+error[E0062]: 类型不可下标访问
+  --> literal_type.fly:13:9
+   |
+  13 | k = None[0]
+   |         ^^^
+   |
+   = help: none 不可下标访问。仅列表/字典/字符串等容器支持下标
+   = note: docs/报错清单.md#E0062
+
+error[E0060]: 运算符类型不支持
+  --> literal_type.fly:14:5
+   |
+  14 | l = -"a"
+   |     ^^^^
+   |
+   = help: 运算符 - 不支持 str。确保操作数类型匹配运算符
+   = note: docs/报错清单.md#E0060
+
+error[E0062]: 类型不可下标访问
+  --> literal_type.fly:15:8
+   |
+  15 | m = "a"[0.5]
+   |        ^^^^^
+   |
+   = help: str 不可下标访问。仅列表/字典/字符串等容器支持下标
+   = note: docs/报错清单.md#E0062
+

@@ -1,1 +1,9 @@
-lock_undefined.fly:1:1: lock 变量 FOO 未定义
+error[E0033]: lock 变量未定义
+  --> lock_undefined.fly:1:1
+   |
+   1 | lock FOO
+   | ^^^^
+   |
+   = help: lock 变量 FOO 未定义。先声明 lock 变量，或检查拼写
+   = note: docs/报错清单.md#E0033
+

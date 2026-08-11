@@ -1,1 +1,9 @@
-undefined_name.fly:13:12: 未定义的名字 nope
+error[E0052]: 名字未定义
+  --> undefined_name.fly:13:12
+   |
+  13 |     return nope
+   |            ^^^^
+   |
+   = help: 未定义的名字 nope。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

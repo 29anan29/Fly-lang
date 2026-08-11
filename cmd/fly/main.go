@@ -6,13 +6,36 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
+	"flylang/internal/ast"
 	"flylang/internal/compile"
 	"flylang/internal/lsp"
 	"flylang/internal/update"
 	"flylang/internal/version"
 )
+
+func cmdError(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "用法: fly error <E码>（如 fly error E0031）")
+		return 2
+	}
+	code := strings.ToUpper(args[0])
+	if !strings.HasPrefix(code, "E") {
+		code = "E" + code
+	}
+	if n, err := strconv.Atoi(strings.TrimPrefix(code, "E")); err == nil {
+		code = fmt.Sprintf("E%04d", n)
+	}
+	info, ok := ast.InfoForCode(code)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "未知错误码 %s\n\n全部错误码见 docs/报错清单.md\n", code)
+		return 1
+	}
+	fmt.Println(info.Example)
+	return 0
+}
 
 func cmdLSP(args []string) int {
 	if len(args) > 0 {
@@ -33,6 +56,7 @@ const usage = `Fly-Lang 编译器
   fly check <file.fly>          仅编译检查
   fly run <file.fly>            转译并执行
   fly version                  显示版本
+  fly error <E码>              查询错误码（示例报错与修复方法）
   fly update [选项]             检查/更新到最新版本
 
 build 选项:
@@ -63,6 +87,8 @@ func run(args []string) int {
 	case "version":
 		fmt.Println(version.String())
 		return 0
+	case "error":
+		return cmdError(args[1:])
 	case "update":
 		return cmdUpdate(args[1:])
 	case "lsp":

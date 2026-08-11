@@ -12,12 +12,16 @@ func (p Position) String() string {
 }
 
 type Diagnostic struct {
-	Pos Position
-	Msg string
+	Pos  Position
+	Code string
+	Msg  string
 }
 
 func (d Diagnostic) Error() string {
-	return fmt.Sprintf("%d:%d: %s", d.Pos.Line, d.Pos.Col, d.Msg)
+	if d.Code == "" {
+		return fmt.Sprintf("%d:%d: %s", d.Pos.Line, d.Pos.Col, d.Msg)
+	}
+	return fmt.Sprintf("%d:%d: error[%s]: %s", d.Pos.Line, d.Pos.Col, d.Code, d.Msg)
 }
 
 type Node interface {

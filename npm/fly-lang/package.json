@@ -1,0 +1,27 @@
+{
+  "name": "fly-lang",
+  "version": "0.0.0",
+  "description": "Fly-Lang: Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）",
+  "license": "MIT",
+  "author": "anan29_china (https://www.npmjs.com/~anan29_china)",
+  "bin": {
+    "fly": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "bin"
+  ],
+  "keywords": [
+    "transpiler",
+    "python",
+    "security",
+    "compiler"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/29anan29/Fly-lang.git"
+  }
+}

@@ -1,1 +1,9 @@
-syntax.fly:2:5: 期望 标识符，实际为 pass
+error[E0001]: 语法不匹配
+  --> syntax.fly:2:5
+   |
+   2 |     pass
+   |     ^^^^
+   |
+   = help: 期望 标识符，实际为 pass。检查该位置的期望符号，补全或修正语法结构
+   = note: docs/报错清单.md#E0001
+

@@ -1,3 +1,27 @@
-dup_def.fly:8:1: 名字 dup 重复定义（第一次在第 4 行）
-dup_def.fly:16:1: 名字 Cls 重复定义（第一次在第 12 行）
-dup_def.fly:20:1: 函数参数 a 重复定义
+error[E0029]: 名字重复定义
+  --> dup_def.fly:8:1
+   |
+   8 | def dup():
+   | ^^^
+   |
+   = help: 名字 dup 重复定义（第一次在第 4 行）。删除或重命名其中一个定义
+   = note: docs/报错清单.md#E0029
+
+error[E0029]: 名字重复定义
+  --> dup_def.fly:16:1
+   |
+  16 | class Cls:
+   | ^^^^^
+   |
+   = help: 名字 Cls 重复定义（第一次在第 12 行）。删除或重命名其中一个定义
+   = note: docs/报错清单.md#E0029
+
+error[E0030]: 参数重复定义
+  --> dup_def.fly:20:1
+   |
+  20 | def f(a, a):
+   | ^^^
+   |
+   = help: 函数参数 a 重复定义。函数参数名必须唯一
+   = note: docs/报错清单.md#E0030
+

@@ -1,2 +1,18 @@
-safe_sql.fly:2:15: 未净化的外部输入 sql 流入 execute（危险汇点）
-safe_sql.fly:2:1: 未定义的名字 cursor
+error[E0031]: 污点数据流入危险汇点
+  --> safe_sql.fly:2:15
+   |
+   2 | cursor.execute(sql)
+   |               ^^^^^
+   |
+   = help: 未净化的外部输入 sql 流入 execute（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
+
+error[E0052]: 名字未定义
+  --> safe_sql.fly:2:1
+   |
+   2 | cursor.execute(sql)
+   | ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 未定义的名字 cursor。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

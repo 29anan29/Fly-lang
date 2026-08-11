@@ -42,7 +42,7 @@ func (p *Parser) peek() lexer.Token {
 
 func (p *Parser) errorf(pos ast.Position, format string, args ...interface{}) {
 	if p.err == nil {
-		p.err = &ast.Diagnostic{Pos: pos, Msg: fmt.Sprintf(format, args...)}
+		p.err = &ast.Diagnostic{Pos: pos, Code: ast.CodeForFormat(format), Msg: fmt.Sprintf(format, args...)}
 	}
 }
 

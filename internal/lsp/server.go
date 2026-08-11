@@ -328,7 +328,8 @@ func (s *Server) checkURI(uri string) {
 			},
 			"severity": 1,
 			"source":   "fly",
-			"message":  fmt.Sprintf("%s: %s", base, e.Msg),
+			"code":     e.Code,
+			"message":  fmt.Sprintf("error[%s]: %s: %s", e.Code, base, e.Msg),
 		})
 	}
 	s.publish(uri, diags)

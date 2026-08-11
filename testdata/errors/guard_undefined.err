@@ -1,1 +1,9 @@
-guard_undefined.fly:2:5: guard 变量 age 未定义
+error[E0039]: guard 变量未定义
+  --> guard_undefined.fly:2:5
+   |
+   2 |     guard age: int, 0 < age < 150
+   |     ^^^^^
+   |
+   = help: guard 变量 age 未定义。先定义该变量（或参数）再使用 guard
+   = note: docs/报错清单.md#E0039
+

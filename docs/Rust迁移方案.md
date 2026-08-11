@@ -36,7 +36,7 @@
 | D2 | 仓库组织 | **同仓库 `src/` 根目录 + `fly` 二进制同名**，Go 源码移入 `legacy-go/`（或按里程碑整体切换） | 新仓库（丢失 issue/CI 历史） |
 | D3 | 双轨期 | Go 与 Rust 并行，以 testdata golden 为行为基线；Rust 全绿后才删 Go | 一步到位直接替换（风险高，不推荐） |
 | D4 | checker 移植顺序 | 跟随 Go 版 P1→P4 关键字实现进度逐块移植 | 一次性全量（工作量大，难验证） |
-| D5 | 错误输出 | 保持 `error: <file>.fly:12:5: <msg>` 逐字节一致（行列号按 **Unicode 字符**计，与 Go 的 rune 语义对齐） | 按字节计（与 Go 不一致，禁止） |
+| D5 | 错误输出 | 保持 Rust 风格错误块逐字节一致（`error[E<CODE>]:` + 源码行 + 下划线 + help/note）（行列号按 **Unicode 字符**计，与 Go 的 rune 语义对齐） | 按字节计（与 Go 不一致，禁止） |
 
 ## 4. 目录结构（目标态）
 
@@ -93,7 +93,7 @@ pub struct Report { pub errors: Vec<Diagnostic> }   // 聚合，上限 MAX_ERROR
 ```
 
 - lexer/parser 出错即停（返回 `Err(Report)`）；checker 收集多条再停
-- 输出统一 `error: <file>.fly:12:5: <msg>`，转义规则与 Go 版 `FormatError` 一致
+- 输出统一 Rust 风格错误块，转义规则与 Go 版 `formatError` 一致（下划线宽度按 Unicode 字符计）
 - 不要用 `panic` 传递错误；`?` + 自定义 `Error`（`impl std::error::Error`）承载 `Report`
 
 ## 8. 契约兼容清单（不可破坏）
@@ -101,7 +101,7 @@ pub struct Report { pub errors: Vec<Diagnostic> }   // 聚合，上限 MAX_ERROR
 | 契约 | 现状 | Rust 版要求 |
 | :--- | :--- | :--- |
 | CLI 子命令 | build/check/run/version/update | 同名、同参数（`-o`、`--check`、`--force`、`--proxy`） |
-| 错误格式 | `error: <file>.fly:L:C: msg` | 逐字节一致（VSCode 插件正则依赖） |
+| 错误格式 | Rust 风格错误块 | 逐字节一致（VSCode 插件正则依赖） |
 | 退出码 | 0 / 1 / 2 | 一致 |
 | 产物命名 | `fly-<os>-<arch>.tar.gz\|.zip`，内含 `fly`/`fly.exe` | 一致（`update.AssetFor` 规则） |
 | version 输出 | `vX.Y.Z` + commit | 格式一致 |

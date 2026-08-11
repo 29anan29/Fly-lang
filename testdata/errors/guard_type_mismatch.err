@@ -1,1 +1,9 @@
-guard_type_mismatch.fly:2:5: guard 类型 int 与参数注解 str 不一致
+error[E0041]: guard 类型与注解不一致
+  --> guard_type_mismatch.fly:2:5
+   |
+   2 |     guard username: int
+   |     ^^^^^
+   |
+   = help: guard 类型 int 与参数注解 str 不一致。统一 guard 类型与参数注解的类型
+   = note: docs/报错清单.md#E0041
+

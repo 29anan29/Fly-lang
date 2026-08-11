@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"fmt"
 	"strings"
 
 	"flylang/internal/ast"
@@ -39,7 +40,7 @@ func (l *Lexer) Err() *ast.Diagnostic {
 
 func (l *Lexer) errorf(p ast.Position, format string, args ...interface{}) {
 	if l.err == nil {
-		l.err = &ast.Diagnostic{Pos: p, Msg: format}
+		l.err = &ast.Diagnostic{Pos: p, Code: ast.CodeForFormat(format), Msg: fmt.Sprintf(format, args...)}
 	}
 }
 
@@ -478,7 +479,7 @@ func (l *Lexer) scanOp() Token {
 		if l.peek(1) == '=' {
 			return two(NE, advance(2))
 		}
-		l.errorf(start, "意外的字符 '!'")
+		l.errorf(start, "意外的字符 %q", '!')
 		return Token{Type: ILLEGAL, Lit: "", Pos: start}
 	case '&':
 		if l.peek(1) == '=' {

@@ -121,8 +121,7 @@ func TestErrorSnapshots(t *testing.T) {
 			var got strings.Builder
 			base := filepath.Base(f)
 			for _, d := range errs {
-				line := FormatError(f, d)
-				line = line[strings.LastIndex(line, base):]
+				line := strings.ReplaceAll(FormatError(f, d), f, base)
 				got.WriteString(line)
 				got.WriteString("\n")
 			}

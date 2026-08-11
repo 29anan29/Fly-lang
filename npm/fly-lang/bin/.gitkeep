@@ -1,0 +1,4 @@
+# 本目录存放 CI 注入的预编译二进制：
+# fly-linux-amd64 / fly-linux-arm64
+# fly-darwin-amd64 / fly-darwin-arm64
+# fly-windows-amd64.exe / fly-windows-arm64.exe

@@ -1,1 +1,9 @@
-lock_delete.fly:1:1: lock 变量 SECRET 不可删除
+error[E0034]: lock 变量不可删除
+  --> lock_delete.fly:1:1
+   |
+   1 | lock SECRET = "abc"
+   | ^^^^
+   |
+   = help: lock 变量 SECRET 不可删除。lock 变量生命周期受保护，删除将破坏不变量
+   = note: docs/报错清单.md#E0034
+

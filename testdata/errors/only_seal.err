@@ -1,3 +1,27 @@
-only_seal.fly:3:9: only 块禁止访问 os（不在白名单 [json]）
-only_seal.fly:13:7: seal 类实例 admin 的属性 role 不可修改
-only_seal.fly:14:7: seal 类实例 admin 的属性 permission 不可修改
+error[E0045]: only 块外访问被禁止
+  --> only_seal.fly:3:9
+   |
+   3 |         os.system("rm -rf /")  # fly:error
+   |         ^^^^^^^^^^^^^
+   |
+   = help: only 块禁止访问 os（不在白名单 [json]）。将该名字加入 only 白名单，或移除该访问
+   = note: docs/报错清单.md#E0045
+
+error[E0046]: seal 属性不可修改
+  --> only_seal.fly:13:7
+   |
+  13 | admin.role = "user"  # fly:error
+   |       ^^^^
+   |
+   = help: seal 类实例 admin 的属性 role 不可修改。seal 类实例属性在实例化后不可再赋值
+   = note: docs/报错清单.md#E0046
+
+error[E0046]: seal 属性不可修改
+  --> only_seal.fly:14:7
+   |
+  14 | admin.permission = "all"  # fly:error
+   |       ^^^^^^^^^^
+   |
+   = help: seal 类实例 admin 的属性 permission 不可修改。seal 类实例属性在实例化后不可再赋值
+   = note: docs/报错清单.md#E0046
+

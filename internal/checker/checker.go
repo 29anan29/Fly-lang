@@ -66,7 +66,7 @@ func (c *Checker) errorf(pos ast.Position, format string, args ...interface{}) {
 	if len(c.errs) >= maxErrs {
 		return
 	}
-	c.errs = append(c.errs, ast.Diagnostic{Pos: pos, Msg: fmt.Sprintf(format, args...)})
+	c.errs = append(c.errs, ast.Diagnostic{Pos: pos, Code: ast.CodeForFormat(format), Msg: fmt.Sprintf(format, args...)})
 }
 
 func (c *Checker) collectModule(m *ast.Module) {

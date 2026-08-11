@@ -3,6 +3,7 @@ package compile
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"flylang/internal/ast"
 	"flylang/internal/checker"
@@ -73,8 +74,62 @@ func BuildFile(path string) (string, []ast.Diagnostic, error) {
 }
 
 func FormatError(path string, d ast.Diagnostic) string {
-	if d.Pos.Line == 0 {
-		return fmt.Sprintf("error: %s: %s", path, d.Msg)
+	src, _ := os.ReadFile(path)
+	return formatError(path, string(src), d)
+}
+
+func formatError(path, src string, d ast.Diagnostic) string {
+	info, ok := ast.InfoForCode(d.Code)
+	if !ok {
+		if d.Pos.Line == 0 {
+			return fmt.Sprintf("error: %s: %s", path, d.Msg)
+		}
+		return fmt.Sprintf("error: %s:%d:%d: %s", path, d.Pos.Line, d.Pos.Col, d.Msg)
 	}
-	return fmt.Sprintf("error: %s:%d:%d: %s", path, d.Pos.Line, d.Pos.Col, d.Msg)
+	var b strings.Builder
+	fmt.Fprintf(&b, "error[%s]: %s\n", d.Code, info.Title)
+	fmt.Fprintf(&b, "  --> %s:%d:%d\n", path, d.Pos.Line, d.Pos.Col)
+	if line, ok := srcLine(src, d.Pos.Line); ok {
+		len := underlineLen(line, d.Pos.Col)
+		fmt.Fprintf(&b, "   |\n")
+		fmt.Fprintf(&b, "%4d | %s\n", d.Pos.Line, line)
+		fmt.Fprintf(&b, "   | %s^%s\n", strings.Repeat(" ", d.Pos.Col-1), strings.Repeat("^", len-1))
+	}
+	fmt.Fprintf(&b, "   |\n")
+	if d.Msg != info.Title {
+		fmt.Fprintf(&b, "   = help: %s。%s\n", d.Msg, info.Help)
+	} else {
+		fmt.Fprintf(&b, "   = help: %s\n", info.Help)
+	}
+	fmt.Fprintf(&b, "   = note: %s\n", info.Note)
+	return b.String()
+}
+
+func srcLine(src string, line int) (string, bool) {
+	if src == "" {
+		return "", false
+	}
+	cur := 1
+	for _, l := range strings.SplitAfter(src, "\n") {
+		if cur == line {
+			return strings.TrimRight(l, "\n"), true
+		}
+		cur++
+	}
+	return "", false
+}
+
+func underlineLen(line string, col int) int {
+	if col-1 > len(line) {
+		return 1
+	}
+	rest := line[col-1:]
+	n := 0
+	for n < len(rest) && n < 32 && rest[n] != ' ' {
+		n++
+	}
+	if n == 0 {
+		return 1
+	}
+	return n
 }

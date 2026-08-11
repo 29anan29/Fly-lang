@@ -1,1 +1,9 @@
-guard_unknown_ref.fly:2:31: guard 条件中引用了未定义的名字 limit
+error[E0043]: guard 条件引用未定义名字
+  --> guard_unknown_ref.fly:2:31
+   |
+   2 |     guard age: int, 0 < age < limit
+   |                               ^^^^^
+   |
+   = help: guard 条件中引用了未定义的名字 limit。先定义条件中引用的名字
+   = note: docs/报错清单.md#E0043
+

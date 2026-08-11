@@ -1,1 +1,9 @@
-mask_print.fly:2:6: 敏感数据 pw 不可流入 print（输出上下文）
+error[E0032]: 敏感数据流入输出上下文
+  --> mask_print.fly:2:6
+   |
+   2 | print(pw)
+   |      ^^^^
+   |
+   = help: 敏感数据 pw 不可流入 print（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+

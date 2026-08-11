@@ -1,4 +1,36 @@
-edge_nesting.fly:6:14: 敏感数据 token 不可流入 print（输出上下文）
-edge_nesting.fly:14:17: only 块禁止访问 os（不在白名单 [json]）
-edge_nesting.fly:14:17: only 块禁止访问 os（不在白名单 [math]）
-edge_nesting.fly:28:22: 敏感数据 x 不可流入 print（输出上下文）
+error[E0032]: 敏感数据流入输出上下文
+  --> edge_nesting.fly:6:14
+   |
+   6 |         print(token)
+   |              ^^^^^^^
+   |
+   = help: 敏感数据 token 不可流入 print（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+
+error[E0045]: only 块外访问被禁止
+  --> edge_nesting.fly:14:17
+   |
+  14 |                 os.system("ls")
+   |                 ^^^^^^^^^^^^^^^
+   |
+   = help: only 块禁止访问 os（不在白名单 [json]）。将该名字加入 only 白名单，或移除该访问
+   = note: docs/报错清单.md#E0045
+
+error[E0045]: only 块外访问被禁止
+  --> edge_nesting.fly:14:17
+   |
+  14 |                 os.system("ls")
+   |                 ^^^^^^^^^^^^^^^
+   |
+   = help: only 块禁止访问 os（不在白名单 [math]）。将该名字加入 only 白名单，或移除该访问
+   = note: docs/报错清单.md#E0045
+
+error[E0032]: 敏感数据流入输出上下文
+  --> edge_nesting.fly:28:22
+   |
+  28 |                 print(x)
+   |                      ^^^
+   |
+   = help: 敏感数据 x 不可流入 print（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+

@@ -1,10 +1,90 @@
-all8_err.fly:8:16: 未净化的外部输入 uid 流入 eval（危险汇点）
-all8_err.fly:14:9: only 块禁止访问 os（不在白名单 [json math]）
-all8_err.fly:18:1: lock 变量 SECRET_KEY 不可再赋值
-all8_err.fly:18:1: lock 变量 SECRET_KEY 不可通过 globals() 反射读取
-all8_err.fly:32:10: 敏感数据 password 不可流入 print（输出上下文）
-all8_err.fly:37:17: 敏感数据 password 不可流入 logging（输出上下文）
-all8_err.fly:54:8: seal 类实例 admin7 的属性 role 不可修改
-all8_err.fly:55:8: seal 类实例 admin7 的属性 permission 不可修改
-all8_err.fly:59:1: trace 级别 BOGUS 非法（支持 DEBUG/INFO/WARNING/ERROR/CRITICAL）
-all8_err.fly:37:5: 未定义的名字 logging
+error[E0031]: 污点数据流入危险汇点
+  --> all8_err.fly:8:16
+   |
+   8 |     data = eval(f"get_user({uid})")
+   |                ^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 未净化的外部输入 uid 流入 eval（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
+
+error[E0045]: only 块外访问被禁止
+  --> all8_err.fly:14:9
+   |
+  14 |         os.system("rm -rf /")
+   |         ^^^^^^^^^^^^^
+   |
+   = help: only 块禁止访问 os（不在白名单 [json math]）。将该名字加入 only 白名单，或移除该访问
+   = note: docs/报错清单.md#E0045
+
+error[E0035]: lock 变量不可再赋值
+  --> all8_err.fly:18:1
+   |
+  18 | lock SECRET_KEY = "abc-123"
+   | ^^^^
+   |
+   = help: lock 变量 SECRET_KEY 不可再赋值。lock 变量只读；如需可变请改用普通变量
+   = note: docs/报错清单.md#E0035
+
+error[E0038]: 禁止反射读取 lock
+  --> all8_err.fly:18:1
+   |
+  18 | lock SECRET_KEY = "abc-123"
+   | ^^^^
+   |
+   = help: lock 变量 SECRET_KEY 不可通过 globals() 反射读取。lock 变量不可通过反射（globals()/vars()/locals()）读取
+   = note: docs/报错清单.md#E0038
+
+error[E0032]: 敏感数据流入输出上下文
+  --> all8_err.fly:32:10
+   |
+  32 |     print(f"密码: {password}")
+   |          ^^^^^^^^^^
+   |
+   = help: 敏感数据 password 不可流入 print（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+
+error[E0032]: 敏感数据流入输出上下文
+  --> all8_err.fly:37:17
+   |
+  37 |     logging.info(password)
+   |                 ^^^^^^^^^^
+   |
+   = help: 敏感数据 password 不可流入 logging（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+
+error[E0046]: seal 属性不可修改
+  --> all8_err.fly:54:8
+   |
+  54 | admin7.role = "user"
+   |        ^^^^
+   |
+   = help: seal 类实例 admin7 的属性 role 不可修改。seal 类实例属性在实例化后不可再赋值
+   = note: docs/报错清单.md#E0046
+
+error[E0046]: seal 属性不可修改
+  --> all8_err.fly:55:8
+   |
+  55 | admin7.permission = "all"
+   |        ^^^^^^^^^^
+   |
+   = help: seal 类实例 admin7 的属性 permission 不可修改。seal 类实例属性在实例化后不可再赋值
+   = note: docs/报错清单.md#E0046
+
+error[E0047]: trace 级别非法
+  --> all8_err.fly:59:1
+   |
+  59 | trace(level="BOGUS"):
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: trace 级别 BOGUS 非法（支持 DEBUG/INFO/WARNING/ERROR/CRITICAL）。使用 DEBUG/INFO/WARNING/ERROR/CRITICAL 之一
+   = note: docs/报错清单.md#E0047
+
+error[E0052]: 名字未定义
+  --> all8_err.fly:37:5
+   |
+  37 |     logging.info(password)
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 未定义的名字 logging。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

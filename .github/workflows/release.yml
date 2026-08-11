@@ -32,6 +32,7 @@ jobs:
           for arch in amd64 arm64; do
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o dist/fly ./cmd/fly
             tar -czf dist/fly-linux-$arch.tar.gz -C dist fly
+            cp dist/fly npm-bin/fly-linux-$arch
             rm dist/fly
 
             mkdir -p pkg/usr/bin pkg/usr/share/pixmaps pkg/DEBIAN
@@ -46,6 +47,11 @@ jobs:
         with:
           name: linux-pkgs
           path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-linux
+          path: npm-bin/*
           if-no-files-found: error
 
   macos:
@@ -65,11 +71,13 @@ jobs:
           set -euo pipefail
           VER=${VERSION#v}
           ldflags="-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$SHA $VERSION_LDFLAGS"
-          mkdir -p dist perarch/amd64 perarch/arm64
+          mkdir -p dist perarch/amd64 perarch/arm64 npm-bin
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o perarch/amd64/fly ./cmd/fly
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o perarch/arm64/fly ./cmd/fly
           tar -czf dist/fly-darwin-amd64.tar.gz -C perarch/amd64 fly
           tar -czf dist/fly-darwin-arm64.tar.gz -C perarch/arm64 fly
+          cp perarch/amd64/fly npm-bin/fly-darwin-amd64
+          cp perarch/arm64/fly npm-bin/fly-darwin-arm64
           lipo -create perarch/amd64/fly perarch/arm64/fly -output dist/fly-universal
 
           # .pkg 安装包（/usr/local/bin）
@@ -90,6 +98,11 @@ jobs:
           name: macos-pkgs
           path: dist/*
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-darwin
+          path: npm-bin/*
+          if-no-files-found: error
 
   windows:
     name: Windows packages
@@ -107,13 +120,14 @@ jobs:
         run: |
           $VER = $env:VERSION.TrimStart('v')
           $ldflags = "-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$env:SHA $env:VERSION_LDFLAGS"
-          New-Item -ItemType Directory -Force dist | Out-Null
+          New-Item -ItemType Directory -Force dist, npm-bin | Out-Null
           foreach ($arch in @('amd64', 'arm64')) {
             $env:CGO_ENABLED = '0'
             $env:GOOS = 'windows'
             $env:GOARCH = $arch
             go build -trimpath -ldflags $ldflags -o dist\fly.exe .\cmd\fly
             Compress-Archive -Path dist\fly.exe -DestinationPath dist\fly-windows-$arch.zip
+            Copy-Item dist\fly.exe npm-bin\fly-windows-$arch.exe
             if ($arch -eq 'amd64') {
               Move-Item dist\fly.exe dist\fly-installer.exe
             } else {
@@ -128,6 +142,11 @@ jobs:
         with:
           name: windows-pkgs
           path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-windows
+          path: npm-bin/*
           if-no-files-found: error
 
   vsix:
@@ -153,6 +172,46 @@ jobs:
           name: vsix-pkgs
           path: dist/*.vsix
           if-no-files-found: error
+
+  npm:
+    name: npm package
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: npm-*
+          path: npm-bin
+          merge-multiple: true
+      - name: Assemble npm package
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VER=${VERSION#v}
+          chmod +x npm-bin/fly-linux-* npm-bin/fly-darwin-*
+          cp npm-bin/* npm/fly-lang/bin/
+          ls -la npm/fly-lang/bin/
+          sed -i "s/\"version\": \"0.0.0\"/\"version\": \"$VER\"/" npm/fly-lang/package.json
+          cd npm/fly-lang && npm pack --dry-run 2>&1 | tail -15
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-pkg
+          path: npm/fly-lang/bin/*
+          if-no-files-found: error
+      - name: Publish to npm
+        if: env.NPM_TOKEN != ''
+        working-directory: npm/fly-lang
+        run: |
+          npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
+          npm publish --access public
 
   release:
     name: publish release
@@ -184,4 +243,5 @@ jobs:
             - macOS: .pkg + .dmg（universal）、tar.gz
             - Windows: .zip（amd64/arm64）、自解压 exe
             - VSCode 插件：fly-lang-*.vsix（LSP 编译期诊断，v0.2.0+ 要求）
+            - npm：\`npm install -g fly-lang\`（二进制全平台单包，见 npm job）
             更新命令：\`fly update\`（dev 版默认走 dev 渠道，\`--channel release\` 切正式版）"

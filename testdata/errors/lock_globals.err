@@ -1,1 +1,9 @@
-lock_globals.fly:1:1: lock 变量 SECRET 不可通过 globals() 反射读取
+error[E0038]: 禁止反射读取 lock
+  --> lock_globals.fly:1:1
+   |
+   1 | lock SECRET = "abc"
+   | ^^^^
+   |
+   = help: lock 变量 SECRET 不可通过 globals() 反射读取。lock 变量不可通过反射（globals()/vars()/locals()）读取
+   = note: docs/报错清单.md#E0038
+

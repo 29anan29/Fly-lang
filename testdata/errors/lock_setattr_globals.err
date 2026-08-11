@@ -1,1 +1,9 @@
-lock_setattr_globals.fly:1:1: lock 变量 SECRET 不可通过 setattr 修改
+error[E0037]: 禁止 setattr 修改 lock
+  --> lock_setattr_globals.fly:1:1
+   |
+   1 | lock SECRET = "abc"
+   | ^^^^
+   |
+   = help: lock 变量 SECRET 不可通过 setattr 修改。lock 变量不可通过 setattr 修改
+   = note: docs/报错清单.md#E0037
+

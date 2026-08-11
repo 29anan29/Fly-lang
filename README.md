@@ -133,11 +133,20 @@ Fly 的检查全部发生在**编译期**（lexer → parser → checker），�
 
 ## 报错格式
 
+Rust 风格：每个错误带错误码、源码行高亮与修复建议（`help`）和威胁模型/文档关联（`note`）：
+
 ```
-error: <file>.fly:12:5: <消息>
+error[E0031]: 污点数据流入危险汇点
+  --> app.fly:10:23
+   |
+  10 |     obj = pickle.loads(data)
+   |                       ^^^^^^
+   |
+   = help: 未净化的外部输入 data 流入 pickle.loads（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
 ```
 
-全部错误消息清单见 [docs/报错清单.md](docs/报错清单.md)。
+全部错误码与消息清单见 [docs/报错清单.md](docs/报错清单.md)，终端可用 `fly error E0031` 查询任意错误码的示例报错与修复方法。
 
 ## LSP（编辑器编译期诊断）
 

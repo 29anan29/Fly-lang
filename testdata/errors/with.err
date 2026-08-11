@@ -1,1 +1,9 @@
-with.fly:1:1: 关键字 with 暂不支持
+error[E0004]: 关键字未实现
+  --> with.fly:1:1
+   |
+   1 | with open("f") as fp:
+   | ^^^^
+   |
+   = help: 关键字 with 暂不支持。替换为受支持的语法（如 with 改为 try/finally）
+   = note: docs/报错清单.md#E0004
+

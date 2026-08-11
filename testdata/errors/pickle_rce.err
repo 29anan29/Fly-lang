@@ -1,3 +1,27 @@
-pickle_rce.fly:10:23: 未净化的外部输入 data 流入 pickle.loads（危险汇点）
-pickle_rce.fly:16:19: 未净化的外部输入 data 流入 pickle.load（危险汇点）
-pickle_rce.fly:21:13: 未净化的外部输入 payload 流入 pickle.loads（危险汇点）
+error[E0031]: 污点数据流入危险汇点
+  --> pickle_rce.fly:10:23
+   |
+  10 |     obj = pickle.loads(data)
+   |                       ^^^^^^
+   |
+   = help: 未净化的外部输入 data 流入 pickle.loads（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
+
+error[E0031]: 污点数据流入危险汇点
+  --> pickle_rce.fly:16:19
+   |
+  16 |     return pk.load(data)
+   |                   ^^^^^^
+   |
+   = help: 未净化的外部输入 data 流入 pickle.load（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
+
+error[E0031]: 污点数据流入危险汇点
+  --> pickle_rce.fly:21:13
+   |
+  21 |     return l(payload)
+   |             ^^^^^^^^^
+   |
+   = help: 未净化的外部输入 payload 流入 pickle.loads（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
+

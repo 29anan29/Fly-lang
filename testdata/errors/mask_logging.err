@@ -1,2 +1,18 @@
-mask_logging.fly:3:17: 敏感数据 password 不可流入 logging（输出上下文）
-mask_logging.fly:3:5: 未定义的名字 logging
+error[E0032]: 敏感数据流入输出上下文
+  --> mask_logging.fly:3:17
+   |
+   3 |     logging.info(password)
+   |                 ^^^^^^^^^^
+   |
+   = help: 敏感数据 password 不可流入 logging（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+
+error[E0052]: 名字未定义
+  --> mask_logging.fly:3:5
+   |
+   3 |     logging.info(password)
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 未定义的名字 logging。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

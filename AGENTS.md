@@ -27,6 +27,7 @@ internal/version/    版本注入（Version/Commit/Repo，ldflags -X flylang/int
 internal/update/     自更新（GitHub Releases API + SOCKS5/HTTP 代理，零第三方依赖）
 tools/icon/          图标生成器（assets/icon.png 产物）
 editor/vscode-fly/   VSCode 插件（TextMate 高亮 + vscode-languageclient 连 fly lsp）
+npm/fly-lang/       npm 包装器（预编译二进制打进 npm 包，npm install -g fly-lang）
 testdata/            正反例测试文件
 ```
 
@@ -45,6 +46,8 @@ testdata/            正反例测试文件
 - 版本注入：`go build -ldflags "-X flylang/internal/version.Version=v1.2.3 -X flylang/internal/version.Commit=<sha> -X flylang/internal/version.Repo=29anan29/Fly-lang"`，CI 用 `VERSION_LDFLAGS` 环境变量传入（见 .github/workflows/release.yml）
 - 版本渠道细分：`version.IsDev()` 判定（Version 空/`dev`/含 `-dev` → dev 版）；`fly version` 输出 `vX.Y.Z (release)` 或 `0.X.Y-dev (commit)`；`fly update --channel dev|release`（默认随当前版本），dev 渠道查 GitHub prerelease（`update.LatestDev`），无预发布时回退正式版渠道；CI 在 tag 含 `-dev` 时 `gh release create --prerelease`
 - 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
+- npm 发布（`npm` job）：三平台 job 交叉编译二进制上传 artifact（`npm-*`）→ `npm` job 组装到 `npm/fly-lang/bin/` → `npm pack` 出 tgz → `npm publish`（账号 anan29_china）；版本号由 tag 注入 package.json；发布依赖 `NPM_TOKEN` secret，未配置时跳过发布只留 artifact
+- `fly error <E码>`：查询错误码示例报错/修复方法，支持 `E0031`/`31` 格式（自动补零到 EXXXX）；错误码 E0001 起连续编号，注册表 `internal/ast/errors.go`（每码含 Title/Help/Note/Example）
 - `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（internal/update.AssetFor），改 CI 产物名必须同步改这里
 - 交互式 update：先 `CheckWritable` 预检，不可写时终端（TTY）自动 `sudo <exe> update <原参数>` 提权重试，非 TTY 回退"建议 sudo 重试"提示；确认用 `update.Confirm`，ANSI 颜色由 `isTTY`（ioctl TIOCGWINSZ，见 cmd/fly/tty*.go）控制
 - 代理：`--proxy` 支持 `http://`/`https://`/`socks5://[user:pass@]host:port`（socks5.go 手写实现，带认证）
@@ -53,7 +56,7 @@ testdata/            正反例测试文件
 
 - 只用 Go 标准库，零第三方依赖
 - 不加注释说明代码（除非必要文档注释），代码风格遵循 gofmt
-- 错误消息格式：`error: <file>.fly:12:5: <消息>`，行列来自 AST 节点 position
+- 错误消息格式：Rust 风格 `error[E<CODE>]: <标题>` + `--> file:line:col` + 源码行下划线高亮 + `= help:` 修复建议 + `= note:` 文档链接；错误码注册表在 `internal/ast/errors.go`（format→code 自动匹配，新增 errorf 消息必须登记错误码），渲染在 `internal/compile/compile.go` 的 `formatError`，行列来自 AST 节点 position
 - checker 与 gen 分离：checker 只收集信息/报错，不修改 AST 生成逻辑；gen 负责所有注入展开
 
 ## 8 个关键字职责划分

@@ -1,1 +1,9 @@
-lock_assign.fly:1:1: lock 变量 SECRET 不可再赋值
+error[E0035]: lock 变量不可再赋值
+  --> lock_assign.fly:1:1
+   |
+   1 | lock SECRET = "abc"
+   | ^^^^
+   |
+   = help: lock 变量 SECRET 不可再赋值。lock 变量只读；如需可变请改用普通变量
+   = note: docs/报错清单.md#E0035
+

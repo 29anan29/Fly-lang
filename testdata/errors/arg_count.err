@@ -1,4 +1,36 @@
-arg_count.fly:12:9: 函数 two 需要至少 2 个参数（实际 1 个）
-arg_count.fly:13:9: 函数 two 最多接受 2 个位置参数（实际 3 个）
-arg_count.fly:14:9: 函数 two 没有名为 c 的参数
-arg_count.fly:15:9: 函数 one 参数 a 重复传值
+error[E0053]: 参数个数不足
+  --> arg_count.fly:12:9
+   |
+  12 | x1 = two(1)
+   |         ^^^
+   |
+   = help: 函数 two 需要至少 2 个参数（实际 1 个）。补齐函数的必需参数
+   = note: docs/报错清单.md#E0053
+
+error[E0054]: 位置参数过多
+  --> arg_count.fly:13:9
+   |
+  13 | x2 = two(1, 2, 3)
+   |         ^^^
+   |
+   = help: 函数 two 最多接受 2 个位置参数（实际 3 个）。改用关键字参数传参
+   = note: docs/报错清单.md#E0054
+
+error[E0055]: 未知参数名
+  --> arg_count.fly:14:9
+   |
+  14 | x3 = two(1, 2, c=3)
+   |         ^^^
+   |
+   = help: 函数 two 没有名为 c 的参数。检查参数名拼写
+   = note: docs/报错清单.md#E0055
+
+error[E0056]: 参数重复传值
+  --> arg_count.fly:15:9
+   |
+  15 | x4 = one(1, a=2)
+   |         ^^^
+   |
+   = help: 函数 one 参数 a 重复传值。同一参数只能传值一次
+   = note: docs/报错清单.md#E0056
+

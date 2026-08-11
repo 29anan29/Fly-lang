@@ -1,1 +1,9 @@
-safe_eval.fly:2:5: 未净化的外部输入 uid 流入 eval（危险汇点）
+error[E0031]: 污点数据流入危险汇点
+  --> safe_eval.fly:2:5
+   |
+   2 | eval(uid)
+   |     ^^^^^
+   |
+   = help: 未净化的外部输入 uid 流入 eval（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
+   = note: SECURITY.md 污点分析一节
+
