@@ -138,5 +138,5 @@ def _fly_cast(fn, *args, line, col):
         ) from None
 
 print("Hello, Fly!")
-x = _fly_binop(1, 2, "add", 3, 7)
+x = 1 + 2
 print(x)

@@ -145,7 +145,7 @@ def _fly_cast(fn, *args, line, col):
         ) from None
 
 def create_user(username, age):
-    if not (isinstance(username, str) and (_fly_cmp(lambda: len(username), lambda: 0, "gt", 4, 29)) and (_fly_cmp(lambda: len(username), lambda: 20, "le", 4, 48))):
+    if not (isinstance(username, str) and (len(username) > 0) and (len(username) <= 20)):
         raise GuardError("guard username: str, len(username) > 0, len(username) <= 20")
     if not (isinstance(age, int) and (_fly_cmp(lambda: 0, lambda: age, "lt", 5, 21) and _fly_cmp(lambda: age, lambda: 150, "lt", 5, 21))):
         raise GuardError("guard age: int, 0 < age < 150")

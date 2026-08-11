@@ -196,7 +196,7 @@ def _fly_cast(fn, *args, line, col):
         ) from None
 
 def outer(a):
-    x = _fly_binop(a, 2, "mul", 4, 11)
+    x = a * 2
     def inner(b):
         x = _fly_binop(b, 1, "add", 7, 15)
         return x
@@ -210,9 +210,9 @@ def counter():
         return count
     return inc, setc
 def fib(n):
-    if _fly_cmp(lambda: n, lambda: 2, "lt", 27, 8):
+    if n < 2:
         return n
-    return _fly_binop(fib(_fly_binop(n, 1, "sub", 29, 18)), fib(_fly_binop(n, 2, "sub", 29, 31)), "add", 29, 23)
+    return fib(n - 1) + fib(n - 2)
 import json
 _fly_ob_b = globals().get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('json'))

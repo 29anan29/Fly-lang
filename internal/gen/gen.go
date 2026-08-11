@@ -20,6 +20,8 @@ type Gen struct {
 	traceCtx  *traceCtx
 	sealInit  bool
 	nc        int
+	types     *TypeInfer
+	curFn     string // 当前生成的函数名（类型推导作用域）
 }
 
 type traceCtx struct {
@@ -30,7 +32,8 @@ type traceCtx struct {
 }
 
 func Generate(m *ast.Module) string {
-	g := &Gen{}
+	g := &Gen{types: NewTypeInfer(m)}
+	g.types.Run()
 	docEnd := 0
 	if len(m.Stmts) > 0 {
 		if es, ok := m.Stmts[0].(*ast.ExprStmt); ok {
@@ -667,6 +670,9 @@ func (g *Gen) params(params []ast.Param) {
 }
 
 func (g *Gen) funcDef(t *ast.FuncDef) {
+	prevFn := g.curFn
+	g.curFn = t.Name
+	defer func() { g.curFn = prevFn }()
 	for _, d := range t.Decorators {
 		g.indentLine()
 		g.w("@")
@@ -1260,6 +1266,14 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 			g.expr(t.Y, p+1)
 			break
 		}
+		if g.types.plainBinOp(t.Op, t.X, t.Y, g.curFn) {
+			// 类型推导为 int/str：原生运算（热路径优化，豁免 _fly_binop 帧）
+			p := binPrec(t.Op)
+			g.expr(t.X, p)
+			g.w(" " + t.Op + " ")
+			g.expr(t.Y, p+1)
+			break
+		}
 		g.w("_fly_binop(")
 		g.expr(t.X, precCond)
 		g.w(", ")
@@ -1305,6 +1319,11 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 				left = t.Ys[i-1]
 			}
 			if op == "==" || op == "!=" || op == "is" || op == "is not" {
+				g.expr(left, precCompare)
+				g.w(" " + op + " ")
+				g.expr(t.Ys[i], precCompare)
+			} else if g.types.plainBinOp(op, left, t.Ys[i], g.curFn) {
+				// 类型推导为 int/str：原生比较（豁免 lambda 惰性帧）
 				g.expr(left, precCompare)
 				g.w(" " + op + " ")
 				g.expr(t.Ys[i], precCompare)
