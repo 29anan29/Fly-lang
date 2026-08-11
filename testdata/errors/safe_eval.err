@@ -7,3 +7,12 @@ error[E0031]: 污点数据流入危险汇点
    = help: 未净化的外部输入 uid 流入 eval（危险汇点）。对该值先做净化（白名单/类型校验）再流入汇点，或改用 only 白名单约束
    = note: SECURITY.md 污点分析一节
 
+error[E0063]: 禁止调用危险内建
+  --> safe_eval.fly:2:1
+   |
+   2 | eval(uid)
+   | ^^^^^^^^^
+   |
+   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+

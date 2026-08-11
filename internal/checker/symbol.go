@@ -69,9 +69,11 @@ var builtins = map[string]bool{
 	"NameError": true, "ImportError": true, "KeyboardInterrupt": true,
 	"NotImplemented": true, "OverflowError": true, "ArithmeticError": true,
 	"LookupError": true, "OSError": true, "FileNotFoundError": true,
-	"IOError": true, "MemoryError": true, "UnicodeError": true, "SystemExit": true,
+	"IOError": true, "MemoryError": true, 	"UnicodeError": true, "SystemExit": true,
 	"GeneratorExit": true, "EOFError": true, "FloatingPointError": true,
 	"IndentationError": true, "SyntaxError": true, "NotImplementedError": true,
 	"RecursionError": true, "UnboundLocalError": true, "EnvironmentError": true,
 	"__name__": true, "__file__": true, "__doc__": true, "__builtins__": true,
+	"TimeoutError": true, "GuardError": true, "FlyRuntimeError": true,
+	"ResourceExhaustedError": true,
 }

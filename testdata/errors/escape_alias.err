@@ -1,0 +1,11 @@
+error: escape_alias.fly:1:5: 禁止访问内建 vars（沙箱逃逸风险）
+error: escape_alias.fly:2:5: 禁止访问内建 eval（沙箱逃逸风险）
+error[E0063]: 禁止调用危险内建
+  --> escape_alias.fly:3:5
+   |
+   3 | z = globals()
+   |     ^^^^^^^^^
+   |
+   = help: 禁止调用内建 globals（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+

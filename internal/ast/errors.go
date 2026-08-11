@@ -54,6 +54,11 @@ var codeForFormat = map[string]string{
 	"lock 变量 %s 不可再赋值":           "E0035",
 	"lock 变量 %s 不可通过反射修改":        "E0036",
 	"lock 变量 %s 不可通过 setattr 修改": "E0037",
+	"禁止调用内建 %s（沙箱逃逸风险）":          "E0063",
+	"禁止反射访问属性 %s（沙箱逃逸风险）":        "E0064",
+	"禁止反射下标访问 %s（沙箱逃逸风险）":        "E0064",
+	"禁止访问 __builtins__（沙箱逃逸风险）":  "E0065",
+	"禁止导入危险模块 %s（沙箱逃逸风险）":        "E0066",
 	"lock 变量 %s 不可通过 %s() 反射读取":  "E0038",
 
 	"guard 变量 %s 未定义":             "E0039",
@@ -592,6 +597,38 @@ var errorInfo = map[string]ErrorInfo{
 			"   |     ^\n" +
 			"   |\n" +
 			"   = help: int 不可下标访问。仅列表/字典/字符串等容器支持下标"},
+	"E0063": {"E0063", "禁止调用危险内建", "eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用", "docs/报错清单.md#E0063",
+		"error[E0063]: 禁止调用危险内建\n" +
+			"  --> example.fly:1:1\n" +
+			"   |\n" +
+			"   1 | eval(user_input)\n" +
+			"   | ^^^^\n" +
+			"   |\n" +
+			"   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用"},
+	"E0064": {"E0064", "禁止反射访问", "__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问", "docs/报错清单.md#E0064",
+		"error[E0064]: 禁止反射访问\n" +
+			"  --> example.fly:1:9\n" +
+			"   |\n" +
+			"   1 | x = obj.__class__\n" +
+			"   |         ^^^^^^^^\n" +
+			"   |\n" +
+			"   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问"},
+	"E0065": {"E0065", "禁止访问 __builtins__", "__builtins__ 是沙箱内建代理的入口，直接访问即逃逸风险", "docs/报错清单.md#E0065",
+		"error[E0065]: 禁止访问 __builtins__\n" +
+			"  --> example.fly:1:1\n" +
+			"   |\n" +
+			"   1 | __builtins__['eval']\n" +
+			"   | ^^^^^^^^^^^^\n" +
+			"   |\n" +
+			"   = help: 禁止访问 __builtins__（沙箱逃逸风险）。__builtins__ 是沙箱内建代理的入口，直接访问即逃逸风险"},
+	"E0066": {"E0066", "禁止导入危险模块", "os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入", "docs/报错清单.md#E0066",
+		"error[E0066]: 禁止导入危险模块\n" +
+			"  --> example.fly:1:8\n" +
+			"   |\n" +
+			"   1 | import os\n" +
+			"   |        ^^\n" +
+			"   |\n" +
+			"   = help: 禁止导入危险模块 os（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入"},
 }
 
 func CodeForFormat(format string) string {

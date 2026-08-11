@@ -1,0 +1,3 @@
+x = vars
+y = eval
+z = globals()

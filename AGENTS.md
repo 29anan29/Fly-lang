@@ -64,6 +64,20 @@ testdata/            正反例测试文件
 - 纯编译期（checker 拦截，零运行时残留）：`safe`、`mask`、`lock`、`guard`
 - 编译期检查 + gen 注入：`only`（`__builtins__` 白名单代理）、`seal`（`__setattr__`）、`trace`（logging）、`cage`（signal/resource 装饰器）
 
+## 沙箱（默认注入，所有编译产物在沙箱内运行）
+
+- 生成 .py 恒注入 `runtime` + `sandbox` 两节（顺序：guard/only/trace/cage/runtime/sandbox，sandbox 依赖 runtime 的 FlyRuntimeError）
+- 运行时：`_FlySandbox` 内建代理（DANGEROUS 名单按名拦截 eval/exec/open/getattr/globals/vars 等）+ `_fly_attr/_fly_get/_fly_set` 反射黑名单（`__class__/__bases__/__subclasses__/__dict__` 等）+ 受限 `__import__`（BLOCKED 模块 os/subprocess/sys/pickle 等，ALLOWED 白名单 math/json/time 等）
+- 编译期：checker/escape.go 同名单拦截（E0063 危险内建、E0064 反射链、E0065 `__builtins__`、E0066 危险模块导入）——名单必须与 fly_runtime.py 的 `_FLY_SB_*` 保持一致
+- CPython 模块顶层帧缓存 builtins（f_builtins），运行时代理只在函数/类体内生效；**顶层逃逸靠编译期拦截**（危险内建名出现在任何读取位置都报 E0063）
+- 沙箱内 prelude 与注入代码禁止裸用危险内建：一律 `_fly_sb_builtins.getattr(...)` / `_fly_sb_module_globals[...]`（`globals()` 不是 builtins 模块属性）
+- `_FlyOnly`/`_FlySandbox` 必须实现 `__getitem__`（CPython 对非 dict 的 `__builtins__` 走下标访问）
+
+## 并发 check
+
+- `fly check <file.fly>...` 支持多文件与目录递归（.fly），goroutine 并发（信号量 `runtime.NumCPU()*2`），结果按输入顺序输出，任一失败退出码 1
+- LSP 诊断仍为单线程 CheckSource（协议串行）
+
 ## 测试约定
 
 - testdata 中 `.fly` 文件可用 `# fly:error` 注释标记该行期望编译报错（表驱动反例测试用）

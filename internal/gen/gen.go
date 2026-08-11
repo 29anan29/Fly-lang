@@ -46,22 +46,25 @@ func Generate(m *ast.Module) string {
 	only := needsOnly(m.Stmts)
 	trace := needsTrace(m.Stmts)
 	cage := needsCage(m.Stmts)
-	rt := needsRuntime(m.Stmts)
+	// 沙箱恒注入：所有编译产物在沙箱内运行（拦截逃逸内建/反射链/危险模块导入）。
+	// runtime 节随沙箱恒注入（sandbox 依赖 FlyRuntimeError 等定义）。
+	sandbox := true
+	rt := true
 	for i, s := range m.Stmts {
-		if i == docEnd && (guard || only || trace || cage || rt) {
+		if i == docEnd {
 			if docEnd == 1 {
 				g.w("\n")
 			}
-			g.runtimePrelude(guard, only, trace, cage, rt)
+			g.runtimePrelude(guard, only, trace, cage, rt, sandbox)
 		}
 		g.stmt(s)
 	}
 	return g.buf.String()
 }
 
-func (g *Gen) runtimePrelude(guard, only, trace, cage, rt bool) {
-	for _, n := range []string{"guard", "only", "trace", "cage", "runtime"} {
-		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace) || (n == "cage" && cage) || (n == "runtime" && rt)
+func (g *Gen) runtimePrelude(guard, only, trace, cage, rt, sandbox bool) {
+	for _, n := range []string{"guard", "only", "trace", "cage", "runtime", "sandbox"} {
+		need := (n == "guard" && guard) || (n == "only" && only) || (n == "trace" && trace) || (n == "cage" && cage) || (n == "runtime" && rt) || (n == "sandbox" && sandbox)
 		if !need {
 			continue
 		}
@@ -739,7 +742,7 @@ func (g *Gen) setattrMethod(del bool) {
 	g.w("def __" + m + "__" + sig + ":\n")
 	g.indent++
 	g.indentLine()
-	g.w(`if getattr(self, "_fly_seal_initializing", False):` + "\n")
+	g.w(`if _fly_sb_builtins.getattr(self, "_fly_seal_initializing", False):` + "\n")
 	g.indent++
 	g.indentLine()
 	g.w("object.__" + m + "__" + "(self, name")
@@ -765,7 +768,7 @@ func (g *Gen) onlyStmt(t *ast.OnlyStmt) {
 	g.nc++
 	saved := "_fly_ob_" + string(rune('a'+g.nc))
 	g.indentLine()
-	g.w(saved + " = globals().get(\"__builtins__\", _fly_builtins)\n")
+	g.w(saved + " = _fly_sb_module_globals.get(\"__builtins__\", _fly_builtins)\n")
 	g.indentLine()
 	g.w("__builtins__ = _FlyOnly(" + modsLit(t.Modules) + ")\n")
 	for _, s := range t.Body {

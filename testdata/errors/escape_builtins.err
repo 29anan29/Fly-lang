@@ -1,0 +1,45 @@
+error[E0063]: 禁止调用危险内建
+  --> escape_builtins.fly:1:1
+   |
+   1 | eval("1 + 1")
+   | ^^^^^^^
+   |
+   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_builtins.fly:2:1
+   |
+   2 | exec("x = 1")
+   | ^^^^^^^
+   |
+   = help: 禁止调用内建 exec（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_builtins.fly:3:1
+   |
+   3 | open("secret.txt")
+   | ^^^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 open（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_builtins.fly:4:1
+   |
+   4 | getattr(obj, "method")
+   | ^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 getattr（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0052]: 名字未定义
+  --> escape_builtins.fly:4:9
+   |
+   4 | getattr(obj, "method")
+   |         ^^^^
+   |
+   = help: 未定义的名字 obj。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

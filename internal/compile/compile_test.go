@@ -107,6 +107,35 @@ func TestRuntimeCatch(t *testing.T) {
 	}
 }
 
+// TestSandboxEscape 验证运行时沙箱兜底：编译期无法静态确定的逃逸
+// （变量下标反射名、危险内建名访问）在运行时被 _fly_* 拦截为 FlyRuntimeError。
+func TestSandboxEscape(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 不可用")
+	}
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"subclass_key", "x = []\nk = \"__subclasses__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __subclasses__"},
+		{"setattr_key", "x = []\nk = \"__class__\"\nx[k] = 1\n", "沙箱: 禁止反射下标赋值 __class__"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			code, errs, err := BuildSource(c.src)
+			if len(errs) > 0 || err != nil {
+				t.Fatalf("期望 check 通过（运行时兜底场景）: %v %v", errs, err)
+			}
+			cmd := exec.Command("python3", "-c", code)
+			out, _ := cmd.CombinedOutput()
+			if !strings.Contains(string(out), c.want) {
+				t.Fatalf("期望输出含 %q，实际:\n%s", c.want, out)
+			}
+		})
+	}
+}
+
 func TestErrorSnapshots(t *testing.T) {
 	files, err := filepath.Glob("../../testdata/errors/*.fly")
 	if err != nil {

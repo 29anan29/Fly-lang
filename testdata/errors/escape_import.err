@@ -1,0 +1,36 @@
+error[E0066]: 禁止导入危险模块
+  --> escape_import.fly:1:1
+   |
+   1 | import os
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 os（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_import.fly:2:1
+   |
+   2 | import subprocess
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 subprocess（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_import.fly:3:1
+   |
+   3 | from sys import argv
+   | ^^^^
+   |
+   = help: 禁止导入危险模块 sys（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_import.fly:4:1
+   |
+   4 | import pickle
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 pickle（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+

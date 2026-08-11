@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"flylang/internal/ast"
 	"flylang/internal/compile"
@@ -52,9 +53,9 @@ func cmdLSP(args []string) int {
 const usage = `Fly-Lang 编译器
 
 用法:
-  fly build [选项] <file.fly>   转译为 Python
-  fly check <file.fly>          仅编译检查
-  fly run <file.fly>            转译并执行
+  fly build [选项] <file.fly>   转译为 Python（含沙箱运行时，拦截逃逸）
+  fly check <file.fly>...       编译检查（支持目录递归，goroutine 并发）
+  fly run <file.fly>            转译并在沙箱内执行
   fly version                  显示版本
   fly error <E码>              查询错误码（示例报错与修复方法）
   fly update [选项]             检查/更新到最新版本
@@ -102,22 +103,71 @@ func run(args []string) int {
 }
 
 func cmdCheck(args []string) int {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "用法: fly check <file.fly>")
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: fly check <file.fly>...（支持目录，递归查找 .fly，并发检查）")
 		return 2
 	}
-	path := args[0]
-	errs, err := compile.CheckFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	var files []string
+	for _, a := range args {
+		info, err := os.Stat(a)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if info.IsDir() {
+			err := filepath.WalkDir(a, func(p string, d os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if !d.IsDir() && strings.HasSuffix(p, ".fly") {
+					files = append(files, p)
+				}
+				return nil
+			})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return 1
+			}
+		} else {
+			files = append(files, a)
+		}
+	}
+	if len(files) == 0 {
+		fmt.Fprintln(os.Stderr, "error: 未找到 .fly 文件")
 		return 1
 	}
-	for _, d := range errs {
-		fmt.Fprintln(os.Stderr, compile.FormatError(path, d))
+	type result struct {
+		path string
+		errs []ast.Diagnostic
 	}
-	if len(errs) > 0 {
+	results := make([]result, len(files))
+	sem := make(chan struct{}, runtime.NumCPU()*2)
+	var wg sync.WaitGroup
+	for i, path := range files {
+		wg.Add(1)
+		go func(i int, path string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			errs, _ := compile.CheckFile(path)
+			results[i] = result{path: path, errs: errs}
+		}(i, path)
+	}
+	wg.Wait()
+	failed := 0
+	for _, r := range results {
+		for _, d := range r.errs {
+			fmt.Fprintln(os.Stderr, compile.FormatError(r.path, d))
+		}
+		if len(r.errs) > 0 {
+			failed++
+		}
+	}
+	if failed > 0 {
+		fmt.Fprintf(os.Stderr, "%d 个文件检查失败\n", failed)
 		return 1
 	}
+	fmt.Printf("ok: %d 个文件检查通过\n", len(files))
 	return 0
 }
 

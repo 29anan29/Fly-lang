@@ -65,7 +65,7 @@ func TestLockReflection(t *testing.T) {
 	wantErr(t, "lock S = 'x'\nsetattr(globals(), 'S', 'y')\n", "不可通过 setattr 修改")
 	wantErr(t, "lock S = 'x'\nglobals()['S'] = 'y'\n", "不可通过反射修改")
 	noErr(t, "lock S = 'x'\nprint(S)\n")
-	noErr(t, "print(globals()['OTHER'])\n")
+	noErr(t, "d = {}\nprint(d['OTHER'])\n")
 }
 
 func TestLockUndefinedBare(t *testing.T) {
@@ -121,7 +121,7 @@ func TestSafeTaint(t *testing.T) {
 }
 
 func TestSafeSanitize(t *testing.T) {
-	noErr(t, "safe uid\nclean = int(uid)\neval(clean)\n")
+	noErr(t, "safe uid\nclean = int(uid)\nprint(clean)\n")
 	noErr(t, "safe uid\nclean = float(uid)\nreturn clean\n")
 	noErr(t, "request = {}\ndb = []\nuid = request.args.get('id')\nsafe uid\nclean = int(uid)\ndb.query(clean)\n")
 }
@@ -158,11 +158,11 @@ func TestFStringMask(t *testing.T) {
 
 func TestFunctionReturnTaint(t *testing.T) {
 	wantErr(t, "def get_input():\n    safe uid\n    return uid\neval(get_input())\n", "未净化的外部输入")
-	noErr(t, "def get_input():\n    safe uid\n    return int(uid)\neval(get_input())\n")
+	noErr(t, "def get_input():\n    safe uid\n    return int(uid)\nprint(get_input())\n")
 }
 
 func TestTaintSourceInput(t *testing.T) {
 	wantErr(t, "x = input()\neval(x)\n", "未净化的外部输入")
-	noErr(t, "x = input()\nx = int(x)\neval(x)\n")
+	wantErr(t, "x = input()\nx = int(x)\nprint(x)\n", "禁止调用内建 input")
 	wantErr(t, "s = os.environ['HOME']\neval(s)\n", "未净化的外部输入")
 }

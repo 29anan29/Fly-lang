@@ -1,0 +1,9 @@
+error[E0065]: 禁止访问 __builtins__
+  --> escape_builtins_name.fly:1:7
+   |
+   1 | print(__builtins__)
+   |       ^^^^^^^^^^^^^
+   |
+   = help: 禁止访问 __builtins__（沙箱逃逸风险）。__builtins__ 是沙箱内建代理的入口，直接访问即逃逸风险
+   = note: docs/报错清单.md#E0065
+

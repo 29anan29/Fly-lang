@@ -7,3 +7,12 @@ error[E0038]: 禁止反射读取 lock
    = help: lock 变量 SECRET 不可通过 globals() 反射读取。lock 变量不可通过反射（globals()/vars()/locals()）读取
    = note: docs/报错清单.md#E0038
 
+error[E0063]: 禁止调用危险内建
+  --> lock_globals.fly:2:7
+   |
+   2 | print(globals()['SECRET'])
+   |       ^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 globals（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+

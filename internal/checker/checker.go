@@ -22,6 +22,7 @@ func Check(m *ast.Module) []ast.Diagnostic {
 	c.collectModule(m)
 	c.cur = c.global
 	c.checkModule(m)
+	c.escapeCheck(m)
 	c.runtimeCheck(m)
 	return c.errs
 }

@@ -1,0 +1,27 @@
+error[E0064]: 禁止反射访问
+  --> escape_reflect.fly:2:7
+   |
+   2 | y = x.__class__
+   |       ^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_reflect.fly:3:7
+   |
+   3 | z = y.__bases__
+   |       ^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __bases__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_reflect.fly:4:7
+   |
+   4 | w = x.__dict__
+   |       ^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __dict__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+

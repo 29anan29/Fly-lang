@@ -1,3 +1,113 @@
+"""P6 最终回归：方案.md 全部 8 个示例（正例行，全部应通过）"""
+
+class GuardError(Exception):
+    """Fly guard 断言失败"""
+
+    pass
+
+import builtins as _fly_builtins
+import sys as _fly_sys
+
+_FLY_SAFE_BUILTINS = frozenset((
+    "len", "int", "float", "str", "bool", "list", "dict", "set", "tuple",
+    "range", "enumerate", "zip", "map", "filter", "sorted", "sum", "min",
+    "max", "abs", "round", "repr", "isinstance", "issubclass", "type",
+    "hasattr", "any", "all", "id", "chr", "ord", "iter", "next", "slice",
+    "reversed", "format", "frozenset", "bytes", "bytearray", "hash",
+    "divmod", "pow", "callable", "classmethod", "staticmethod", "property",
+    "super", "object", "print", "Exception", "ValueError", "TypeError",
+    "KeyError", "RuntimeError", "AttributeError", "IndexError",
+    "StopIteration", "NotImplemented", "ZeroDivisionError",
+    "AssertionError", "NameError", "ImportError", "KeyboardInterrupt",
+    "BaseException",
+))
+
+class _FlyOnly:
+    def __init__(self, mods):
+        self._mods = frozenset(mods)
+
+    def __getattr__(self, name):
+        if name.startswith("__") and name.endswith("__"):
+            return _fly_sb_builtins.getattr(_fly_builtins, name)
+        if name.startswith("_fly_") or name in ("FlyRuntimeError", "GuardError"):
+            return _fly_sb_module_globals[name]
+        if name in self._mods:
+            if name in _fly_sys.modules:
+                return _fly_sys.modules[name]
+            return _fly_sb_builtins.__import__(name)
+        if name in _FLY_SAFE_BUILTINS:
+            return _fly_sb_builtins.getattr(_fly_builtins, name)
+        raise RuntimeError("only: 禁止访问未白名单名称 " + name)
+
+    def __getitem__(self, name):
+        return self.__getattr__(name)
+
+
+def _fly_patch_builtins(fn, mods):
+    proxy = _FlyOnly(mods)
+    g = fn.__globals__
+    def wrapped(*args, **kwargs):
+        old = g.get("__builtins__")
+        g["__builtins__"] = proxy
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            if old is None:
+                del g["__builtins__"]
+            else:
+                g["__builtins__"] = old
+    wrapped.__name__ = fn.__name__
+    return wrapped
+
+import logging as _fly_log
+
+import functools as _fly_functools
+import resource as _fly_resource
+import signal as _fly_signal
+
+
+class ResourceExhaustedError(RuntimeError):
+    """Fly cage 资源超限"""
+
+
+def _fly_timeout_handler(signum, frame):
+    raise TimeoutError("cage: 执行超时")
+
+
+def _fly_cage(max_time=None, max_memory=None):
+    def deco(fn):
+        @_fly_functools.wraps(fn)
+        def wrapped(*args, **kwargs):
+            prev_alarm = None
+            prev_rlimit = None
+            try:
+                if max_time is not None:
+                    prev_alarm = _fly_signal.getsignal(_fly_signal.SIGALRM)
+                    _fly_signal.signal(_fly_signal.SIGALRM, _fly_timeout_handler)
+                    _fly_signal.setitimer(_fly_signal.ITIMER_REAL, max_time)
+                if max_memory is not None:
+                    prev_rlimit = _fly_resource.getrlimit(_fly_resource.RLIMIT_AS)
+                    soft, hard = prev_rlimit
+                    if soft == _fly_resource.RLIM_INFINITY or max_memory < soft:
+                        soft = max_memory
+                    _fly_resource.setrlimit(_fly_resource.RLIMIT_AS, (soft, hard))
+                try:
+                    return fn(*args, **kwargs)
+                except MemoryError:
+                    raise ResourceExhaustedError(
+                        "cage: 内存超限（限制 %d 字节）" % max_memory
+                    )
+            finally:
+                if max_time is not None:
+                    _fly_signal.setitimer(_fly_signal.ITIMER_REAL, 0)
+                    _fly_signal.signal(_fly_signal.SIGALRM, prev_alarm)
+                if max_memory is not None:
+                    _fly_resource.setrlimit(_fly_resource.RLIMIT_AS, prev_rlimit)
+
+        return wrapped
+
+    return deco
+
 import operator as _fly_op
 
 
@@ -222,8 +332,72 @@ class _FlySandbox:
 
 __builtins__ = _FlySandbox()
 
+class _Request:
+    def get(self, key, default=None):
+        return "42"
+request = _Request()
+def handle():
+    uid = _fly_attr(request, "get", 14, 19)('id')
+    clean = _fly_cast(int, uid, line=16, col=16)
+    return clean
+import json
+import math
+_fly_ob_b = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
+__builtins__ = _FlyOnly(('json', 'math'))
+def parse(raw):
+    data = _fly_attr(json, "loads", 23, 21)(raw)
+    return _fly_attr(math, "sqrt", 24, 21)(_fly_get(data, "x", 24, 30))
+parse = _fly_patch_builtins(parse, ('json', 'math'))
+__builtins__ = _fly_ob_b
 SECRET_KEY = "abc-123"
-x = 42
-def read():
-    return _fly_binop(SECRET_KEY, str(x), "add", 6, 23)
-print(read())
+hashed = hash(SECRET_KEY)
+def login(password):
+    hashed = hash(password)
+    return hashed
+@_fly_cage(2, 52428800)
+def heavy():
+    data = _fly_binop([0], 1000, "mul", 43, 20)
+    return len(data)
+def create_user(username, age):
+    if not (isinstance(username, str) and (len(username) > 0) and (len(username) <= 20)):
+        raise GuardError("guard username: str, len(username) > 0, len(username) <= 20")
+    if not (isinstance(age, int) and (_fly_cmp(lambda: 0, lambda: age, "lt", 50, 21) and _fly_cmp(lambda: age, lambda: 150, "lt", 50, 21))):
+        raise GuardError("guard age: int, 0 < age < 150")
+    return (username, age)
+class Admin:
+    role = "admin"
+    def __init__(self, name):
+        object.__setattr__(self, '_fly_seal_initializing', True)
+        _fly_setattr(self, "name", name, 59, 14)
+        object.__setattr__(self, '_fly_seal_initializing', False)
+    def __setattr__(self, name, value):
+        if _fly_sb_builtins.getattr(self, "_fly_seal_initializing", False):
+            object.__setattr__(self, name, value)
+        else:
+            raise AttributeError("seal 类 %s 的属性 %s 不可修改" % (type(self).__name__, name))
+    def __delattr__(self, name):
+        if _fly_sb_builtins.getattr(self, "_fly_seal_initializing", False):
+            object.__delattr__(self, name)
+        else:
+            raise AttributeError("seal 类 %s 的属性 %s 不可删除" % (type(self).__name__, name))
+admin = Admin("Alice")
+def delete_user(uid):
+    _fly_log.log(_fly_log.WARNING, "enter delete_user, uid=%r", uid)
+    try:
+        _fly_ret_c = _fly_trace_impl_delete_user(uid)
+    except BaseException as _fly_err_c:
+        _fly_log.log(_fly_log.WARNING, "exit delete_user: raise %r", _fly_err_c)
+        raise
+    _fly_log.log(_fly_log.WARNING, "exit delete_user: ret=%r", _fly_ret_c)
+    return _fly_ret_c
+def _fly_trace_impl_delete_user(uid):
+    _fly_attr(db, "append", 68, 12)(uid)
+    return uid
+db = []
+print(parse('{"x": 9}'))
+print(hashed is not None)
+print(login("pw"))
+print(heavy())
+print(create_user("alice", 30))
+print(_fly_attr(admin, "name", 78, 13), _fly_attr(admin, "role", 78, 25))
+print(delete_user(7))

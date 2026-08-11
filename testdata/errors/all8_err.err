@@ -79,6 +79,33 @@ error[E0047]: trace 级别非法
    = help: trace 级别 BOGUS 非法（支持 DEBUG/INFO/WARNING/ERROR/CRITICAL）。使用 DEBUG/INFO/WARNING/ERROR/CRITICAL 之一
    = note: docs/报错清单.md#E0047
 
+error[E0063]: 禁止调用危险内建
+  --> all8_err.fly:6:11
+   |
+   6 |     uid = input()
+   |           ^^^^^^^
+   |
+   = help: 禁止调用内建 input（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> all8_err.fly:8:12
+   |
+   8 |     data = eval(f"get_user({uid})")
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> all8_err.fly:26:11
+   |
+  26 |     print(globals()['SECRET_KEY'])
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 globals（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
 error[E0052]: 名字未定义
   --> all8_err.fly:37:5
    |
