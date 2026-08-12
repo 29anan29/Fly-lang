@@ -420,7 +420,7 @@ func (g *Gen) stmt(s ast.Stmt) {
 			if it.Alias != "" {
 				bind = it.Alias
 			}
-			g.w(bind + " = _fly_sb_import(\"" + it.Name + "\")\n")
+			g.w(fmt.Sprintf("%s = _fly_sb_import(\"%s\", %d, %d)\n", bind, it.Name, t.Pos_.Line, t.Pos_.Col))
 		}
 	case *ast.FromImportStmt:
 		g.indentLine()
@@ -429,7 +429,7 @@ func (g *Gen) stmt(s ast.Stmt) {
 		for i, it := range t.Items {
 			fromlist[i] = it.Name
 		}
-		g.w(modVar + " = _fly_sb_import(\"" + t.Module + "\", fromlist=(\"" + strings.Join(fromlist, "\",\"") + "\"))\n")
+		g.w(fmt.Sprintf("%s = _fly_sb_import(\"%s\", %d, %d, fromlist=(\"%s\"))\n", modVar, t.Module, t.Pos_.Line, t.Pos_.Col, strings.Join(fromlist, "\",\"")))
 		for _, it := range t.Items {
 			g.indentLine()
 			bind := it.Name

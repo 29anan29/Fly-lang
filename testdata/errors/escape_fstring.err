@@ -1,0 +1,36 @@
+error[E0064]: 禁止反射访问
+  --> escape_fstring.fly:4:6
+   |
+   4 | a = f"{x.__class__}"
+   |      ^^^^^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_fstring.fly:5:6
+   |
+   5 | b = f"{x.__bases__[0]}"
+   |      ^^^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __bases__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0063]: 禁止调用危险内建
+  --> escape_fstring.fly:6:6
+   |
+   6 | c = f"{eval('1')}"
+   |      ^^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0064]: 禁止反射访问
+  --> escape_fstring.fly:7:6
+   |
+   7 | d = f"{x['__dict__']}"
+   |      ^^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止反射下标访问 __dict__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = note: docs/报错清单.md#E0064
+

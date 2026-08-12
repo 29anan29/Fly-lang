@@ -125,8 +125,11 @@ func TestSandboxEscape(t *testing.T) {
 		{"func_param_key", "def f(k):\n    x = []\n    return x[k]\n\nprint(f(\"__bases__\"))\n", "沙箱: 禁止反射下标访问 __bases__"},
 		{"escape_unicode_key", "x = []\nk = \"\\u005f_class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__"},
 		{"whiteout_mod", "import tkinter\nprint(\"loaded\")\n", "沙箱: 模块 tkinter 不在白名单"},
+		{"modattr_indirect", "import logging\nm = logging\nprint(m.os)\n", "沙箱: 禁止访问模块属性 os"},
+		{"modattr_indirect_attrgetter", "import operator\nm = operator\nprint(m.attrgetter)\n", "沙箱: 禁止访问模块属性 attrgetter"},
 		{"allow_mod", "import math\nfrom math import sqrt as sq\nprint(sq(16))\n", "4.0"},
 		{"allow_dangerous_name_var", "os = 5\nprint(os)\n", "5"},
+		{"allow_modattr_safe", "import math\nimport json\nprint(math.floor(2.9), json.dumps([1]))\n", "2 [1]"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -138,6 +141,9 @@ func TestSandboxEscape(t *testing.T) {
 			out, _ := cmd.CombinedOutput()
 			if !strings.Contains(string(out), c.want) {
 				t.Fatalf("期望输出含 %q，实际:\n%s", c.want, out)
+			}
+			if strings.Contains(c.want, "沙箱: ") && !strings.Contains(string(out), "[fly-sandbox] audit: ") {
+				t.Fatalf("沙箱拦截未产生审计日志，实际:\n%s", out)
 			}
 		})
 	}

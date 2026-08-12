@@ -1,0 +1,18 @@
+error[E0064]: 禁止反射访问
+  --> escape_traceback.fly:6:12
+   |
+   6 |     tb = e.__traceback__
+   |            ^^^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __traceback__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_traceback.fly:7:23
+   |
+   7 |     print(tb.tb_frame.f_globals["os"])
+   |                       ^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 f_globals（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = note: docs/报错清单.md#E0064
+

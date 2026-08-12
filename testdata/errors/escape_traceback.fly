@@ -1,0 +1,7 @@
+"""异常对象反射：__traceback__ 帧逃逸链"""
+
+try:
+    {}["k"]
+except Exception as e:
+    tb = e.__traceback__
+    print(tb.tb_frame.f_globals["os"])

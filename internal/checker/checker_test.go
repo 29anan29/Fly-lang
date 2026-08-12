@@ -208,5 +208,9 @@ func TestEscapeNoFalsePositive(t *testing.T) {
 	noErr(t, "d = {}\nk = \"safe_key\"\nprint(d[k])\n")
 	noErr(t, "import math\nprint(math.sqrt(9))\n")
 	noErr(t, "from json import dumps\nprint(dumps(1))\n")
+	noErr(t, "import logging as lg\nlg.info(\"boot\")\n")
+	noErr(t, "class C:\n    os = 1\n\nc = C()\nprint(c.os)\n")
+	noErr(t, "name = \"world\"\nprint(f\"hi {name} {1 + 2}\")\n")
+	noErr(t, "import math\nprint(f\"sqrt: {math.sqrt(2)}\")\n")
 	noErr(t, "def f():\n    s = \"__class__\"\n    return s\nprint(f())\n")
 }

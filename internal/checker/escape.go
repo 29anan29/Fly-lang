@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"flylang/internal/ast"
+	"flylang/internal/parser"
 )
 
 // 沙箱逃逸拦截：与 fly_runtime.py sandbox 节的运行时名单保持一致（双保险）。
@@ -18,12 +19,23 @@ var escapeBuiltins = map[string]bool{
 }
 
 // escapeReflect 反射属性链：属性访问/下标访问命中即逃逸风险。
+// __traceback__/__builtins__ 为模块/异常对象上的 builtins 字典与帧逃逸入口，
+// gi_frame 等生成器帧属性（Python 语法不支持 yield 时不可达，仍双名单防护）。
 var escapeReflect = map[string]bool{
 	"__class__": true, "__bases__": true, "__base__": true, "__mro__": true,
 	"__subclasses__": true, "__globals__": true, "__code__": true,
 	"__closure__": true, "__dict__": true, "__reduce__": true,
 	"__reduce_ex__": true, "__getattribute__": true, "__setattr__": true,
 	"__delattr__": true, "__init_subclass__": true, "__prepare__": true,
+	"__builtins__": true, "__traceback__": true, "gi_frame": true,
+	"ag_frame": true, "cr_frame": true, "f_globals": true, "f_locals": true,
+	"__loader__": true,
+}
+
+// escapeModAttrs 模块级危险属性：白名单模块对象上取用即逃逸风险
+// （attrgetter/itemgetter 可用点路径直接穿透任意对象反射链）。
+var escapeModAttrs = map[string]bool{
+	"attrgetter": true, "itemgetter": true,
 }
 
 // escapeModules 危险模块：import 即沙箱逃逸风险（与运行时 _FLY_SB_BLOCKED_MODS 一致）。
@@ -50,17 +62,22 @@ var escapeModules = map[string]bool{
 
 // escapeCheck 一趟遍历：拦截危险内建调用、反射属性链、__builtins__ 访问、危险模块导入。
 func (c *Checker) escapeCheck(m *ast.Module) {
-	e := &escapeCheck{c: c}
+	e := &escapeCheck{c: c, modBinds: map[string]bool{}}
 	for _, s := range m.Stmts {
 		e.stmt(s, 0)
 	}
 }
 
 type escapeCheck struct {
-	c *Checker
+	c           *Checker
+	modBinds    map[string]bool
+	posOverride *ast.Position
 }
 
 func (e *escapeCheck) errorf(pos ast.Position, format string, args ...interface{}) {
+	if e.posOverride != nil {
+		pos = *e.posOverride
+	}
 	e.c.errorf(pos, format, args...)
 }
 
@@ -70,6 +87,11 @@ func (e *escapeCheck) stmt(s ast.Stmt, inOnly int) {
 		for _, it := range t.Items {
 			if inOnly == 0 {
 				e.checkModule(it.Name, t.Pos_)
+				bind := moduleRoot(it.Name)
+				if it.Alias != "" {
+					bind = it.Alias
+				}
+				e.modBinds[bind] = true
 			}
 		}
 	case *ast.FromImportStmt:
@@ -215,6 +237,101 @@ func moduleRoot(name string) string {
 	return name
 }
 
+// checkFString f-string 在词法层是整体 STRING token，内部表达式进不了 AST：
+// 对花括号内表达式文本二次解析后复用 expr 遍历；解析失败（转义/复杂语法）时
+// 文本级名单匹配兜底。
+func (e *escapeCheck) checkFString(t *ast.StringLit, inOnly int) {
+	raw := t.Value
+	if len(raw) < 2 || (raw[0] != 'f' && raw[0] != 'F') {
+		return
+	}
+	body := strValue(raw[1:])
+	for _, expr := range fstringExprs(body) {
+		p := parser.New("___fly_fs = " + expr + "\n")
+		m := p.ParseModule()
+		if p.Error() != nil {
+			e.checkFStringText(expr, t.Pos_)
+			continue
+		}
+		if as, ok := m.Stmts[0].(*ast.AssignStmt); ok {
+			old := e.posOverride
+			e.posOverride = &t.Pos_
+			e.expr(as.Right, inOnly)
+			e.posOverride = old
+		}
+	}
+}
+
+// checkFStringText 文本级兜底：名单名作为完整标识符出现即拦。
+func (e *escapeCheck) checkFStringText(expr string, pos ast.Position) {
+	for name := range escapeBuiltins {
+		if hasWord(expr, name) {
+			e.errorf(pos, "f-string 内禁止访问内建 %s（沙箱逃逸风险）", name)
+			return
+		}
+	}
+	for name := range escapeReflect {
+		if hasWord(expr, name) {
+			e.errorf(pos, "f-string 内禁止反射访问 %s（沙箱逃逸风险）", name)
+			return
+		}
+	}
+}
+
+func hasWord(s, w string) bool {
+	for i := 0; ; {
+		j := strings.Index(s[i:], w)
+		if j < 0 {
+			return false
+		}
+		j += i
+		i = j + len(w)
+		okL := j == 0 || !isIdentChar(s[j-1])
+		okR := i >= len(s) || !isIdentChar(s[i])
+		if okL && okR {
+			return true
+		}
+	}
+}
+
+func isIdentChar(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+}
+
+// fstringExprs 提取 f-string 主体中所有 {expr} 的表达式文本（跳过 {{/}} 转义，
+// 平衡嵌套花括号）。
+func fstringExprs(body string) []string {
+	var out []string
+	depth := 0
+	start := -1
+	for i := 0; i < len(body); i++ {
+		c := body[i]
+		if depth == 0 && c != '{' {
+			continue
+		}
+		if c == '{' {
+			if i+1 < len(body) && body[i+1] == '{' {
+				i++
+				continue
+			}
+			if depth == 0 {
+				start = i + 1
+			}
+			depth++
+		} else if c == '}' {
+			if i+1 < len(body) && body[i+1] == '}' {
+				i++
+				continue
+			}
+			depth--
+			if depth == 0 && start >= 0 {
+				out = append(out, body[start:i])
+			}
+		}
+	}
+	return out
+}
+
 // strValue 从字符串字面量文本（lexer 保留原文，含前缀与引号）提取纯字符串值。
 // 转义变体（如 "\u005f_class__"）编译期无法解码，由运行时 _fly_get 兜底拦截。
 func strValue(lit string) string {
@@ -249,7 +366,9 @@ func (e *escapeCheck) expr(x ast.Expr, inOnly int) {
 		} else if inOnly == 0 && escapeBuiltins[t.Name] {
 			e.errorf(t.Pos_, "禁止访问内建 %s（沙箱逃逸风险）", t.Name)
 		}
-	case *ast.IntLit, *ast.FloatLit, *ast.StringLit, *ast.EllipsisLit:
+	case *ast.IntLit, *ast.FloatLit, *ast.EllipsisLit:
+	case *ast.StringLit:
+		e.checkFString(t, inOnly)
 	case *ast.ListLit:
 		for _, el := range t.Elems {
 			e.expr(el, inOnly)
@@ -284,6 +403,11 @@ func (e *escapeCheck) expr(x ast.Expr, inOnly int) {
 	case *ast.AttrExpr:
 		if escapeReflect[t.Name] {
 			e.errorf(t.Pos_, "禁止反射访问属性 %s（沙箱逃逸风险）", t.Name)
+		} else if n, ok := t.X.(*ast.Name); ok && e.modBinds[n.Name] {
+			// 白名单模块对象上的危险子模块/属性（random.os、operator.attrgetter 等）
+			if escapeModules[t.Name] || escapeModAttrs[t.Name] {
+				e.errorf(t.Pos_, "禁止访问模块属性 %s（沙箱逃逸风险）", t.Name)
+			}
 		}
 		e.expr(t.X, inOnly)
 	case *ast.SubscriptExpr:

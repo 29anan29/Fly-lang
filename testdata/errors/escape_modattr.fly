@@ -1,0 +1,11 @@
+"""模块属性逃逸：__builtins__ dict、白名单模块 os 子模块、attrgetter 点路径"""
+
+import json
+import logging
+import operator
+import random
+
+d = json.__builtins__["eval"]
+m = logging.os
+f = operator.attrgetter("__class__.__bases__[0].__subclasses__")
+g = random.os

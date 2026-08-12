@@ -67,8 +67,10 @@ testdata/            正反例测试文件
 ## 沙箱（默认注入，所有编译产物在沙箱内运行）
 
 - 生成 .py 恒注入 `runtime` + `sandbox` 两节（顺序：guard/only/trace/cage/runtime/sandbox，sandbox 依赖 runtime 的 FlyRuntimeError）
-- 运行时：`_FlySandbox` 内建代理（DANGEROUS 名单按名拦截 eval/exec/open/getattr/globals/vars 等）+ `_fly_attr/_fly_get/_fly_set` 反射黑名单（`__class__/__bases__/__subclasses__/__dict__` 等）+ 受限 `__import__`（BLOCKED 模块 os/subprocess/sys/pickle 等，ALLOWED 白名单 math/json/time 等）
-- 编译期：checker/escape.go 同名单拦截（E0063 危险内建、E0064 反射链、E0065 `__builtins__`、E0066 危险模块导入）——名单必须与 fly_runtime.py 的 `_FLY_SB_*` 保持一致
+- 运行时：`_FlySandbox` 内建代理（DANGEROUS 名单按名拦截 eval/exec/open/getattr/globals/vars 等）+ `_fly_attr/_fly_get/_fly_set` 反射黑名单（`__class__/__bases__/__subclasses__/__dict__` 等 + `__builtins__/__traceback__/gi_frame/f_globals` 帧与模块逃逸）+ 受限 `__import__`（BLOCKED 模块 os/subprocess/sys/pickle 等，ALLOWED 白名单 math/json/time 等）+ 模块属性拦截（`_fly_sb_check_modattr`：ModuleType 上的 BLOCKED 子模块与 `attrgetter/itemgetter`）+ 拦截审计（`_fly_sb_audit` 输出 `[fly-sandbox] audit:` 到 stderr，gen 注入 import 时带行列号）
+- 编译期：checker/escape.go 同名单拦截（E0063 危险内建、E0064 反射链/模块属性/异常帧/f-string 内联表达式、E0065 `__builtins__`、E0066 危险模块导入）——名单必须与 fly_runtime.py 的 `_FLY_SB_*` 保持一致
+- f-string 词法层是整体 STRING token，编译期对花括号内表达式二次解析复用 escape 遍历（解析失败走文本级名单匹配兜底）；错误位置归一到 f-string 字面量起始
+- 模块绑定跟踪：escapeCheck 记录 import 绑定名（`modBinds`），白名单模块对象上的危险子模块属性（`random.os`）与 `attrgetter/itemgetter` 编译期拦截
 - CPython 模块顶层帧缓存 builtins（f_builtins），运行时代理只在函数/类体内生效；**顶层逃逸靠编译期拦截**（危险内建名出现在任何读取位置都报 E0063）
 - 沙箱内 prelude 与注入代码禁止裸用危险内建：一律 `_fly_sb_builtins.getattr(...)` / `_fly_sb_module_globals[...]`（`globals()` 不是 builtins 模块属性）
 - `_FlyOnly`/`_FlySandbox` 必须实现 `__getitem__`（CPython 对非 dict 的 `__builtins__` 走下标访问）

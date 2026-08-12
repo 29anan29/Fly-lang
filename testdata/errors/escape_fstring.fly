@@ -1,0 +1,7 @@
+"""f-string 内联表达式逃逸（词法层整体 STRING，二次解析拦截）"""
+
+x = []
+a = f"{x.__class__}"
+b = f"{x.__bases__[0]}"
+c = f"{eval('1')}"
+d = f"{x['__dict__']}"

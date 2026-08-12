@@ -4,7 +4,7 @@ error[E0064]: 禁止反射访问
    4 | y = x.__class__
    |       ^^^^^^^^^
    |
-   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -13,7 +13,7 @@ error[E0064]: 禁止反射访问
    5 | z = y.__bases__[0]
    |       ^^^^^^^^^^^^
    |
-   = help: 禁止反射访问属性 __bases__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = help: 禁止反射访问属性 __bases__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -22,7 +22,7 @@ error[E0064]: 禁止反射访问
    6 | w = z.__subclasses__()
    |       ^^^^^^^^^^^^^^^^
    |
-   = help: 禁止反射访问属性 __subclasses__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = help: 禁止反射访问属性 __subclasses__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -31,7 +31,7 @@ error[E0064]: 禁止反射访问
    7 | m = x.__mro__
    |       ^^^^^^^
    |
-   = help: 禁止反射访问属性 __mro__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = help: 禁止反射访问属性 __mro__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -40,7 +40,7 @@ error[E0064]: 禁止反射访问
    8 | c = x.__code__
    |       ^^^^^^^^
    |
-   = help: 禁止反射访问属性 __code__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = help: 禁止反射访问属性 __code__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -49,6 +49,6 @@ error[E0064]: 禁止反射访问
    9 | g = x.__globals__
    |       ^^^^^^^^^^^
    |
-   = help: 禁止反射访问属性 __globals__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = help: 禁止反射访问属性 __globals__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
