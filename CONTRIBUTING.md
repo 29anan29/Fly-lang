@@ -53,3 +53,5 @@ cd editor/vscode-fly && npm run compile
 ## 问题报告
 
 Bug 或特性请求请开 Issue，附上：Fly 版本（`fly version`）、操作系统、最小复现代码与期望行为。
+
+邮箱地址：anwang13@outlook.com（暂时没有专用邮箱）
