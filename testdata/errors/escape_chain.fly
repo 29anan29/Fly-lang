@@ -1,0 +1,9 @@
+"""经典逃逸链：__class__.__bases__[0].__subclasses__()（六层全拦）"""
+
+x = []
+y = x.__class__
+z = y.__bases__[0]
+w = z.__subclasses__()
+m = x.__mro__
+c = x.__code__
+g = x.__globals__

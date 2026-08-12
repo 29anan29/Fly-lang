@@ -108,7 +108,7 @@ func TestRuntimeCatch(t *testing.T) {
 }
 
 // TestSandboxEscape 验证运行时沙箱兜底：编译期无法静态确定的逃逸
-// （变量下标反射名、危险内建名访问）在运行时被 _fly_* 拦截为 FlyRuntimeError。
+// （变量下标反射名、白名单外模块）在运行时被 _fly_* / _fly_sb_import 拦截。
 func TestSandboxEscape(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 不可用")
@@ -119,7 +119,14 @@ func TestSandboxEscape(t *testing.T) {
 		want string
 	}{
 		{"subclass_key", "x = []\nk = \"__subclasses__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __subclasses__"},
+		{"class_key", "x = []\nk = \"__class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__"},
+		{"dict_key", "x = {}\nk = \"__dict__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __dict__"},
 		{"setattr_key", "x = []\nk = \"__class__\"\nx[k] = 1\n", "沙箱: 禁止反射下标赋值 __class__"},
+		{"func_param_key", "def f(k):\n    x = []\n    return x[k]\n\nprint(f(\"__bases__\"))\n", "沙箱: 禁止反射下标访问 __bases__"},
+		{"escape_unicode_key", "x = []\nk = \"\\u005f_class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__"},
+		{"whiteout_mod", "import tkinter\nprint(\"loaded\")\n", "沙箱: 模块 tkinter 不在白名单"},
+		{"allow_mod", "import math\nfrom math import sqrt as sq\nprint(sq(16))\n", "4.0"},
+		{"allow_dangerous_name_var", "os = 5\nprint(os)\n", "5"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

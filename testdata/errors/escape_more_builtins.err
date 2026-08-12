@@ -1,0 +1,90 @@
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:3:1
+   |
+   3 | breakpoint()
+   | ^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 breakpoint（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:4:1
+   |
+   4 | help(len)
+   | ^^^^^^^^^
+   |
+   = help: 禁止调用内建 help（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:5:1
+   |
+   5 | dir(x)
+   | ^^^^^^
+   |
+   = help: 禁止调用内建 dir（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:6:1
+   |
+   6 | memoryview(b"x")
+   | ^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 memoryview（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:7:1
+   |
+   7 | compile("1", "<s>", "eval")
+   | ^^^^^^^^^^^^
+   |
+   = help: 禁止调用内建 compile（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:8:1
+   |
+   8 | locals()
+   | ^^^^^^^^
+   |
+   = help: 禁止调用内建 locals（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_more_builtins.fly:9:1
+   |
+   9 | input("?")
+   | ^^^^^^^^^^
+   |
+   = help: 禁止调用内建 input（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0052]: 名字未定义
+  --> escape_more_builtins.fly:3:1
+   |
+   3 | breakpoint()
+   | ^^^^^^^^^^^^
+   |
+   = help: 未定义的名字 breakpoint。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+
+error[E0052]: 名字未定义
+  --> escape_more_builtins.fly:4:1
+   |
+   4 | help(len)
+   | ^^^^^^^^^
+   |
+   = help: 未定义的名字 help。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+
+error[E0052]: 名字未定义
+  --> escape_more_builtins.fly:5:5
+   |
+   5 | dir(x)
+   |     ^^
+   |
+   = help: 未定义的名字 x。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

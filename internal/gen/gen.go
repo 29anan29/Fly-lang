@@ -360,6 +360,15 @@ func needStmt(scan func([]ast.Stmt) bool, s ast.Stmt) bool {
 	return false
 }
 
+func moduleRoot(name string) string {
+	for i := 0; i < len(name); i++ {
+		if name[i] == '.' {
+			return name[:i]
+		}
+	}
+	return name
+}
+
 func (g *Gen) indentLine() {
 	g.buf.WriteString(strings.Repeat("    ", g.indent))
 }
@@ -402,31 +411,33 @@ func (g *Gen) w(s string) {
 func (g *Gen) stmt(s ast.Stmt) {
 	switch t := s.(type) {
 	case *ast.ImportStmt:
-		g.indentLine()
-		g.w("import ")
 		for i, it := range t.Items {
 			if i > 0 {
-				g.w(", ")
+				g.w("\n")
 			}
-			g.w(it.Name)
+			g.indentLine()
+			bind := moduleRoot(it.Name)
 			if it.Alias != "" {
-				g.w(" as " + it.Alias)
+				bind = it.Alias
 			}
+			g.w(bind + " = _fly_sb_import(\"" + it.Name + "\")\n")
 		}
-		g.w("\n")
 	case *ast.FromImportStmt:
 		g.indentLine()
-		g.w("from " + t.Module + " import ")
+		modVar := "_fly_sb_mod_" + strings.ReplaceAll(t.Module, ".", "_")
+		fromlist := make([]string, len(t.Items))
 		for i, it := range t.Items {
-			if i > 0 {
-				g.w(", ")
-			}
-			g.w(it.Name)
-			if it.Alias != "" {
-				g.w(" as " + it.Alias)
-			}
+			fromlist[i] = it.Name
 		}
-		g.w("\n")
+		g.w(modVar + " = _fly_sb_import(\"" + t.Module + "\", fromlist=(\"" + strings.Join(fromlist, "\",\"") + "\"))\n")
+		for _, it := range t.Items {
+			g.indentLine()
+			bind := it.Name
+			if it.Alias != "" {
+				bind = it.Alias
+			}
+			g.w(bind + " = " + modVar + "." + it.Name + "\n")
+		}
 	case *ast.AssignStmt:
 		if t.Op != "=" {
 			g.augAssign(t)

@@ -1,0 +1,27 @@
+error[E0064]: 禁止反射访问
+  --> escape_subscript.fly:4:8
+   |
+   4 | k1 = d["__class__"]
+   |        ^^^^^^^^^^^^
+   |
+   = help: 禁止反射下标访问 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_subscript.fly:5:3
+   |
+   5 | d["__dict__"] = 1
+   |   ^^^^^^^^^^^
+   |
+   = help: 禁止反射下标访问 __dict__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_subscript.fly:6:9
+   |
+   6 | print(d["__bases__"])
+   |         ^^^^^^^^^^^^^
+   |
+   = help: 禁止反射下标访问 __bases__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+

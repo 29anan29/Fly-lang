@@ -222,8 +222,10 @@ class _FlySandbox:
 
 __builtins__ = _FlySandbox()
 
-import json
-from math import sqrt as s, pi
+json = _fly_sb_import("json")
+_fly_sb_mod_math = _fly_sb_import("math", fromlist=("sqrt","pi"))
+s = _fly_sb_mod_math.sqrt
+pi = _fly_sb_mod_math.pi
 def process(items):
     total = 0
     for x in _fly_iter(items, 6, 5):

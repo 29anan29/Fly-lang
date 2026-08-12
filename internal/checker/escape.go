@@ -1,6 +1,8 @@
 package checker
 
 import (
+	"strings"
+
 	"flylang/internal/ast"
 )
 
@@ -213,6 +215,27 @@ func moduleRoot(name string) string {
 	return name
 }
 
+// strValue 从字符串字面量文本（lexer 保留原文，含前缀与引号）提取纯字符串值。
+// 转义变体（如 "\u005f_class__"）编译期无法解码，由运行时 _fly_get 兜底拦截。
+func strValue(lit string) string {
+	s := lit
+	for len(s) > 0 && strings.ContainsRune("fFbBrRuU", rune(s[0])) {
+		s = s[1:]
+	}
+	var q string
+	if len(s) >= 3 && s[:3] == `"""` {
+		q = `"""`
+	} else if len(s) >= 3 && s[:3] == `'''` {
+		q = `'''`
+	} else if len(s) >= 2 && (s[0] == '"' || s[0] == '\'') {
+		q = s[:1]
+	}
+	if q != "" && strings.HasSuffix(s, q) {
+		return s[len(q) : len(s)-len(q)]
+	}
+	return s
+}
+
 func (e *escapeCheck) expr(x ast.Expr, inOnly int) {
 	if x == nil {
 		return
@@ -264,8 +287,10 @@ func (e *escapeCheck) expr(x ast.Expr, inOnly int) {
 		}
 		e.expr(t.X, inOnly)
 	case *ast.SubscriptExpr:
-		if k, ok := t.Index.(*ast.StringLit); ok && escapeReflect[k.Value] {
-			e.errorf(k.Pos_, "禁止反射下标访问 %s（沙箱逃逸风险）", k.Value)
+		if k, ok := t.Index.(*ast.StringLit); ok {
+			if v := strValue(k.Value); escapeReflect[v] {
+				e.errorf(k.Pos_, "禁止反射下标访问 %s（沙箱逃逸风险）", v)
+			}
 		}
 		e.expr(t.X, inOnly)
 		e.expr(t.Index, inOnly)

@@ -271,7 +271,7 @@ class _FlySandbox:
 
 __builtins__ = _FlySandbox()
 
-import time
+time = _fly_sb_import("time")
 @_fly_cage(2, 52428800)
 def heavy():
     data = _fly_binop([0], 100_000_000, "mul", 7, 20)

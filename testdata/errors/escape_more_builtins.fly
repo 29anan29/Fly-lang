@@ -1,0 +1,9 @@
+"""其余危险内建：breakpoint/help/dir/memoryview/compile/locals/input"""
+
+breakpoint()
+help(len)
+dir(x)
+memoryview(b"x")
+compile("1", "<s>", "eval")
+locals()
+input("?")

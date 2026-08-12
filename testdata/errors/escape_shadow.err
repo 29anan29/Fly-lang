@@ -1,0 +1,9 @@
+error[E0063]: 禁止调用危险内建
+  --> escape_shadow.fly:7:7
+   |
+   7 | print(eval(1))
+   |       ^^^^^^^^
+   |
+   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+

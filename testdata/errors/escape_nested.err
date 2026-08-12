@@ -1,0 +1,47 @@
+error[E0063]: 禁止调用危险内建
+  --> escape_nested.fly:4:12
+   |
+   4 |     return eval(data)
+   |            ^^^^^^^^^^
+   |
+   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_nested.fly:8:9
+   |
+   8 |     v = open("f")
+   |         ^^^^^^^^^
+   |
+   = help: 禁止调用内建 open（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error[E0063]: 禁止调用危险内建
+  --> escape_nested.fly:13:9
+   |
+  13 |         exec("x = 1")
+   |         ^^^^^^^
+   |
+   = help: 禁止调用内建 exec（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error: escape_nested.fly:14:13: 禁止访问内建 vars（沙箱逃逸风险）
+error[E0063]: 禁止调用危险内建
+  --> escape_nested.fly:18:42
+   |
+  18 |     return x if not hasattr(x, "y") else getattr(x, "y")
+   |                                          ^^^^^^^^^^
+   |
+   = help: 禁止调用内建 getattr（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用
+   = note: docs/报错清单.md#E0063
+
+error: escape_nested.fly:21:7: 禁止访问内建 __import__（沙箱逃逸风险）
+error[E0052]: 名字未定义
+  --> escape_nested.fly:21:7
+   |
+  21 | sq = [__import__ for i in range(2)]
+   |       ^^^^^^^^^^
+   |
+   = help: 未定义的名字 __import__。先定义该名字，或检查拼写
+   = note: docs/报错清单.md#E0052
+

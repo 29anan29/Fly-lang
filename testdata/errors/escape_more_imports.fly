@@ -1,0 +1,13 @@
+"""更多危险模块：网络/解压/元编程/存储"""
+
+import socket
+import ctypes
+import tempfile
+import importlib
+import sqlite3
+import urllib.request
+import gzip
+import marshal
+import shelve
+import pty
+import http.server

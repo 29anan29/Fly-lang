@@ -1,0 +1,54 @@
+error[E0064]: 禁止反射访问
+  --> escape_chain.fly:4:7
+   |
+   4 | y = x.__class__
+   |       ^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_chain.fly:5:7
+   |
+   5 | z = y.__bases__[0]
+   |       ^^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __bases__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_chain.fly:6:7
+   |
+   6 | w = z.__subclasses__()
+   |       ^^^^^^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __subclasses__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_chain.fly:7:7
+   |
+   7 | m = x.__mro__
+   |       ^^^^^^^
+   |
+   = help: 禁止反射访问属性 __mro__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_chain.fly:8:7
+   |
+   8 | c = x.__code__
+   |       ^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __code__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+
+error[E0064]: 禁止反射访问
+  --> escape_chain.fly:9:7
+   |
+   9 | g = x.__globals__
+   |       ^^^^^^^^^^^
+   |
+   = help: 禁止反射访问属性 __globals__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问
+   = note: docs/报错清单.md#E0064
+

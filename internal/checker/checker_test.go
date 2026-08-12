@@ -166,3 +166,47 @@ func TestTaintSourceInput(t *testing.T) {
 	wantErr(t, "x = input()\nx = int(x)\nprint(x)\n", "禁止调用内建 input")
 	wantErr(t, "s = os.environ['HOME']\neval(s)\n", "未净化的外部输入")
 }
+
+func TestEscapeBuiltinList(t *testing.T) {
+	for name := range escapeBuiltins {
+		t.Run(name, func(t *testing.T) {
+			wantErr(t, name+"(1)\n", "禁止调用内建 "+name)
+			wantErr(t, "x = "+name+"\n", "禁止访问内建 "+name)
+		})
+	}
+}
+
+func TestEscapeReflectList(t *testing.T) {
+	for name := range escapeReflect {
+		t.Run(name, func(t *testing.T) {
+			wantErr(t, "x = []\ny = x."+name+"\n", "禁止反射访问属性 "+name)
+		})
+	}
+	for _, name := range []string{"__class__", "__dict__", "__bases__", "__subclasses__"} {
+		t.Run("index_"+name, func(t *testing.T) {
+			wantErr(t, "d = {}\nk = d[\""+name+"\"]\n", "禁止反射下标访问 "+name)
+		})
+	}
+}
+
+func TestEscapeModuleList(t *testing.T) {
+	for name := range escapeModules {
+		if d := parser.New("import " + name + "\n").ParseModule(); d != nil {
+			t.Logf("跳过关键字冲突模块 %s", name)
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			wantErr(t, "import "+name+"\n", "禁止导入危险模块 "+name)
+			wantErr(t, "from "+name+" import x\n", "禁止导入危险模块 "+name)
+		})
+	}
+}
+
+func TestEscapeNoFalsePositive(t *testing.T) {
+	noErr(t, "os = 5\nprint(os)\n")
+	noErr(t, "x = \"ok\"\ny = x.__len__\nprint(y)\n")
+	noErr(t, "d = {}\nk = \"safe_key\"\nprint(d[k])\n")
+	noErr(t, "import math\nprint(math.sqrt(9))\n")
+	noErr(t, "from json import dumps\nprint(dumps(1))\n")
+	noErr(t, "def f():\n    s = \"__class__\"\n    return s\nprint(f())\n")
+}

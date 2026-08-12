@@ -1,0 +1,21 @@
+"""逃逸出现在嵌套上下文（函数体/类体/循环/三元/推导式）也拦截"""
+
+def f(data):
+    return eval(data)
+
+
+class C:
+    v = open("f")
+
+
+def g(n):
+    for i in range(n):
+        exec("x = 1")
+    return [vars for i in range(3)]
+
+
+def h(x):
+    return x if not hasattr(x, "y") else getattr(x, "y")
+
+
+sq = [__import__ for i in range(2)]

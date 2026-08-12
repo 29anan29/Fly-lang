@@ -184,6 +184,7 @@ go vet ./...
 - `testdata/golden/`：正例，转译输出与同名 `.py` golden 对比（全部经 `python3` 实跑行为验证，含 p4_cage 超时/超内存双场景）
 - `testdata/errors/`：反例，必须编译报错（含 escape_* 系列沙箱逃逸反例：危险内建/反射链/`__builtins__`/危险模块导入）
 - 生成的 `.py` 需 Python 3.10+ 可运行
+- 安全测试体系（5 层：反例快照/名单全覆盖 188 断言/运行时兜底/健全性/golden 实跑）见 **[docs/安全测试报告.md](docs/安全测试报告.md)**
 
 ## 发布流水线
 

@@ -1,0 +1,99 @@
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:3:1
+   |
+   3 | import socket
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 socket（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:4:1
+   |
+   4 | import ctypes
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 ctypes（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:5:1
+   |
+   5 | import tempfile
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 tempfile（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:6:1
+   |
+   6 | import importlib
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 importlib（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:7:1
+   |
+   7 | import sqlite3
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 sqlite3（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:8:1
+   |
+   8 | import urllib.request
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 urllib（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:9:1
+   |
+   9 | import gzip
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 gzip（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:10:1
+   |
+  10 | import marshal
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 marshal（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:11:1
+   |
+  11 | import shelve
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 shelve（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:12:1
+   |
+  12 | import pty
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 pty（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_more_imports.fly:13:1
+   |
+  13 | import http.server
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 http（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
