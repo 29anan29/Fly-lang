@@ -172,6 +172,14 @@ jobs:
           sed -i "s/\"version\": \"[0-9][^\"]*\"/\"version\": \"$VER\"/" package.json
           mkdir -p ../../dist
           npx --yes @vscode/vsce package --out ../../dist/fly-lang-${VERSION#v}.vsix
+      - name: Delete stale artifact (rerun-safe)
+        run: |
+          curl -sS -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+            | jq -r '.artifacts[] | select(.name=="vsix-pkgs") | .id' \
+            | xargs -r -I{} curl -sS -X DELETE \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/{}"
       - uses: actions/upload-artifact@v4
         with:
           name: vsix-pkgs
