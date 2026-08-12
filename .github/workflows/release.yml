@@ -153,6 +153,8 @@ jobs:
   vsix:
     name: vscode extension
     runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -166,8 +168,20 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           npm ci
+          VER=${VERSION#v}
+          sed -i "s/\"version\": \"[0-9][^\"]*\"/\"version\": \"$VER\"/" package.json
           mkdir -p ../../dist
           npx --yes @vscode/vsce package --out ../../dist/fly-lang-${VERSION#v}.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-pkgs
+          path: dist/*.vsix
+          if-no-files-found: error
+      - name: Publish to VSCode Marketplace
+        if: env.VSCE_PAT != ''
+        working-directory: editor/vscode-fly
+        run: |
+          npx --yes @vscode/vsce publish --skip-duplicate -p "${VSCE_PAT}"
       - uses: actions/upload-artifact@v4
         with:
           name: vsix-pkgs

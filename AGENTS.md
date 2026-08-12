@@ -47,6 +47,7 @@ testdata/            正反例测试文件
 - 版本渠道细分：`version.IsDev()` 判定（Version 空/`dev`/含 `-dev` → dev 版）；`fly version` 输出 `vX.Y.Z (release)` 或 `0.X.Y-dev (commit)`；`fly update --channel dev|release`（默认随当前版本），dev 渠道查 GitHub prerelease（`update.LatestDev`），无预发布时回退正式版渠道；CI 在 tag 含 `-dev` 时 `gh release create --prerelease`
 - 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
 - npm 发布（`npm` job）：三平台 job 交叉编译二进制上传 artifact（`npm-*`）→ `npm` job 组装到 `npm/fly-lang/bin/` → `npm pack` 出 tgz → `npm publish`（账号 anan29_china）；版本号由 tag 注入 package.json；发布依赖 `NPM_TOKEN` secret，未配置时跳过发布只留 artifact
+- VSCode Marketplace 发布（`vsix` job 内）：`vsce package` 出 vsix（attach 到 GitHub Release）后 `vsce publish --skip-duplicate`（publisher 29anan29，扩展 `29anan29.fly-lang`）；版本号由 tag 注入 editor/vscode-fly/package.json（`sed "s/\"version\": \"[0-9][^\"]*\"/..."`）；依赖 `VSCE_PAT` secret（marketplace 管理页获取），未配置时跳过发布只留 vsix artifact
 - `fly error <E码>`：查询错误码示例报错/修复方法，支持 `E0031`/`31` 格式（自动补零到 EXXXX）；错误码 E0001 起连续编号，注册表 `internal/ast/errors.go`（每码含 Title/Help/Note/Example）
 - `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（internal/update.AssetFor），改 CI 产物名必须同步改这里
 - 交互式 update：先 `CheckWritable` 预检，不可写时终端（TTY）自动 `sudo <exe> update <原参数>` 提权重试，非 TTY 回退"建议 sudo 重试"提示；确认用 `update.Confirm`，ANSI 颜色由 `isTTY`（ioctl TIOCGWINSZ，见 cmd/fly/tty*.go）控制
