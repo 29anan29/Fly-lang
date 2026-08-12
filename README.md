@@ -13,7 +13,7 @@
 [![Release](https://img.shields.io/github/v/release/29anan29/Fly-lang)](https://github.com/29anan29/Fly-lang/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/29anan29/Fly-lang/release.yml?label=Release%20CI)](https://github.com/29anan29/Fly-lang/actions)
 
-Fly 是 Python 3.10+ 的安全增强超集：用 Go 实现的转译器，把 `.fly` 源码转译为纯净 Python。新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法。
+Fly 是 Python 3.10+ 的安全增强超集：用 Go 实现的转译器，把 `.fly` 源码转译为 Python。新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
 
 详细设计见 [方案.md](方案.md)（语言设计）与 [Plan.md](Plan.md)（实现方案）。
 
@@ -58,10 +58,11 @@ fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ## 用法
 
 ```
-./fly build [选项] <file.fly>   转译为 Python
-./fly check <file.fly>          仅编译检查（出错退出码 1）
-./fly run <file.fly>            转译并执行（python3）
+./fly build [选项] <file.fly>   转译为 Python（含沙箱运行时，见"沙箱"一节）
+./fly check <file.fly>...       仅编译检查，支持多文件与目录递归（goroutine 并发，出错退出码 1）
+./fly run <file.fly>            转译并在沙箱内执行（python3）
 ./fly version                   打印版本与提交号
+./fly error <E码>               查询错误码示例报错与修复方法（如 fly error E0066）
 ./fly update [--check|--force|--channel <dev|release>|--proxy <url>]  自更新（见上）
 ```
 
@@ -78,6 +79,7 @@ build 选项：
 ./fly build testdata/golden/hello.fly -o out.py   # 或指定输出
 python3 out.py
 ./fly check app.fly
+./fly check src/ errors/lock_assign.fly # 目录递归 + 多文件并发检查
 ./fly run testdata/golden/basic.fly
 ```
 
@@ -89,6 +91,21 @@ python3 out.py
 # 桌面版（PyQt6：pip install PyQt6）
 ./fly build example/flytodos_qt/flytodos_qt.fly -o flytodos_qt.py && python3 flytodos_qt.py
 ```
+
+## 沙箱（所有编译产物默认在沙箱内运行）
+
+每个生成的 `.py` 恒注入 `runtime` + `sandbox` 两个运行时节，沙箱在任意 Python 3.10+ 环境生效，编译期拦截与运行时兜底双层防护：
+
+| 逃逸途径 | 编译期（checker，E码） | 运行时（注入代理） |
+| :--- | :--- | :--- |
+| 危险内建调用/别名（`eval`/`exec`/`open`/`getattr`/`globals`/`vars`/`input` 等 15 个） | 任何读取位置即报 E0063 | `_FlySandbox` 内建代理按名拦截 |
+| 反射链（`__class__`/`__bases__`/`__mro__`/`__subclasses__`/`__dict__`/`__code__` 等 16 个） | 属性访问/字面量下标报 E0064 | `_fly_attr`/`_fly_get`/`_fly_set` 黑名单（含变量下标动态逃逸） |
+| `__builtins__` 直接访问 | E0065 | 代理 + 反射黑名单 |
+| 危险模块导入（`os`/`subprocess`/`sys`/`pickle`/`socket`/`ctypes` 等 ~70 个） | E0066 | 受限 `__import__`（BLOCKED/ALLOWED 双名单，math/json/time/re 等白名单正常） |
+
+- 模块顶层帧缓存 builtins（CPython 架构限制），运行时代理在函数/类体内生效，**顶层逃逸依赖编译期拦截**
+- `only` 块内保持更严格的 `_FlyOnly` 白名单代理
+- 名单双向同步：checker/escape.go 与 fly_runtime.py 的 `_FLY_SB_*` 必须一致（E0063-E0066 运行时同样抛 `FlyRuntimeError: 沙箱: ...`）
 
 ## 8 个安全关键字
 
@@ -164,8 +181,8 @@ go test ./...
 go vet ./...
 ```
 
-- `testdata/golden/`：正例，转译输出与同名 `.py` golden 对比
-- `testdata/errors/`：反例，必须编译报错
+- `testdata/golden/`：正例，转译输出与同名 `.py` golden 对比（全部经 `python3` 实跑行为验证，含 p4_cage 超时/超内存双场景）
+- `testdata/errors/`：反例，必须编译报错（含 escape_* 系列沙箱逃逸反例：危险内建/反射链/`__builtins__`/危险模块导入）
 - 生成的 `.py` 需 Python 3.10+ 可运行
 
 ## 发布流水线
@@ -212,10 +229,10 @@ cmd/fly/           CLI 入口（build/check/run/version/update/lsp）
 internal/lexer/    词法分析
 internal/ast/      AST 节点（带位置信息）
 internal/parser/   递归下降解析器
-internal/checker/  编译期语义检查（P1 起）
-internal/gen/      代码生成 + 运行时注入
+internal/checker/  编译期语义检查（含 escape.go 沙箱逃逸拦截 E0063-E0066）
+internal/gen/      代码生成 + 运行时注入（恒注入 sandbox）
 internal/lsp/      LSP 服务器（JSON-RPC stdio：诊断/hover）
-internal/runtime/  fly_runtime.py 运行时支持库（P4 起）
+internal/runtime/  fly_runtime.py 运行时支持库（runtime + sandbox 两节）
 internal/version/  版本信息（ldflags 注入）
 internal/update/   自更新 + SOCKS5 代理
 tools/icon/        图标生成器
