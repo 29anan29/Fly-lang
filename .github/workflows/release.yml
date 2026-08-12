@@ -262,15 +262,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -la dist/
-          PRERELEASE=""
-          if [[ "$GITHUB_REF_NAME" == *-dev* ]]; then PRERELEASE="--prerelease"; fi
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "$GITHUB_REF_NAME" \
-            $PRERELEASE \
             --notes "Fly-Lang $GITHUB_REF_NAME
             - Linux: .deb（amd64/arm64）、tar.gz
             - macOS: .pkg + .dmg（universal）、tar.gz
             - Windows: .zip（amd64/arm64）、自解压 exe
             - VSCode 插件：fly-lang-*.vsix（LSP 编译期诊断，v0.2.0+ 要求）
             - npm：\`npm install -g fly-lang\`（二进制全平台单包，见 npm job）
-            更新命令：\`fly update\`（dev 版默认走 dev 渠道，\`--channel release\` 切正式版）"
+            更新命令：\`fly update\`"

@@ -49,11 +49,10 @@ sudo installer -pkg fly-<ver>.pkg -target /
 fly update                  # 检查并更新到最新版（交互式：展示更新日志 + 询问是否安装）
 fly update --check          # 仅检查，有新版本时退出码 2
 fly update --force          # 强制更新（即使已是最新）
-fly update --channel dev    # 走 dev 渠道（GitHub 预发布版；默认随当前版本：dev 版→dev，正式版→release）
 fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ```
 
-安装目录不可写时（如 `/usr/bin` 下的旧版），终端里直接执行 `fly update` 会自动通过 `sudo` 提权重试，无需手动 `sudo <路径>/fly update`。版本号细分：`fly version` 显示 `vX.Y.Z (release)`（正式版）或 `0.X.Y-dev (commit)`（dev 版）；打 `vX.Y.Z-dev` 的 tag 由 CI 发布为 prerelease，`fly update --channel dev` 即可获取。
+安装目录不可写时（如 `/usr/bin` 下的旧版），终端里直接执行 `fly update` 会自动通过 `sudo` 提权重试，无需手动 `sudo <路径>/fly update`。
 
 ## 用法
 
@@ -63,7 +62,7 @@ fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ./fly run <file.fly>            转译并在沙箱内执行（python3）
 ./fly version                   打印版本与提交号
 ./fly error <E码>               查询错误码示例报错与修复方法（如 fly error E0066）
-./fly update [--check|--force|--channel <dev|release>|--proxy <url>]  自更新（见上）
+./fly update [--check|--force|--proxy <url>]  自更新（见上）
 ```
 
 build 选项：

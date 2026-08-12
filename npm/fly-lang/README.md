@@ -17,7 +17,7 @@ fly build example.fly -o out.py
 fly check app.fly
 fly run app.fly
 fly error E0031        # 查询错误码示例报错与修复方法
-fly update             # 自更新（GitHub Releases 渠道，与原生安装一致）
+fly update             # 自更新（GitHub Releases 最新正式版，与原生安装一致）
 ```
 
 ## 工作原理

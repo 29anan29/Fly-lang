@@ -27,10 +27,9 @@ type Asset struct {
 }
 
 type Release struct {
-	TagName    string `json:"tag_name"`
-	Body       string `json:"body"`
-	Prerelease bool   `json:"prerelease"`
-	Assets     []struct {
+	TagName string `json:"tag_name"`
+	Body    string `json:"body"`
+	Assets  []struct {
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
@@ -94,34 +93,6 @@ func (u *Updater) Latest() (*Release, error) {
 		return nil, err
 	}
 	return &rel, nil
-}
-
-func (u *Updater) LatestDev() (*Release, error) {
-	url := fmt.Sprintf("%s/repos/%s/releases?per_page=10", u.BaseURL, u.Repo)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "fly-lang/"+version.String())
-	resp, err := u.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("检查更新失败: HTTP %d", resp.StatusCode)
-	}
-	var rels []Release
-	if err := json.NewDecoder(resp.Body).Decode(&rels); err != nil {
-		return nil, err
-	}
-	for i := range rels {
-		if rels[i].Prerelease {
-			return &rels[i], nil
-		}
-	}
-	return nil, fmt.Errorf("dev 渠道暂无预发布版本")
 }
 
 func (u *Updater) AssetFor(goos, goarch string, rel *Release) (*Asset, error) {
