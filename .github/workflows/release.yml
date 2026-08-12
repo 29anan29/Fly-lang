@@ -190,11 +190,6 @@ jobs:
         working-directory: editor/vscode-fly
         run: |
           npx --yes @vscode/vsce publish --skip-duplicate -p "${VSCE_PAT}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vsix-pkgs
-          path: dist/*.vsix
-          if-no-files-found: error
 
   npm:
     name: npm package
