@@ -1,3 +1,5 @@
+//go:build linux
+
 package main
 
 // fly sandbox: 进程级沙箱（Fast 模式）——namespaces + Landlock + seccomp + rlimit。
