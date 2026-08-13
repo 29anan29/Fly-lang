@@ -15,7 +15,8 @@ Fly-Lang 是用 Go 实现的 Python 安全超集转译器。核心文件是 Plan
 ## 架构概览
 
 ```
-cmd/fly/main.go      CLI 入口（build/check/run/version/update/lsp）
+cmd/fly/main.go      CLI 入口（build/check/run/sandbox/version/update/lsp）
+cmd/fly/sandbox.go   `fly sandbox` 进程级沙箱（clone ns 建 user/mount/pid/net/uts/ipc → Landlock → seccomp 白名单 → exec python3，rlimit 由注入 python wrapper 设置）
 internal/lexer/      词法分析
 internal/ast/        AST 节点（必须带 position，报错需要行列号）
 internal/parser/     递归下降解析器

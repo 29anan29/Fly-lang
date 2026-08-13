@@ -56,6 +56,7 @@ const usage = `Fly-Lang 编译器
   fly build [选项] <file.fly>   转译为 Python（含沙箱运行时，拦截逃逸）
   fly check <file.fly>...       编译检查（支持目录递归，goroutine 并发）
   fly run <file.fly>            转译并在沙箱内执行
+  fly sandbox <script.py>       进程级沙箱运行 Python（Landlock+seccomp+ns）
   fly version                  显示版本
   fly error <E码>              查询错误码（示例报错与修复方法）
   fly update [选项]             检查/更新到最新版本
@@ -84,6 +85,8 @@ func run(args []string) int {
 		return cmdCheck(args[1:])
 	case "run":
 		return cmdRun(args[1:])
+	case "sandbox":
+		return cmdSandbox(args[1:])
 	case "version":
 		fmt.Println(version.String())
 		return 0
