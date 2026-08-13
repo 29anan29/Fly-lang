@@ -132,6 +132,25 @@ func TestSafeFlow(t *testing.T) {
 	wantErr(t, "safe x\ns = x + 'y'\neval(s)\n", "未净化的外部输入")
 }
 
+func TestTaintIOSources(t *testing.T) {
+	wantErr(t, "eval(open('f').read())\n", "未净化的外部输入 read()")
+	wantErr(t, "data = open('f').read()\neval(data)\n", "未净化的外部输入")
+	wantErr(t, "f = open('f')\nline = f.readline()\nprint(line)\neval(line)\n", "未净化的外部输入")
+	wantErr(t, "import urllib.request\nhtml = urllib.request.urlopen('http://x').read()\neval(html)\n", "未净化的外部输入")
+	wantErr(t, "import subprocess\nout = subprocess.check_output(['ls'])\neval(out)\n", "未净化的外部输入")
+	wantErr(t, "import os\nout = os.popen('ls').read()\neval(out)\n", "未净化的外部输入")
+	wantErr(t, "import requests\nr = requests.get('http://x')\neval(r.text)\n", "未净化的外部输入")
+	wantErr(t, "import requests\neval(requests.post('http://x').json())\n", "未净化的外部输入")
+	wantErr(t, "s = open('f')\nline = s.readline()\neval(line)\n", "未净化的外部输入")
+	noErr(t, "import requests\nr = requests.get('http://x')\nclean = int(r.text)\nprint(clean)\n")
+	noErr(t, "d = {}\nv = d.get('k')\nprint(v)\n")
+}
+
+func TestTaintIoFileToSink(t *testing.T) {
+	wantErr(t, "import subprocess\nout = subprocess.check_output(['cat', 'f'])\nos.system(out)\n", "未净化的外部输入")
+	wantErr(t, "data = open('db.sql').read()\ncursor.execute(data)\n", "未净化的外部输入")
+}
+
 func TestMaskTaint(t *testing.T) {
 	wantErr(t, "mask pw\nprint(pw)\n", "敏感数据 pw 不可流入 print")
 	wantErr(t, "def login(password):\n    mask password\n    print(password)\n", "敏感数据 password 不可流入 print")

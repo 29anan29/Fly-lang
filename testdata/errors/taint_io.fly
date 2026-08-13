@@ -1,0 +1,10 @@
+"""污点数据源强化：网络读取/子进程输出返回值为外部输入，流入危险汇点报错"""
+
+import requests
+
+html = requests.get("http://x").text  # fly:error
+eval(html)
+r = requests.post("http://x").json()  # fly:error
+eval(r)
+data = requests.get("http://x").text  # fly:error
+exec(data)

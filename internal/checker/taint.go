@@ -120,6 +120,10 @@ func firstHint(a, b string) string {
 
 func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 	c.checkReflectCall(t)
+	recvTaint, recvHint := Taint{}, ""
+	if a, ok := t.Func.(*ast.AttrExpr); ok {
+		recvTaint, recvHint = c.exprTaint(a.X)
+	}
 	var argTaint Taint
 	var argHint string
 	for _, a := range t.Args {
@@ -155,9 +159,26 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 		case "system", "popen", "spawnl", "spawnlp", "spawnv", "spawnvp":
 			c.checkSafeSink(t, argTaint, argHint, "os."+name)
 		}
+		if name == "popen" || name == "read" {
+			return Taint{Safe: true}, "os." + name + "()"
+		}
 		return Taint{}, ""
 	case "subprocess":
 		c.checkSafeSink(t, argTaint, argHint, "subprocess."+name)
+		if name == "check_output" || name == "run" || name == "check_call" {
+			return Taint{Safe: true}, "subprocess." + name + "()"
+		}
+		return Taint{}, ""
+	case "requests":
+		switch name {
+		case "get", "post", "put", "delete", "patch":
+			return Taint{Safe: true}, "requests." + name + "()"
+		}
+		return Taint{}, ""
+	case "urllib":
+		if name == "urlopen" {
+			return Taint{Safe: true}, "urllib." + name + "()"
+		}
 		return Taint{}, ""
 	}
 	switch name {
@@ -174,6 +195,8 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 		return Taint{}, ""
 	case "input":
 		return Taint{Safe: true}, "input()"
+	case "open", "urlopen", "read_text", "read", "readline", "readlines", "recv":
+		return Taint{Safe: true}, name + "()"
 	}
 	if name != "" {
 		if isSanitizer(name) {
@@ -183,7 +206,7 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 			return argTaint.union(sym.Taint), argHint
 		}
 	}
-	return Taint{}, ""
+	return recvTaint, recvHint
 }
 
 func (c *Checker) callName(f ast.Expr) (name, mod string) {
