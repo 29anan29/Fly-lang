@@ -46,8 +46,10 @@ var codeForFormat = map[string]string{
 	"名字 %s 重复定义（第一次在第 %d 行）": "E0029",
 	"函数参数 %s 重复定义":           "E0030",
 
-	"未净化的外部输入 %s 流入 %s（危险汇点）": "E0031",
-	"敏感数据 %s 不可流入 %s（输出上下文）":  "E0032",
+	"未净化的外部输入 %s 流入 %s（危险汇点）":          "E0031",
+	"未净化的外部输入 %s 流入函数 %s 的参数 %s（危险汇点）": "E0031",
+	"敏感数据 %s 不可流入 %s（输出上下文）":           "E0032",
+	"敏感数据 %s 流入函数 %s 的参数 %s（输出上下文）":    "E0032",
 
 	"lock 变量 %s 未定义":              "E0033",
 	"lock 变量 %s 不可删除":             "E0034",
@@ -641,4 +643,9 @@ func CodeForFormat(format string) string {
 func InfoForCode(code string) (ErrorInfo, bool) {
 	info, ok := errorInfo[code]
 	return info, ok
+}
+
+// AllErrorInfos 暴露注册表全集（tools/gen_errorinfo 生成 Rust 版注册表用）。
+func AllErrorInfos() map[string]ErrorInfo {
+	return errorInfo
 }

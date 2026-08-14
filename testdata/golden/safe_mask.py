@@ -222,7 +222,7 @@ _FLY_SB_ALLOWED_MODS = frozenset((
     "copy", "pprint", "reprlib", "difflib", "unicodedata", "enum", "abc",
     "typing", "dataclasses", "contextlib", "threading", "queue", "warnings",
     "ast", "token", "keyword", "symtable", "this", "exceptions", "html",
-    "xml", "unittest",
+    "xml", "unittest", "requests",
 ))
 
 
@@ -262,5 +262,5 @@ class _DB:
         return ("q", v)
 db = _DB()
 def handle():
-    clean = _fly_cast(int, uid, line=17, col=16)
-    return _fly_attr(db, "query", 18, 15)(clean)
+    clean = _fly_cast(int, uid, line=14, col=16)
+    return _fly_attr(db, "query", 15, 15)(clean)

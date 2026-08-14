@@ -17,6 +17,7 @@ type Gen struct {
 	sealUsed  bool
 	traceUsed bool
 	plain     bool // 纯文本模式（guard 消息等）：不注入 _fly_* 兜底
+	keepAnn   bool // 产物保留安全关键字审计注释
 	traceCtx  *traceCtx
 	sealInit  bool
 	nc        int
@@ -32,7 +33,20 @@ type traceCtx struct {
 }
 
 func Generate(m *ast.Module) string {
+	return GenerateOpts(m, GenOpts{})
+}
+
+// GenOpts 控制代码生成选项。
+type GenOpts struct {
+	// KeepAnnotations 在产物中保留安全关键字审计注释（zero-residual 关键字的审计痕迹）。
+	KeepAnnotations bool
+}
+
+func GenerateOpts(m *ast.Module, opts GenOpts) string {
 	g := &Gen{types: NewTypeInfer(m)}
+	if opts.KeepAnnotations {
+		g.keepAnn = true
+	}
 	g.types.Run()
 	docEnd := 0
 	if len(m.Stmts) > 0 {
@@ -56,10 +70,108 @@ func Generate(m *ast.Module) string {
 				g.w("\n")
 			}
 			g.runtimePrelude(guard, only, trace, cage, rt, sandbox)
+			if opts.KeepAnnotations {
+				g.w(annotations(m.Stmts))
+			}
 		}
 		g.stmt(s)
 	}
 	return g.buf.String()
+}
+
+// annotations 收集各安全关键字的声明位置，生成审计注释块（零残留关键字的产物痕迹）。
+func annotations(stmts []ast.Stmt) string {
+	var sb strings.Builder
+	var walk func(s ast.Stmt)
+	walk = func(s ast.Stmt) {
+		switch t := s.(type) {
+		case *ast.SafeStmt:
+			for _, n := range t.Names {
+				fmt.Fprintf(&sb, "# fly-safe: %s 声明于 %d:%d\n", n, t.Pos_.Line, t.Pos_.Col)
+			}
+		case *ast.MaskStmt:
+			for _, n := range t.Names {
+				fmt.Fprintf(&sb, "# fly-mask: %s 声明于 %d:%d\n", n, t.Pos_.Line, t.Pos_.Col)
+			}
+		case *ast.LockStmt:
+			fmt.Fprintf(&sb, "# fly-lock: %s 声明于 %d:%d\n", t.Name, t.Pos_.Line, t.Pos_.Col)
+		case *ast.GuardStmt:
+			sub := &Gen{plain: true}
+			fmt.Fprintf(&sb, "# fly-guard: %s 声明于 %d:%d\n", sub.guardMsg(t), t.Pos_.Line, t.Pos_.Col)
+		case *ast.OnlyStmt:
+			fmt.Fprintf(&sb, "# fly-only: 白名单 %v 开始于 %d:%d\n", t.Modules, t.Pos_.Line, t.Pos_.Col)
+			for _, s := range t.Body {
+				walk(s)
+			}
+		case *ast.ClassDef:
+			if t.Seal {
+				fmt.Fprintf(&sb, "# fly-seal: 类 %s 定义于 %d:%d\n", t.Name, t.Pos_.Line, t.Pos_.Col)
+			}
+			for _, s := range t.Body {
+				walk(s)
+			}
+		case *ast.TraceStmt:
+			fmt.Fprintf(&sb, "# fly-trace: level=%s 开始于 %d:%d\n", t.Level, t.Pos_.Line, t.Pos_.Col)
+			for _, s := range t.Body {
+				walk(s)
+			}
+		case *ast.CageStmt:
+			fmt.Fprintf(&sb, "# fly-cage: 开始于 %d:%d\n", t.Pos_.Line, t.Pos_.Col)
+			for _, s := range t.Body {
+				walk(s)
+			}
+		case *ast.FuncDef:
+			for _, s := range t.Body {
+				walk(s)
+			}
+		case *ast.IfStmt:
+			for _, s := range t.Then {
+				walk(s)
+			}
+			for _, s := range t.Else {
+				walk(s)
+			}
+			for _, el := range t.Elifs {
+				for _, s := range el.Body {
+					walk(s)
+				}
+			}
+		case *ast.ForStmt:
+			for _, s := range t.Body {
+				walk(s)
+			}
+			for _, s := range t.Else {
+				walk(s)
+			}
+		case *ast.WhileStmt:
+			for _, s := range t.Body {
+				walk(s)
+			}
+		case *ast.TryStmt:
+			for _, s := range t.Body {
+				walk(s)
+			}
+			for _, s := range t.Else {
+				walk(s)
+			}
+			for _, s := range t.Finally {
+				walk(s)
+			}
+			for _, h := range t.Handlers {
+				for _, s := range h.Body {
+					walk(s)
+				}
+			}
+		}
+	}
+	for _, s := range stmts {
+		walk(s)
+	}
+	if sb.Len() == 0 {
+		return ""
+	}
+	sb.WriteString("\n")
+	return sb.String()
 }
 
 func (g *Gen) runtimePrelude(guard, only, trace, cage, rt, sandbox bool) {
@@ -508,7 +620,8 @@ func (g *Gen) stmt(s ast.Stmt) {
 		g.w("):\n")
 		g.indent++
 		g.indentLine()
-		g.w(`raise GuardError("` + g.guardMsg(t) + `")` + "\n")
+		quoted := strconv.Quote(g.guardMsg(t))
+		g.w(`raise GuardError(` + quoted + `)` + "\n")
 		g.indent--
 	case *ast.ExprStmt:
 		g.indentLine()

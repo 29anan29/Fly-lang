@@ -46,6 +46,11 @@ func CheckSource(src string) []ast.Diagnostic {
 }
 
 func BuildSource(src string) (string, []ast.Diagnostic, error) {
+	return BuildSourceOpts(src, gen.GenOpts{})
+}
+
+// BuildSourceOpts 同 BuildSource，支持代码生成选项（如 --keep-annotations）。
+func BuildSourceOpts(src string, opts gen.GenOpts) (string, []ast.Diagnostic, error) {
 	p := parser.New(src)
 	m := p.ParseModule()
 	if d := p.Error(); d != nil {
@@ -54,7 +59,7 @@ func BuildSource(src string) (string, []ast.Diagnostic, error) {
 	if errs := checker.Check(m); len(errs) > 0 {
 		return "", errs, nil
 	}
-	return gen.Generate(m), nil, nil
+	return gen.GenerateOpts(m, opts), nil, nil
 }
 
 func CheckFile(path string) ([]ast.Diagnostic, error) {
@@ -66,19 +71,43 @@ func CheckFile(path string) ([]ast.Diagnostic, error) {
 }
 
 func BuildFile(path string) (string, []ast.Diagnostic, error) {
+	return BuildFileOpts(path, gen.GenOpts{})
+}
+
+// BuildFileOpts 同 BuildFile，支持代码生成选项（如 --keep-annotations）。
+func BuildFileOpts(path string, opts gen.GenOpts) (string, []ast.Diagnostic, error) {
 	m, errs := ParseFile(path)
 	if len(errs) > 0 {
 		return "", errs, nil
 	}
-	return gen.Generate(m), nil, nil
+	return gen.GenerateOpts(m, opts), nil, nil
 }
 
 func FormatError(path string, d ast.Diagnostic) string {
 	src, _ := os.ReadFile(path)
-	return formatError(path, string(src), d)
+	return formatError(path, string(src), d, false)
 }
 
-func formatError(path, src string, d ast.Diagnostic) string {
+func FormatErrorColor(path string, d ast.Diagnostic, color bool) string {
+	src, _ := os.ReadFile(path)
+	return formatError(path, string(src), d, color)
+}
+
+var colorCodes = map[string]string{
+	"red":   "\x1b[31m",
+	"bred":  "\x1b[1;31m",
+	"cyan":  "\x1b[1;36m",
+	"reset": "\x1b[0m",
+}
+
+func colorWrap(color bool, code, s string) string {
+	if !color {
+		return s
+	}
+	return colorCodes[code] + s + colorCodes["reset"]
+}
+
+func formatError(path, src string, d ast.Diagnostic, color bool) string {
 	info, ok := ast.InfoForCode(d.Code)
 	if !ok {
 		if d.Pos.Line == 0 {
@@ -87,13 +116,16 @@ func formatError(path, src string, d ast.Diagnostic) string {
 		return fmt.Sprintf("error: %s:%d:%d: %s", path, d.Pos.Line, d.Pos.Col, d.Msg)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "error[%s]: %s\n", d.Code, info.Title)
-	fmt.Fprintf(&b, "  --> %s:%d:%d\n", path, d.Pos.Line, d.Pos.Col)
+	fmt.Fprintf(&b, "%s: %s\n",
+		colorWrap(color, "bred", "error["+d.Code+"]"), info.Title)
+	fmt.Fprintf(&b, "%s\n",
+		colorWrap(color, "cyan", fmt.Sprintf("  --> %s:%d:%d", path, d.Pos.Line, d.Pos.Col)))
 	if line, ok := srcLine(src, d.Pos.Line); ok {
 		len := underlineLen(line, d.Pos.Col)
 		fmt.Fprintf(&b, "   |\n")
 		fmt.Fprintf(&b, "%4d | %s\n", d.Pos.Line, line)
-		fmt.Fprintf(&b, "   | %s^%s\n", strings.Repeat(" ", d.Pos.Col-1), strings.Repeat("^", len-1))
+		under := strings.Repeat("^", len-1)
+		fmt.Fprintf(&b, "   | %s\n", colorWrap(color, "red", strings.Repeat(" ", d.Pos.Col-1)+"^"+under))
 	}
 	fmt.Fprintf(&b, "   |\n")
 	if d.Msg != info.Title {

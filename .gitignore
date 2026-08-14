@@ -4,15 +4,18 @@
 out.py
 build/
 dist/
+/target/
 
 # VSCode 插件
 node_modules/
 *.vsix
-
-/docs
 
 # 个人规划（不入库）
 /plan
 
 # 演示产物
 payload.bin
+
+# 第三方工具产物
+.VSCodeCounter/
+fly-sandboxd/target/

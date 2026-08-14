@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"flylang/internal/gen"
 )
 
 func TestGolden(t *testing.T) {
@@ -130,6 +132,7 @@ func TestSandboxEscape(t *testing.T) {
 		{"allow_mod", "import math\nfrom math import sqrt as sq\nprint(sq(16))\n", "4.0"},
 		{"allow_dangerous_name_var", "os = 5\nprint(os)\n", "5"},
 		{"allow_modattr_safe", "import math\nimport json\nprint(math.floor(2.9), json.dumps([1]))\n", "2 [1]"},
+		{"allow_requests_s6", "import requests\nprint(\"loaded\")\n", "loaded"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -175,5 +178,67 @@ func TestErrorSnapshots(t *testing.T) {
 				t.Errorf("错误消息与快照不一致\n--- got ---\n%s--- want ---\n%s", got.String(), want)
 			}
 		})
+	}
+}
+
+// S5：--keep-annotations 产物审计注释（零残留关键字 safe/mask/lock/guard 的产物痕迹）。
+func TestKeepAnnotations(t *testing.T) {
+	src := "safe data\nmask p\nlock X = 1\nguard X > 0\nseal class Admin:\n    def __init__(self, n):\n        self.name = n\n"
+	plain, _, err := BuildSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(plain, "fly-safe:") {
+		t.Fatal("默认产物不应含审计注释")
+	}
+	annotated, _, err := BuildSourceOpts(src, gen.GenOpts{KeepAnnotations: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"# fly-safe: data 声明于",
+		"# fly-mask: p 声明于",
+		"# fly-lock: X 声明于",
+		"# fly-guard: guard X > 0 声明于",
+		"# fly-seal: 类 Admin 定义于",
+	} {
+		if !strings.Contains(annotated, want) {
+			t.Fatalf("产物缺少 %q", want)
+		}
+	}
+	if !strings.Contains(annotated, plain[len(plain)-80:]) {
+		t.Fatal("注释不应改变产物行为代码（尾部语句应一致）")
+	}
+}
+
+// S6：第三方库受控包装（G1 缓解）——wrapper 示例必须通过 check 且可编译；
+// requests 是编译期 safe 源点（taint），危险模块属性仍被 E0064 拦截。
+func TestThirdPartyWrapper(t *testing.T) {
+	_, errs, err := BuildFile("../../examples/third_party/safe_http.fly")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(errs) > 0 {
+		t.Fatalf("wrapper 示例应通过检查: %v", errs[0])
+	}
+	if _, errs, _ := BuildSource("import requests\nprint(requests.os)\n"); len(errs) == 0 {
+		t.Fatal("requests.os 应被编译期 E0064 拦截")
+	}
+	if _, errs, _ := BuildSource("import requests\nr = requests.get(\"https://x\")\nprint(r)\n"); len(errs) > 0 {
+		t.Fatalf("requests.get 是合法源点不应报错: %v", errs[0])
+	}
+}
+
+// S6 回归：guard 条件含字符串字面量时 GuardError 消息必须转义（产物语法合法）。
+func TestGuardMsgEscape(t *testing.T) {
+	code, errs, err := BuildSource("x = \"https://a\"\nguard x.startswith(\"https://\")\nprint(x)\n")
+	if len(errs) > 0 || err != nil {
+		t.Fatalf("check 应通过: %v %v", errs, err)
+	}
+	if strings.Contains(code, `GuardError("guard x.startswith("https://")`) {
+		t.Fatal("GuardError 消息字符串引号未转义，产物将语法错误")
+	}
+	if !strings.Contains(code, `GuardError("guard x.startswith(\"https://\")")`) {
+		t.Fatalf("期望转义后的 GuardError 消息，实际:\n%q", code[strings.Index(code, "raise GuardError"):strings.Index(code, "raise GuardError")+80])
 	}
 }

@@ -1,3 +1,4 @@
+// symbol.go：符号表——作用域、名字解析、污点传播（含 x.attr 属性污点，兑现威胁模型 R2）。
 package checker
 
 import "flylang/internal/ast"
@@ -13,14 +14,19 @@ const (
 )
 
 type Symbol struct {
-	Kind   Kind
-	Pos    ast.Position
-	Anno   ast.Expr
-	Taint  Taint
-	Seal   bool
-	Func   *ast.FuncDef
-	Module string // KImport：顶层模块名（import pickle → "pickle"）
-	Orig   string // KImport：模块内原名（from pickle import loads as l → "loads"）
+	Kind       Kind
+	Pos        ast.Position
+	Anno       ast.Expr
+	Taint      Taint
+	Attrs      map[string]Taint // 实例属性污点（obj.attr = tainted 传播）
+	Seal       bool
+	Func       *ast.FuncDef
+	Module     string // KImport：顶层模块名（import pickle → "pickle"）
+	Orig       string // KImport：模块内原名（from pickle import loads as l → "loads"）
+	Scope      *Scope // KClass：类作用域（方法查找）
+	Params     []string
+	SinkParams map[string]bool
+	RetParam   bool
 }
 
 type Scope struct {
@@ -69,7 +75,7 @@ var builtins = map[string]bool{
 	"NameError": true, "ImportError": true, "KeyboardInterrupt": true,
 	"NotImplemented": true, "OverflowError": true, "ArithmeticError": true,
 	"LookupError": true, "OSError": true, "FileNotFoundError": true,
-	"IOError": true, "MemoryError": true, 	"UnicodeError": true, "SystemExit": true,
+	"IOError": true, "MemoryError": true, "UnicodeError": true, "SystemExit": true,
 	"GeneratorExit": true, "EOFError": true, "FloatingPointError": true,
 	"IndentationError": true, "SyntaxError": true, "NotImplementedError": true,
 	"RecursionError": true, "UnboundLocalError": true, "EnvironmentError": true,

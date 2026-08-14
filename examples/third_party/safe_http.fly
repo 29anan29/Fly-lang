@@ -1,0 +1,31 @@
+"""S6 试点：第三方库受控包装（G1 缓解）
+
+requests 是网络库：编译期把 requests.get/post 视为 safe 源点（外部数据），
+但模块内部是供应链信任（不静态审查）。本示例用 seal + guard + safe 收口：
+
+1. seal：请求客户端只能通过 SafeHttp 创建，实例属性不可篡改
+2. guard：URL 协议白名单（仅 https）+ 路径字符校验（防路径注入/SSRF 放宽）
+3. safe：外部路径经 guard 值校验后仍保持 safe 污点，流向 requests.get
+   （源点，合法）；若流入 eval/os.system 等汇点则编译报错
+
+运行时兜底：sandbox 注入恒启用（模块属性拦截 + 审计）；requests.os 等
+危险子模块属性在编译期 E0064 与运行时 _fly_sb_check_modattr 双层拦截。
+"""
+
+import requests
+
+seal class SafeHttp:
+    def __init__(self, base):
+        guard base.startswith("https://")
+        self.base = base
+
+    def get(self, path):
+        guard path.isalnum()
+        safe path
+        url = self.base + "/" + path
+        resp = requests.get(url, timeout=10)
+        return resp.text
+
+client = SafeHttp("https://example.com")
+data = client.get("docs")
+print(len(data))

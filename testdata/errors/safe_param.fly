@@ -1,0 +1,4 @@
+safe cmd
+def run(c):
+    exec(c)
+run(cmd)

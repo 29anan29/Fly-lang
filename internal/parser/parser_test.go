@@ -174,3 +174,14 @@ func TestDocstring(t *testing.T) {
 		t.Fatalf("应有 1 条语句")
 	}
 }
+
+// fuzz 回归：孤立关键字 `in` 曾导致 parseComparison 对 nil 左操作数 panic。
+func TestFuzzRegressionIsolatedKeyword(t *testing.T) {
+	for _, src := range []string{"in", "is", "not", "or", "and", "|", "+", "**"} {
+		p := New(src)
+		p.ParseModule()
+		if p.Error() == nil {
+			t.Fatalf("%q 应有解析错误", src)
+		}
+	}
+}

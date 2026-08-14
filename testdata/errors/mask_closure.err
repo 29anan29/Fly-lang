@@ -1,0 +1,9 @@
+error[E0032]: 敏感数据流入输出上下文
+  --> mask_closure.fly:5:10
+   |
+   5 |     print(inner())
+   |          ^^^^^^^^^
+   |
+   = help: 敏感数据 inner 不可流入 print（输出上下文）。对该值脱敏（如遮蔽/哈希）后再输出，或移除该输出调用
+   = note: SECURITY.md 污点分析一节
+

@@ -1,3 +1,4 @@
+// only.go：only 白名单编译期检查——块内只允许名单内模块/名字（E0044/E0045），跨文件收集引用。
 package checker
 
 import (

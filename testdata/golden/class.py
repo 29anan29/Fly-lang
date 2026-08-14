@@ -222,7 +222,7 @@ _FLY_SB_ALLOWED_MODS = frozenset((
     "copy", "pprint", "reprlib", "difflib", "unicodedata", "enum", "abc",
     "typing", "dataclasses", "contextlib", "threading", "queue", "warnings",
     "ast", "token", "keyword", "symtable", "this", "exceptions", "html",
-    "xml", "unittest",
+    "xml", "unittest", "requests",
 ))
 
 
@@ -261,4 +261,4 @@ class Animal:
     def speak(self):
         return f"{self.name} makes a sound"
 a = Animal("dog")
-print(_fly_attr(a, "legs", 12, 9), _fly_attr(a, "speak", 12, 17)())
+print(_fly_attr(a, "legs", 11, 9), _fly_attr(a, "speak", 11, 17)())

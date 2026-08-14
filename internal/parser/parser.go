@@ -1,3 +1,4 @@
+// parser.go：递归下降解析器——语句/表达式/8 关键字语法，产出带 position 的 AST。
 package parser
 
 import (
@@ -887,6 +888,9 @@ func (p *Parser) exprItem() ast.Expr {
 
 func (p *Parser) parseTest() ast.Expr {
 	x := p.parseOrTest()
+	if x == nil {
+		return nil
+	}
 	if p.tok.Type == lexer.IF {
 		pos := x.Pos()
 		p.next()
@@ -938,6 +942,9 @@ func (p *Parser) parseNotTest() ast.Expr {
 
 func (p *Parser) parseComparison() ast.Expr {
 	x := p.parseBitOr()
+	if x == nil {
+		return nil
+	}
 	if !p.isCompOp() {
 		return x
 	}
@@ -998,6 +1005,9 @@ func (p *Parser) compOp() string {
 
 func (p *Parser) parseBitOr() ast.Expr {
 	x := p.parseBitXor()
+	if x == nil {
+		return nil
+	}
 	for p.tok.Type == lexer.PIPE {
 		pos := p.tok.Pos
 		p.next()
@@ -1009,6 +1019,9 @@ func (p *Parser) parseBitOr() ast.Expr {
 
 func (p *Parser) parseBitXor() ast.Expr {
 	x := p.parseBitAnd()
+	if x == nil {
+		return nil
+	}
 	for p.tok.Type == lexer.CARET {
 		pos := p.tok.Pos
 		p.next()
@@ -1020,6 +1033,9 @@ func (p *Parser) parseBitXor() ast.Expr {
 
 func (p *Parser) parseBitAnd() ast.Expr {
 	x := p.parseShift()
+	if x == nil {
+		return nil
+	}
 	for p.tok.Type == lexer.AMP {
 		pos := p.tok.Pos
 		p.next()
@@ -1031,6 +1047,9 @@ func (p *Parser) parseBitAnd() ast.Expr {
 
 func (p *Parser) parseShift() ast.Expr {
 	x := p.parseArith()
+	if x == nil {
+		return nil
+	}
 	for p.tok.Type == lexer.SHL || p.tok.Type == lexer.SHR {
 		pos := p.tok.Pos
 		op := p.tok.Lit
@@ -1043,6 +1062,9 @@ func (p *Parser) parseShift() ast.Expr {
 
 func (p *Parser) parseArith() ast.Expr {
 	x := p.parseTerm()
+	if x == nil {
+		return nil
+	}
 	for p.tok.Type == lexer.PLUS || p.tok.Type == lexer.MINUS {
 		pos := p.tok.Pos
 		op := p.tok.Lit
@@ -1055,6 +1077,9 @@ func (p *Parser) parseArith() ast.Expr {
 
 func (p *Parser) parseTerm() ast.Expr {
 	x := p.parseFactor()
+	if x == nil {
+		return nil
+	}
 	for p.tok.Type == lexer.STAR || p.tok.Type == lexer.SLASH || p.tok.Type == lexer.FLOORDIV || p.tok.Type == lexer.PERCENT {
 		pos := p.tok.Pos
 		op := p.tok.Lit
@@ -1071,6 +1096,9 @@ func (p *Parser) parseFactor() ast.Expr {
 		op := p.tok.Lit
 		p.next()
 		x := p.parseFactor()
+		if x == nil {
+			return nil
+		}
 		return &ast.UnaryOpExpr{Pos_: pos, Op: op, X: x}
 	}
 	return p.parsePower()
@@ -1078,6 +1106,9 @@ func (p *Parser) parseFactor() ast.Expr {
 
 func (p *Parser) parsePower() ast.Expr {
 	x := p.parseAtomExpr()
+	if x == nil {
+		return nil
+	}
 	if p.tok.Type == lexer.DOUBLESTAR {
 		pos := p.tok.Pos
 		p.next()
@@ -1118,6 +1149,9 @@ func (p *Parser) callArgs(f ast.Expr) ast.Expr {
 			c.DblStar = p.parseTest()
 		} else {
 			e := p.parseTest()
+			if e == nil {
+				break
+			}
 			if p.tok.Type == lexer.ASSIGN {
 				name, ok := e.(*ast.Name)
 				if !ok {

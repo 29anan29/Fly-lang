@@ -283,7 +283,7 @@ _FLY_SB_ALLOWED_MODS = frozenset((
     "copy", "pprint", "reprlib", "difflib", "unicodedata", "enum", "abc",
     "typing", "dataclasses", "contextlib", "threading", "queue", "warnings",
     "ast", "token", "keyword", "symtable", "this", "exceptions", "html",
-    "xml", "unittest",
+    "xml", "unittest", "requests",
 ))
 
 
@@ -324,7 +324,7 @@ def outer(a):
 def counter():
     count = 0
     def inc():
-        return _fly_binop(count, 1, "add", 17, 22)
+        return _fly_binop(count, 1, "add", 16, 22)
     def setc(n):
         count = n
         return count
@@ -337,23 +337,23 @@ import json
 _fly_ob_b = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('json'))
 def parse(raw):
-    return _fly_attr(json, "loads", 34, 21)(raw)
+    return _fly_attr(json, "loads", 31, 21)(raw)
 parse = _fly_patch_builtins(parse, ('json'))
 import math
 _fly_ob_c = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('math'))
 def sq(x):
-    return _fly_attr(math, "sqrt", 38, 25)(x)
+    return _fly_attr(math, "sqrt", 35, 25)(x)
 sq = _fly_patch_builtins(sq, ('math'))
 data = sq(4.0)
 __builtins__ = _fly_ob_c
 def double(raw):
-    return _fly_attr(json, "dumps", 43, 21)(raw)
+    return _fly_attr(json, "dumps", 40, 21)(raw)
 double = _fly_patch_builtins(double, ('json'))
 __builtins__ = _fly_ob_b
 uid = "42"
 def use_taint():
-    clean = _fly_cast(int, uid, line=51, col=16)
+    clean = _fly_cast(int, uid, line=46, col=16)
     return clean
 def secret():
     password = "s3cr3t"

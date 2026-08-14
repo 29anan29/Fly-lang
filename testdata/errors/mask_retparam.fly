@@ -1,0 +1,4 @@
+def identity(x):
+    return x
+mask pw
+print(identity(pw))

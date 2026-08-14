@@ -1,0 +1,5 @@
+def outer():
+    mask pw
+    def inner():
+        return pw
+    print(inner())

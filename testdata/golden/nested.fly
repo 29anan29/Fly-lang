@@ -1,0 +1,23 @@
+def counter():
+    n = [0]
+    def inc():
+        n[0] += 1
+        return n[0]
+    return inc
+
+def compose(f, g):
+    def h(x):
+        return f(g(x))
+    return h
+
+c = counter()
+print(c(), c(), c())
+
+def double(x):
+    return x * 2
+
+def add1(x):
+    return x + 1
+
+h = compose(double, add1)
+print(h(10))

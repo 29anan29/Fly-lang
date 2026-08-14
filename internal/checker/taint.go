@@ -55,7 +55,15 @@ func (c *Checker) exprTaint(e ast.Expr) (Taint, string) {
 				return Taint{Safe: true}, "os.environ"
 			}
 		}
-		return c.exprTaint(t.X)
+		bt, bn := c.exprTaint(t.X)
+		if n, ok := t.X.(*ast.Name); ok {
+			if sym, ok := c.cur.Lookup(n.Name); ok {
+				if at, ok := sym.Attrs[t.Name]; ok {
+					return bt.union(at), firstHint(bn, n.Name+"."+t.Name)
+				}
+			}
+		}
+		return bt, bn
 	case *ast.SubscriptExpr:
 		c.exprTaint(t.Index)
 		if name := c.reflectReadName(t); name != "" {
@@ -143,6 +151,15 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 		}
 	}
 
+	if a, ok := t.Func.(*ast.AttrExpr); ok {
+		if n, ok := a.X.(*ast.Name); ok {
+			if sym, ok := c.cur.Lookup(n.Name); ok && sym.Kind == KClass && sym.Scope != nil {
+				if m, ok := sym.Scope.Lookup(a.Name); ok && m.Kind == KFunc {
+					return c.checkCallFunc(t, n.Name+"."+a.Name, m)
+				}
+			}
+		}
+	}
 	name, mod := c.callName(t.Func)
 	switch mod {
 	case "pickle":
@@ -189,6 +206,9 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 		if argTaint.Safe {
 			c.errorf(t.Pos_, "未净化的外部输入 %s 流入 %s（危险汇点）", argHint, name)
 		}
+		if argHint != "" {
+			c.markSinkParam(argHint)
+		}
 		return Taint{}, ""
 	case "execute", "executemany":
 		c.checkSafeSink(t, argTaint, argHint, "execute")
@@ -203,7 +223,7 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 			return Taint{}, ""
 		}
 		if sym, ok := c.cur.Lookup(name); ok && sym.Kind == KFunc {
-			return argTaint.union(sym.Taint), argHint
+			return c.checkCallFunc(t, name, sym)
 		}
 	}
 	return recvTaint, recvHint
@@ -236,12 +256,68 @@ func (c *Checker) checkSafeSink(t *ast.CallExpr, argTaint Taint, hint, sink stri
 	if argTaint.Safe {
 		c.errorf(t.Pos_, "未净化的外部输入 %s 流入 %s（危险汇点）", hint, sink)
 	}
+	if hint != "" {
+		c.markSinkParam(hint)
+	}
 }
 
 func (c *Checker) checkMaskSink(t *ast.CallExpr, argTaint Taint, hint, sink string) {
 	if argTaint.Mask {
 		c.errorf(t.Pos_, "敏感数据 %s 不可流入 %s（输出上下文）", hint, sink)
 	}
+	if hint != "" {
+		c.markSinkParam(hint)
+	}
+}
+
+func (c *Checker) markSinkParam(name string) {
+	if c.fnSym == nil || c.fnSym.Params == nil {
+		return
+	}
+	for _, pn := range c.fnSym.Params {
+		if pn == name {
+			if c.fnSym.SinkParams == nil {
+				c.fnSym.SinkParams = make(map[string]bool)
+			}
+			c.fnSym.SinkParams[pn] = true
+			return
+		}
+	}
+}
+
+// checkCallFunc 自定义函数调用的 taint 传播：
+// 1. 返回值 taint = 函数返回 taint ∪ 实参 taint（参数透传）；
+// 2. 实参流入函数体内汇点的敏感/外部数据在调用点拦截。
+func (c *Checker) checkCallFunc(t *ast.CallExpr, name string, fnSym *Symbol) (Taint, string) {
+	if fnSym.SinkParams != nil {
+		for i, a := range t.Args {
+			if i < len(fnSym.Params) && fnSym.SinkParams[fnSym.Params[i]] {
+				at, an := c.exprTaint(a)
+				if at.Mask {
+					c.errorf(t.Pos_, "敏感数据 %s 流入函数 %s 的参数 %s（输出上下文）", an, name, fnSym.Params[i])
+				}
+				if at.Safe {
+					c.errorf(t.Pos_, "未净化的外部输入 %s 流入函数 %s 的参数 %s（危险汇点）", an, name, fnSym.Params[i])
+				}
+			}
+		}
+	}
+	argTaint, argHint := Taint{}, ""
+	for _, a := range t.Args {
+		at, an := c.exprTaint(a)
+		argTaint = argTaint.union(at)
+		if argHint == "" {
+			argHint = an
+		}
+	}
+	res := fnSym.Taint
+	if fnSym.RetParam {
+		res = res.union(argTaint)
+	}
+	if res.dirty() && argHint == "" {
+		return res, name
+	}
+	return res, argHint
 }
 
 var fstringNameStart = func(ch byte) bool {

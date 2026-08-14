@@ -9,7 +9,6 @@ def outer(a):
 
     return inner(10) + x
 
-
 def counter():
     count = 0
 
@@ -22,18 +21,16 @@ def counter():
 
     return inc, setc
 
-
 def fib(n):
     if n < 2:
         return n
     return fib(n - 1) + fib(n - 2)
 
-
-only (json):
+only(json):
     def parse(raw):
         return json.loads(raw)
 
-    only (math):
+    only(math):
         def sq(x):
             return math.sqrt(x)
 
@@ -42,22 +39,18 @@ only (json):
     def double(raw):
         return json.dumps(raw)
 
-
 uid = "42"
 safe uid
-
 
 def use_taint():
     clean = int(uid)
     return clean
-
 
 def secret():
     password = "s3cr3t"
     mask password
     hashed = hash(password)
     return hashed
-
 
 print(outer(5))
 inc, setc = counter()

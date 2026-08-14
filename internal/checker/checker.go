@@ -268,6 +268,7 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 		c.cur = cl
 		if s, ok := c.cur.Lookup(t.Name); ok {
 			s.Seal = t.Seal
+			s.Scope = cl
 		}
 		for _, st := range t.Body {
 			c.checkStmt(st)
@@ -333,9 +334,16 @@ func (c *Checker) checkStmt(s ast.Stmt) {
 			c.checkStmt(st)
 		}
 	case *ast.ReturnStmt:
-		rt, _ := c.exprTaint(t.Value)
+		rt, hint := c.exprTaint(t.Value)
 		if c.fnSym != nil {
 			c.fnSym.Taint = c.fnSym.Taint.union(rt)
+			if hint != "" {
+				for _, pn := range c.fnSym.Params {
+					if pn == hint {
+						c.fnSym.RetParam = true
+					}
+				}
+			}
 		}
 	case *ast.RaiseStmt:
 		c.exprTaint(t.Exc)
@@ -349,20 +357,28 @@ func (c *Checker) propagateTaint(l ast.Expr, rt Taint) {
 	switch n := l.(type) {
 	case *ast.Name:
 		if sym, ok := c.cur.Lookup(n.Name); ok {
-			sym.Taint = rt
+			sym.Taint.Safe = rt.Safe
+			sym.Taint.Mask = sym.Taint.Mask || rt.Mask
 		}
+	case *ast.AttrExpr:
+		if sym, ok := c.cur.Lookup(n.Name); ok && rt.dirty() {
+			if sym.Attrs == nil {
+				sym.Attrs = make(map[string]Taint)
+			}
+			cur := sym.Attrs[n.Name]
+			sym.Attrs[n.Name] = Taint{Safe: cur.Safe || rt.Safe, Mask: cur.Mask || rt.Mask}
+		}
+		c.taintObject(n.X, rt)
 	case *ast.TupleLit:
 		for _, el := range n.Elems {
 			c.propagateTaint(el, rt)
 		}
+	case *ast.SubscriptExpr:
+		c.taintObject(n.X, rt)
 	case *ast.ListLit:
 		for _, el := range n.Elems {
 			c.propagateTaint(el, rt)
 		}
-	case *ast.AttrExpr:
-		c.taintObject(n.X, rt)
-	case *ast.SubscriptExpr:
-		c.taintObject(n.X, rt)
 	}
 }
 
@@ -384,12 +400,13 @@ func (c *Checker) checkFunc(t *ast.FuncDef) {
 		fnSym = s
 	} else {
 		fnSym = &Symbol{Kind: KFunc, Pos: t.Pos_}
-		c.cur.Define(t.Name, fnSym)
+		old.Define(t.Name, fnSym)
 	}
 	c.fnSym = fnSym
 	for _, p := range t.Params {
 		if p.Name != "" {
 			fn.Define(p.Name, &Symbol{Kind: KParam, Pos: t.Pos_, Anno: p.Anno})
+			fnSym.Params = append(fnSym.Params, p.Name)
 		}
 	}
 	for _, st := range t.Body {

@@ -4,12 +4,12 @@ import time
 
 cage(max_time="2s", max_memory="50MB"):
     def heavy():
-        data = [0] * 100_000_000  # 超内存则抛 ResourceExhaustedError
+        data = [0] * 100_000_000 # 超内存则抛 ResourceExhaustedError
         return len(data)
 
     def busy():
         while True:
-            time.sleep(0.01)  # 超时则抛 TimeoutError
+            time.sleep(0.01) # 超时则抛 TimeoutError
 
 try:
     print(heavy())

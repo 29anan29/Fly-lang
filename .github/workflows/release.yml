@@ -44,6 +44,13 @@ jobs:
             rm -rf pkg
           done
           ls -la dist/
+      - name: Sign packages (ed25519)
+        if: env.SIGN_PRIVATE_KEY != ''
+        env:
+          SIGN_PRIVATE_KEY: ${{ secrets.SIGN_PRIVATE_KEY }}
+        run: |
+          go run ./tools/sign dist/*.tar.gz dist/*.deb
+          ls -la dist/
       - uses: actions/upload-artifact@v4
         with:
           name: linux-pkgs
@@ -94,6 +101,13 @@ jobs:
 
           rm dist/fly-universal
           ls -la dist/
+      - name: Sign packages (ed25519)
+        if: env.SIGN_PRIVATE_KEY != ''
+        env:
+          SIGN_PRIVATE_KEY: ${{ secrets.SIGN_PRIVATE_KEY }}
+        run: |
+          go run ./tools/sign dist/*.pkg dist/*.dmg dist/*.tar.gz
+          ls -la dist/
       - uses: actions/upload-artifact@v4
         with:
           name: macos-pkgs
@@ -139,6 +153,14 @@ jobs:
           & 'C:\Program Files\7-Zip\7z.exe' a -t7z -sfx -mx9 dist\fly-windows-amd64-installer.exe dist\fly-installer.exe | Out-Null
           Remove-Item dist\fly-installer.exe
           Get-ChildItem dist
+      - name: Sign packages (ed25519)
+        if: env.SIGN_PRIVATE_KEY != ''
+        env:
+          SIGN_PRIVATE_KEY: ${{ secrets.SIGN_PRIVATE_KEY }}
+        shell: pwsh
+        run: |
+          $files = (Get-ChildItem dist -File | ForEach-Object { $_.FullName })
+          go run ./tools/sign $files
       - uses: actions/upload-artifact@v4
         with:
           name: windows-pkgs
@@ -270,4 +292,4 @@ jobs:
             - Windows: .zip（amd64/arm64）、自解压 exe
             - VSCode 插件：fly-lang-*.vsix（LSP 编译期诊断，v0.2.0+ 要求）
             - npm：\`npm install -g fly-lang\`（二进制全平台单包，见 npm job）
-            更新命令：\`fly update\`"
+            更新命令：\`fly update\`（ed25519 签名验证：产物 .sig 由 SIGN_PRIVATE_KEY 签名，客户端内嵌公钥校验）"

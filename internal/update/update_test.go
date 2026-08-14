@@ -4,6 +4,9 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -157,6 +160,7 @@ func TestDialSocks5BadProxy(t *testing.T) {
 }
 
 func TestCheckAndInstall(t *testing.T) {
+	priv := installTestKey(t)
 	var bin bytes.Buffer
 	gw := gzip.NewWriter(&bin)
 	tw := tar.NewWriter(gw)
@@ -168,15 +172,26 @@ func TestCheckAndInstall(t *testing.T) {
 	tw.Close()
 	gw.Close()
 
+	sig := ed25519.Sign(priv, bin.Bytes())
+
 	var srv *httptest.Server
 	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
 			rel := Release{TagName: "v1.2.3"}
-			rel.Assets = append(rel.Assets, struct {
-				Name               string `json:"name"`
-				BrowserDownloadURL string `json:"browser_download_url"`
-			}{Name: "fly-linux-amd64.tar.gz", BrowserDownloadURL: srv.URL + "/dl/fly-linux-amd64.tar.gz"})
+			rel.Assets = append(rel.Assets,
+				struct {
+					Name               string `json:"name"`
+					BrowserDownloadURL string `json:"browser_download_url"`
+				}{Name: "fly-linux-amd64.tar.gz", BrowserDownloadURL: srv.URL + "/dl/fly-linux-amd64.tar.gz"},
+				struct {
+					Name               string `json:"name"`
+					BrowserDownloadURL string `json:"browser_download_url"`
+				}{Name: "fly-linux-amd64.tar.gz.sig", BrowserDownloadURL: srv.URL + "/dl/fly-linux-amd64.tar.gz.sig"})
 			json.NewEncoder(w).Encode(rel)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, ".sig") {
+			w.Write(sig)
 			return
 		}
 		w.Write(bin.Bytes())
@@ -217,6 +232,103 @@ func TestCheckAndInstall(t *testing.T) {
 	}
 	if u.IsOutdated("1.0.0") || u.IsOutdated("v1.0.0") {
 		t.Fatal("同版本应判定为最新")
+	}
+}
+
+// installTestKey 生成测试密钥对并临时替换 SignPubKey，返回私钥供签名。
+func installTestKey(t *testing.T) ed25519.PrivateKey {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := SignPubKey
+	SignPubKey = base64.StdEncoding.EncodeToString(priv.Public().(ed25519.PublicKey))
+	t.Cleanup(func() { SignPubKey = orig })
+	return priv
+}
+
+// 篡改产物或签名 → 必须拒绝安装，且不触碰现有二进制。
+func TestInstallRejectsTampered(t *testing.T) {
+	priv := installTestKey(t)
+	content := []byte("#!/bin/sh\necho new\n")
+	_ = ed25519.Sign(priv, content)
+
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "fly")
+	os.WriteFile(exe, []byte("old"), 0755)
+
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".sig") {
+			w.Write([]byte("tampered-signature"))
+			return
+		}
+		w.Write(content)
+	}))
+	defer srv.Close()
+
+	u := New()
+	u.BaseURL = srv.URL
+	u.ExecPath = exe
+	a := &Asset{Name: "fly-linux-amd64.tar.gz", URL: srv.URL + "/dl/x", SigURL: srv.URL + "/dl/x.sig"}
+	err := u.Install(a)
+	if err == nil {
+		t.Fatal("篡改签名应拒绝安装")
+	}
+	got, _ := os.ReadFile(exe)
+	if string(got) != "old" {
+		t.Fatal("拒绝后不应替换二进制")
+	}
+}
+
+// 缺少签名资产 → 拒绝安装（即使 --force 场景也需签名的防御纵深）。
+func TestInstallMissingSig(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "fly")
+	os.WriteFile(exe, []byte("old"), 0755)
+
+	u := New()
+	u.ExecPath = exe
+	a := &Asset{Name: "fly-linux-amd64.tar.gz", URL: "https://invalid.example/x"}
+	if err := u.Install(a); err == nil {
+		t.Fatal("缺少签名文件应拒绝安装")
+	}
+}
+
+// Insecure 模式跳过验证（自建测试源逃生门）。
+func TestInstallInsecure(t *testing.T) {
+	var bin bytes.Buffer
+	gw := gzip.NewWriter(&bin)
+	tw := tar.NewWriter(gw)
+	content := []byte("#!/bin/sh\necho unsigned\n")
+	tw.WriteHeader(&tar.Header{Name: "fly", Mode: 0755, Size: int64(len(content))})
+	tw.Write(content)
+	tw.Close()
+	gw.Close()
+
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "fly")
+	os.WriteFile(exe, []byte("old"), 0755)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(bin.Bytes())
+	}))
+	defer srv.Close()
+
+	u := New()
+	u.ExecPath = exe
+	u.Insecure = true
+	a := &Asset{Name: "fly-linux-amd64.tar.gz", URL: srv.URL + "/dl/x"}
+	if err := u.Install(a); err != nil {
+		t.Fatalf("Insecure 模式应放行: %v", err)
+	}
+	got, err := os.ReadFile(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatal("Insecure 安装应替换二进制")
 	}
 }
 

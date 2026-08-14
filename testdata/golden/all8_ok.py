@@ -332,7 +332,7 @@ _FLY_SB_ALLOWED_MODS = frozenset((
     "copy", "pprint", "reprlib", "difflib", "unicodedata", "enum", "abc",
     "typing", "dataclasses", "contextlib", "threading", "queue", "warnings",
     "ast", "token", "keyword", "symtable", "this", "exceptions", "html",
-    "xml", "unittest",
+    "xml", "unittest", "requests",
 ))
 
 
@@ -369,16 +369,16 @@ class _Request:
         return "42"
 request = _Request()
 def handle():
-    uid = _fly_attr(request, "get", 14, 19)('id')
-    clean = _fly_cast(int, uid, line=16, col=16)
+    uid = _fly_attr(request, "get", 11, 19)('id')
+    clean = _fly_cast(int, uid, line=13, col=16)
     return clean
 import json
 import math
 _fly_ob_b = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('json', 'math'))
 def parse(raw):
-    data = _fly_attr(json, "loads", 23, 21)(raw)
-    return _fly_attr(math, "sqrt", 24, 21)(_fly_get(data, "x", 24, 30))
+    data = _fly_attr(json, "loads", 19, 21)(raw)
+    return _fly_attr(math, "sqrt", 20, 21)(_fly_get(data, "x", 20, 30))
 parse = _fly_patch_builtins(parse, ('json', 'math'))
 __builtins__ = _fly_ob_b
 SECRET_KEY = "abc-123"
@@ -388,19 +388,19 @@ def login(password):
     return hashed
 @_fly_cage(2, 52428800)
 def heavy():
-    data = _fly_binop([0], 1000, "mul", 43, 20)
+    data = _fly_binop([0], 1000, "mul", 36, 20)
     return len(data)
 def create_user(username, age):
     if not (isinstance(username, str) and (len(username) > 0) and (len(username) <= 20)):
         raise GuardError("guard username: str, len(username) > 0, len(username) <= 20")
-    if not (isinstance(age, int) and (_fly_cmp(lambda: 0, lambda: age, "lt", 50, 21) and _fly_cmp(lambda: age, lambda: 150, "lt", 50, 21))):
+    if not (isinstance(age, int) and (_fly_cmp(lambda: 0, lambda: age, "lt", 42, 21) and _fly_cmp(lambda: age, lambda: 150, "lt", 42, 21))):
         raise GuardError("guard age: int, 0 < age < 150")
     return (username, age)
 class Admin:
     role = "admin"
     def __init__(self, name):
         object.__setattr__(self, '_fly_seal_initializing', True)
-        _fly_setattr(self, "name", name, 59, 14)
+        _fly_setattr(self, "name", name, 50, 14)
         object.__setattr__(self, '_fly_seal_initializing', False)
     def __setattr__(self, name, value):
         if _fly_sb_builtins.getattr(self, "_fly_seal_initializing", False):
@@ -423,7 +423,7 @@ def delete_user(uid):
     _fly_log.log(_fly_log.WARNING, "exit delete_user: ret=%r", _fly_ret_c)
     return _fly_ret_c
 def _fly_trace_impl_delete_user(uid):
-    _fly_attr(db, "append", 68, 12)(uid)
+    _fly_attr(db, "append", 57, 12)(uid)
     return uid
 db = []
 print(parse('{"x": 9}'))
@@ -431,5 +431,5 @@ print(hashed is not None)
 print(login("pw"))
 print(heavy())
 print(create_user("alice", 30))
-print(_fly_attr(admin, "name", 78, 13), _fly_attr(admin, "role", 78, 25))
+print(_fly_attr(admin, "name", 66, 13), _fly_attr(admin, "role", 66, 25))
 print(delete_user(7))

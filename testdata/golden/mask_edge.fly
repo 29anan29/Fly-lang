@@ -1,0 +1,20 @@
+def outer():
+    mask pw
+    def inner():
+        return pw
+    def use(v):
+        return hash(v)
+    return use(inner())
+
+def identity(x):
+    return x
+
+mask token
+token = "abc"
+print(identity("safe-value"))
+
+class A:
+    def m(self, x):
+        return x
+
+print(A.m(A(), "hello"))

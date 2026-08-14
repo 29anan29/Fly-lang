@@ -1,0 +1,5 @@
+class A:
+    def m(self, x):
+        print(x)
+mask pw
+A.m(A(), pw)

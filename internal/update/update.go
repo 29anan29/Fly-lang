@@ -22,8 +22,9 @@ import (
 )
 
 type Asset struct {
-	Name string
-	URL  string
+	Name   string
+	URL    string
+	SigURL string
 }
 
 type Release struct {
@@ -41,6 +42,8 @@ type Updater struct {
 	BaseURL  string
 	Current  string
 	ExecPath string
+	// Insecure 跳过产物签名验证（危险：仅用于无签名来源/测试服务器）。
+	Insecure bool
 }
 
 func New() *Updater {
@@ -103,10 +106,20 @@ func (u *Updater) AssetFor(goos, goarch string, rel *Release) (*Asset, error) {
 	want := fmt.Sprintf("fly-%s-%s.%s", goos, goarch, ext)
 	for _, a := range rel.Assets {
 		if a.Name == want {
-			return &Asset{Name: a.Name, URL: a.BrowserDownloadURL}, nil
+			return &Asset{Name: a.Name, URL: a.BrowserDownloadURL, SigURL: u.sigURLFor(rel, want)}, nil
 		}
 	}
 	return nil, fmt.Errorf("当前平台 %s/%s 暂无更新包（需要 %s）", goos, goarch, want)
+}
+
+func (u *Updater) sigURLFor(rel *Release, name string) string {
+	sigName := name + ".sig"
+	for _, a := range rel.Assets {
+		if a.Name == sigName {
+			return a.BrowserDownloadURL
+		}
+	}
+	return ""
 }
 
 func (u *Updater) IsOutdated(latest string) bool {
@@ -116,6 +129,40 @@ func (u *Updater) IsOutdated(latest string) bool {
 		return true
 	}
 	return cur != rel
+}
+
+// verifyAsset 下载产物对应的 .sig 并验证签名；缺少签名文件即拒绝安装（防降级/篡改）。
+func (u *Updater) verifyAsset(a *Asset, artifactPath string, log func(string)) error {
+	if a.SigURL == "" {
+		return fmt.Errorf("缺少签名文件 %s.sig：为防篡改已拒绝安装，请从 GitHub Releases 手动下载", a.Name)
+	}
+	log("下载签名 " + a.Name + ".sig")
+	sigReq, err := http.NewRequest(http.MethodGet, a.SigURL, nil)
+	if err != nil {
+		return err
+	}
+	sigReq.Header.Set("User-Agent", "fly-lang/"+version.String())
+	sigResp, err := u.Client.Do(sigReq)
+	if err != nil {
+		return err
+	}
+	defer sigResp.Body.Close()
+	if sigResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("下载签名失败: HTTP %d", sigResp.StatusCode)
+	}
+	sig, err := io.ReadAll(sigResp.Body)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(artifactPath)
+	if err != nil {
+		return err
+	}
+	log("验证签名")
+	if err := VerifySigned(data, sig); err != nil {
+		return fmt.Errorf("安全校验失败：%v", err)
+	}
+	return nil
 }
 
 func (u *Updater) Install(a *Asset) error {
@@ -153,6 +200,14 @@ func (u *Updater) InstallVerbose(a *Asset, logf func(step string)) error {
 		return err
 	}
 	tmp.Close()
+
+	if !u.Insecure {
+		if err := u.verifyAsset(a, tmpPath, log); err != nil {
+			return err
+		}
+	} else {
+		log("跳过签名验证（--insecure，不推荐）")
+	}
 
 	exe, err := u.Executable()
 	if err != nil {
