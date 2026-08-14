@@ -1,3 +1,4 @@
+// version.go：版本注入与判定——ldflags 注入 Version/Commit/Repo；IsDev 识别 dev 版。
 package version
 
 import "strings"

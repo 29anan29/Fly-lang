@@ -1,3 +1,4 @@
+// pos.go：AST 节点行列号（Position）与 1 基渲染，报错定位的数据基础。
 package ast
 
 import "fmt"

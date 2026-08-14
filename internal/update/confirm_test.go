@@ -1,3 +1,4 @@
+// confirm_test.go：交互式确认（终端输入）单测。
 package update
 
 import (

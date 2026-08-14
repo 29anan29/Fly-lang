@@ -1,3 +1,4 @@
+// version_test.go：版本号解析与 dev 判定单测。
 package version
 
 import "testing"

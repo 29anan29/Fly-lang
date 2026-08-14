@@ -1,5 +1,7 @@
 //go:build !windows
 
+// tty.go：终端检测（ioctl TIOCGWINSZ），控制交互式 update 的 sudo 提权与 ANSI 颜色。
+
 package main
 
 import (

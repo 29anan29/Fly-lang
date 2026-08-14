@@ -1,3 +1,5 @@
+// Package lexer 词法分析：源文件字符串 → Token 流（关键字/字面量/运算符）。
+// 与 Rust 版 src/lexer 行为一致（CLI 对照验收），fuzz 目标见 fuzz_test.go。
 package lexer
 
 import "flylang/internal/ast"
@@ -107,6 +109,65 @@ const (
 	ELLIPSIS
 )
 
+// tokenText 非关键字 token 的展示名（关键字部分由 keywords 反查得到）。
+var tokenText = map[TokenType]string{
+	EOF:               "EOF",
+	IDENT:             "标识符",
+	INT:               "整数",
+	FLOAT:             "浮点数",
+	STRING:            "字符串",
+	NEWLINE:           "换行",
+	INDENT:            "缩进",
+	DEDENT:            "取消缩进",
+	ILLEGAL:           "非法token",
+	PLUS:              "+",
+	MINUS:             "-",
+	STAR:              "*",
+	SLASH:             "/",
+	PERCENT:           "%",
+	DOUBLESTAR:        "**",
+	FLOORDIV:          "//",
+	SHL:               "<<",
+	SHR:               ">>",
+	AMP:               "&",
+	PIPE:              "|",
+	CARET:             "^",
+	TILDE:             "~",
+	LT:                "<",
+	GT:                ">",
+	LE:                "<=",
+	GE:                ">=",
+	EQEQ:              "==",
+	NE:                "!=",
+	ASSIGN:            "=",
+	PLUS_ASSIGN:       "+=",
+	MINUS_ASSIGN:      "-=",
+	STAR_ASSIGN:       "*=",
+	SLASH_ASSIGN:      "/=",
+	PERCENT_ASSIGN:    "%=",
+	DOUBLESTAR_ASSIGN: "**=",
+	FLOORDIV_ASSIGN:   "//=",
+	SHL_ASSIGN:        "<<=",
+	SHR_ASSIGN:        ">>=",
+	AMP_ASSIGN:        "&=",
+	PIPE_ASSIGN:       "|=",
+	CARET_ASSIGN:      "^=",
+	COLON:             ":",
+	COMMA:             ",",
+	DOT:               ".",
+	SEMICOLON:         ";",
+	ARROW:             "->",
+	LPAREN:            "(",
+	RPAREN:            ")",
+	LBRACKET:          "[",
+	RBRACKET:          "]",
+	LBRACE:            "{",
+	RBRACE:            "}",
+	AT:                "@",
+	ELLIPSIS:          "...",
+}
+
+// keywords 关键字文本 → TokenType（含 8 个 Fly 安全关键字）。
 var keywords = map[string]TokenType{
 	"def": DEF, "class": CLASS, "if": IF, "elif": ELIF, "else": ELSE,
 	"for": FOR, "while": WHILE, "return": RETURN, "raise": RAISE,
@@ -121,6 +182,7 @@ var keywords = map[string]TokenType{
 	"cage": CAGE, "guard": GUARD, "seal": SEAL, "trace": TRACE,
 }
 
+// tokenNames 由 keywords 反查：关键字 TokenType → 文本。
 var tokenNames = map[TokenType]string{}
 
 func init() {
@@ -129,119 +191,13 @@ func init() {
 	}
 }
 
+// String 返回 token 展示名：关键字表 → 非关键字静态表 → 未知。
 func (t TokenType) String() string {
 	if s, ok := tokenNames[t]; ok {
 		return s
 	}
-	switch t {
-	case EOF:
-		return "EOF"
-	case IDENT:
-		return "标识符"
-	case INT:
-		return "整数"
-	case FLOAT:
-		return "浮点数"
-	case STRING:
-		return "字符串"
-	case NEWLINE:
-		return "换行"
-	case INDENT:
-		return "缩进"
-	case DEDENT:
-		return "取消缩进"
-	case ILLEGAL:
-		return "非法token"
-	case PLUS:
-		return "+"
-	case MINUS:
-		return "-"
-	case STAR:
-		return "*"
-	case SLASH:
-		return "/"
-	case PERCENT:
-		return "%"
-	case DOUBLESTAR:
-		return "**"
-	case FLOORDIV:
-		return "//"
-	case SHL:
-		return "<<"
-	case SHR:
-		return ">>"
-	case AMP:
-		return "&"
-	case PIPE:
-		return "|"
-	case CARET:
-		return "^"
-	case TILDE:
-		return "~"
-	case LT:
-		return "<"
-	case GT:
-		return ">"
-	case LE:
-		return "<="
-	case GE:
-		return ">="
-	case EQEQ:
-		return "=="
-	case NE:
-		return "!="
-	case ASSIGN:
-		return "="
-	case PLUS_ASSIGN:
-		return "+="
-	case MINUS_ASSIGN:
-		return "-="
-	case STAR_ASSIGN:
-		return "*="
-	case SLASH_ASSIGN:
-		return "/="
-	case PERCENT_ASSIGN:
-		return "%="
-	case DOUBLESTAR_ASSIGN:
-		return "**="
-	case FLOORDIV_ASSIGN:
-		return "//="
-	case SHL_ASSIGN:
-		return "<<="
-	case SHR_ASSIGN:
-		return ">>="
-	case AMP_ASSIGN:
-		return "&="
-	case PIPE_ASSIGN:
-		return "|="
-	case CARET_ASSIGN:
-		return "^="
-	case COLON:
-		return ":"
-	case COMMA:
-		return ","
-	case DOT:
-		return "."
-	case SEMICOLON:
-		return ";"
-	case ARROW:
-		return "->"
-	case LPAREN:
-		return "("
-	case RPAREN:
-		return ")"
-	case LBRACKET:
-		return "["
-	case RBRACKET:
-		return "]"
-	case LBRACE:
-		return "{"
-	case RBRACE:
-		return "}"
-	case AT:
-		return "@"
-	case ELLIPSIS:
-		return "..."
+	if s, ok := tokenText[t]; ok {
+		return s
 	}
 	return "未知"
 }

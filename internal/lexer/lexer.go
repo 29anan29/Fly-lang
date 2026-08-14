@@ -1,3 +1,4 @@
+// lexer.go：词法分析主实现——缩进栈、字符串前缀、数字/运算符扫描，产出 Token 流。
 package lexer
 
 import (

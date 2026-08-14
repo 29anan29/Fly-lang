@@ -1,3 +1,4 @@
+// lexer_test.go：词法单测（token 序列断言）。
 package lexer
 
 import (

@@ -1,3 +1,4 @@
+// server_test.go：LSP 协议单测（帧解析/请求分发）。
 package lsp
 
 import (

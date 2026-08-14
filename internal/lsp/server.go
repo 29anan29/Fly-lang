@@ -1,3 +1,4 @@
+// server.go：LSP 服务器——JSON-RPC 2.0 over stdio，诊断与 fly check 同一编译管线（CheckSource）。
 package lsp
 
 import (

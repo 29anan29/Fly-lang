@@ -1,3 +1,4 @@
+// checker_test.go：checker 单元测试（表驱动：交互组合/红队对抗见同目录 interaction_test.go 与 redteam_test.go）。
 package checker
 
 import (

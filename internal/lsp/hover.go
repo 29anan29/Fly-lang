@@ -1,3 +1,4 @@
+// hover.go：LSP hover 支持——8 个安全关键字的中文文档。
 package lsp
 
 import (

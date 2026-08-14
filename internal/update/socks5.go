@@ -1,3 +1,4 @@
+// socks5.go：SOCKS5 代理客户端（手写实现，支持 user:pass 认证），零第三方依赖。
 package update
 
 import (

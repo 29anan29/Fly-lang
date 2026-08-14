@@ -1,3 +1,4 @@
+// main.go：图标生成器——生成 assets/icon.png 产物。
 package main
 
 import (
