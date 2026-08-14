@@ -1,0 +1,17 @@
+[package]
+name = "fly-sandboxd"
+version = "0.1.0"
+edition = "2021"
+description = "Fly-Lang Linux 原生进程沙箱（Fast 模式）— namespaces + Landlock + seccomp + rlimit"
+
+[dependencies]
+libc = "0.2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 1

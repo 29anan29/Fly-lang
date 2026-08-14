@@ -8,6 +8,18 @@
 
 </div>
 
+## 合伙宣言（AI × 人类）
+
+Fly-Lang 由人与 AI 结对开发：**人做决策，AI 写代码**。
+
+- **代码主权在人**。AI 可以生成一万行代码，但每一行都要经过人的评审、测试与取舍才进入仓库。仓库里的每个 commit 背后，是人的判断。
+- **AI 是不知疲倦的合伙人**。它负责体力活：翻译、重构、查缺补漏、穷举边界用例；把人的精力留给真正需要智慧的事：语义、边界、取舍、方向。
+- **分工清楚**。变革性决策（语言设计、安全模型、架构方向）由人拍板；执行性产出（编码、测试、文档、CI）由 AI 先行完成，人验收。
+- **可验证胜过自夸**。AI 的产出不靠信任，靠测试：golden 逐字节对比、反例快照、CI 全绿才合并。
+- **AI 不署名，但要留痕**。commit 记录协作过程，让后人知道哪些代码由 AI 生成、如何被验证——这是对代码负责，也是对合作者负责。
+
+---
+
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/29anan29/Fly-lang)](https://github.com/29anan29/Fly-lang/releases)

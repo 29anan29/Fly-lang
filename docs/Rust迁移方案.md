@@ -18,7 +18,7 @@
 ## 2. 目标与非目标
 
 **目标**
-- 核心编译管线（lexer / ast / parser / checker / gen / compile）用 Rust 重写
+- 核心编译管线（lexer / ast / parser / gen / compile 编排）用 Rust 重写；**checker 语义检查留 Go**（D6：并发多文件检查语义保留）
 - CLI 行为、错误格式、退出码、产物命名与 Go 版**完全兼容**（VSCode 插件、CI、`fly update` 契约不变）
 - testdata 正反例全部复用，golden 输出与 Go 版逐字节一致
 - 保持「标准库优先，第三方 crate 最小化」的项目精神
@@ -35,30 +35,30 @@
 | D1 | crate 策略 | **std-only 优先**；update 的 HTTPS 请求若 std-only 成本过高，允许 `ureq`（约 1 个依赖，静态链接） | reqwest（重）；完全手写 HTTP+TLS（不可行，TLS 无法 std-only） |
 | D2 | 仓库组织 | **同仓库 `src/` 根目录 + `fly` 二进制同名**，Go 源码移入 `legacy-go/`（或按里程碑整体切换） | 新仓库（丢失 issue/CI 历史） |
 | D3 | 双轨期 | Go 与 Rust 并行，以 testdata golden 为行为基线；Rust 全绿后才删 Go | 一步到位直接替换（风险高，不推荐） |
-| D4 | checker 移植顺序 | 跟随 Go 版 P1→P4 关键字实现进度逐块移植 | 一次性全量（工作量大，难验证） |
+| D4 | checker 移植顺序 | **checker 不迁移**（见 D6），Rust 侧只做管线编排与桥接 | 跟随 Go 版 P1→P4 逐块移植（已废弃） |
 | D5 | 错误输出 | 保持 Rust 风格错误块逐字节一致（`error[E<CODE>]:` + 源码行 + 下划线 + help/note）（行列号按 **Unicode 字符**计，与 Go 的 rune 语义对齐） | 按字节计（与 Go 不一致，禁止） |
+| D6 | **checker 留 Go（并发语义保留）** | `checker` 整体不迁移：Go 侧保留为独立服务进程 `fly-checkd`（stdio JSON-RPC，与 LSP 同管线，`compile.CheckSource` 驱动，goroutine 并发处理多文件）。Rust 主进程 `std::thread` 并发向 checkd 发请求。R5 切换时 checkd 二进制随 Release 一并分发（产物命名 `fly-checkd-<os>-<arch>`），Rust `fly check` 自动发现同目录 checkd | checker 迁移 Rust（丢失 goroutine 并发模型，需重写调度，不选） |
 
 ## 4. 目录结构（目标态）
 
 ```
 fly-lang/
 ├── Cargo.toml
-├── build.rs                  # 注入 commit sha / repo
+├── build.rs                  # 注入 commit sha / repo（FLY_VERSION 环境变量注入版本）
 ├── src/
-│   ├── main.rs               # CLI：build/check/run/version/update
+│   ├── main.rs               # CLI：build/check/run/version/update（checker 走 checkd 桥接）
 │   ├── cli.rs                # 参数解析（手写，行为对齐 Go flag 版）
 │   ├── diagnostic.rs         # Position + Diagnostic + 聚合（上限 N 条）
-│   ├── version.rs            # env!("CARGO_PKG_VERSION") + build.rs 注入
+│   ├── version.rs            # FLY_VERSION/FLY_COMMIT（build.rs 注入，与 Go ldflags 语义对齐）
 │   ├── lexer/                # token.rs（token 定义）、lexer.rs（缩进栈状态机）
 │   ├── ast/                  # node.rs（节点枚举）、pos.rs
 │   ├── parser/               # 递归下降
-│   ├── checker/              # symbol.rs / taint.rs / whitelist.rs / guard.rs
 │   ├── gen/                  # python.rs（发射）、inject.rs（关键字展开）
-│   ├── runtime.rs            # include_str!("fly_runtime.py")（与 Go go:embed 等价）
+│   ├── checkd.rs             # 桥接客户端：spawn 并管理 Go 版 fly-checkd（stdio JSON-RPC）
 │   └── update/               # github.rs（API/下载）、socks5.rs（手写）、install.rs（原子替换）
 ├── fly_runtime.py
 ├── testdata/                 # 原样复用（golden + 反例）
-└── legacy-go/                # Go 版源码归档（迁移完成后删除）
+└── legacy-go/                # Go 版源码归档（checker/checkd 常驻保留，其余迁移完成后删除）
 ```
 
 ## 5. 架构映射（Go → Rust）
@@ -68,7 +68,7 @@ fly-lang/
 | `internal/lexer`（token.go/lexer.go，~800 行） | `src/lexer/` | 缩进栈状态机照搬；token 枚举化；f-string 嵌套引号处理逐字翻译 |
 | `internal/ast`（ast.go/pos.go） | `src/ast/` | 见 §6 所有权设计 |
 | `internal/parser`（~1000 行） | `src/parser/` | 递归下降直接翻译；`only:`/`cage():` 等新语法为特权路径 |
-| `internal/checker` | `src/checker/` | Go 用符号表 + 遍历收集；Rust 用 `&mut SymbolTable` 穿行 |
+| `internal/checker` | **不迁移**（D6）：Go 侧保留为 `fly-checkd` 常驻服务，stdio JSON-RPC 暴露 `checkSource`（与 LSP 同一 `compile.CheckSource` 管线，goroutine 并发多文件） | Rust 侧 `checkd.rs` 客户端：spawn 子进程 + 帧协议 + 并发（`std::thread`）分发 |
 | `internal/gen`（~500 行） | `src/gen/` | 发射器用 `String` buffer + 缩进计数，输出必须与 Go 逐字节一致 |
 | `internal/compile`（管线编排） | `src/main.rs` 内 `compile()` | 错误聚合语义对齐（一次报多个、上限 N） |
 | `internal/update`（socks5.go/update.go） | `src/update/` | socks5.go 手写协议直接翻译；HTTP 层见 D1；`AssetFor` 命名规则不变 |
@@ -119,14 +119,14 @@ pub struct Report { pub errors: Vec<Diagnostic> }   // 聚合，上限 MAX_ERROR
 
 ## 10. 分阶段计划（R0 → R5）
 
-### R0 骨架与基建
-- Cargo.toml、build.rs（注入 commit/repo）、CLI 框架（子命令分发 + `fly version`）
-- golden 测试框架搭建（能加载 testdata 并跑通空实现，全部失败但可运行）
-- 验收：`cargo build --release` 产出 `fly`；`fly version` 输出与 Go 版一致
+### R0 骨架与基建（✅ 已交付）
+- Cargo.toml、build.rs（注入 commit/repo，FLY_VERSION 注入版本，与 Go ldflags 语义对齐）、CLI 框架（子命令分发 + `fly version`）
+- golden 测试框架搭建（tests/golden.rs 枚举 testdata 断言 .fly/.py、.fly/.err 文件对齐全；R1 起逐字节对比）
+- 验收：`cargo build --release` 产出 `fly`；`fly version` 输出与 Go 版一致（dev 默认 / `FLY_VERSION` 注入 release）
 
 ### R1 lexer + ast + parser（对应 P0）
-- token 定义、缩进栈、f-string、字符串转义、数字/注释
-- AST 枚举 + Box 树；递归下降解析器
+- ✅ **lexer 已交付**：token 枚举（src/lexer/token.rs，44 关键字含 8 安全关键字）、缩进栈状态机、f-string 前缀、数字/字符串/运算符全量翻译；13 个单测（Go lexer_test 全量对照）；**testdata+example 71 个 .fly 与 Go 版逐 token 零差异**（对照工具 examples/dump_tokens.rs）
+- ⬜ ast 节点枚举 + Box 树；parser 递归下降
 - 验收：golden 测试 **全绿**（输出与 Go 版逐字节一致）；反例 syntax/with/string 等报错行号一致
 
 ### R2 compile 管线 + gen
@@ -138,13 +138,14 @@ pub struct Report { pub errors: Vec<Diagnostic> }   // 聚合，上限 MAX_ERROR
 - socks5 代理（含认证）翻译 + 假服务器单测
 - 验收：`fly update --check` 对 v0.1.0 release 返回退出码 2；单测全绿
 
-### R4 checker 关键字语义（对应 P1 → P4）
-- 按 Go 版进度逐块移植：symbol+lock/guard → taint(safe/mask) → whitelist(only)/seal/trace → cage+runtime
-- 验收：反例测试全部报错且消息一致；`python3` 行为测试通过
+### R4 checkd 桥接（checker 语义留 Go，D6）
+- Go 侧：`cmd/fly-checkd/` 独立二进制，stdio JSON-RPC（帧协议与 LSP 相同），`checkSource {src} → [Diagnostic]`，goroutine 并发处理多文件请求
+- Rust 侧：`checkd.rs` 客户端（spawn + 发现同目录二进制 + 并发分发 + 结果聚合），`fly check` 输出与 Go 版一致（错误块/退出码）
+- 验收：`fly check` 多文件并发、反例全部报错且消息一致；checkd 缺失时 Rust `fly check` 报友好错误
 
 ### R5 切换与退役
-- CI：release.yml 换 `dtolnay/rust-toolchain@stable`，跨编译（linux arm64 用 `cross` 或容器），产物命名不变
-- 删除 legacy-go/，AGENTS.md/README/CONTRIBUTING 更新
+- CI：release.yml 换 `dtolnay/rust-toolchain@stable`，跨编译（linux arm64 用 `cross` 或容器），产物命名不变（含 `fly-checkd-<os>-<arch>` 一并分发）
+- 删除 legacy-go/ 中除 checker/checkd 外的源码，AGENTS.md/README/CONTRIBUTING 更新
 - 验收：打 v1.0.0 tag，Release 产物与 v0.1.0 同构；VSCode 插件直接可用
 
 ## 11. 注意事项与坑（checklist）
