@@ -26,7 +26,9 @@ jobs:
           python-version: ${{ matrix.py }}
       - name: Go 全量测试（TestGolden/TestSandboxEscape/TestRuntimeCatch 走当前 python 实跑产物）
         run: go test ./...
-      - name: Rust 测试（build_golden 逐字节 + lexer/parser）
+      - name: 构建 fly-checkd（Rust LSP 集成测试 full_session 依赖同目录二进制）
+        run: go build -o target/debug/fly-checkd ./cmd/fly-checkd
+      - name: Rust 测试（build_golden 逐字节 + lexer/parser + lsp）
         run: cargo test
 
   linux:
@@ -208,6 +210,8 @@ jobs:
             go build -trimpath -o dist\fly-sandboxd.exe .\cmd\fly-sandboxd
             Compress-Archive -Path dist\fly.exe, dist\fly-checkd.exe, dist\fly-sandboxd.exe -DestinationPath dist\fly-windows-$arch.zip
             Copy-Item dist\fly.exe npm-bin\fly-windows-$arch.exe
+            Copy-Item dist\fly-checkd.exe npm-bin\fly-checkd-windows-$arch.exe
+            Copy-Item dist\fly-sandboxd.exe npm-bin\fly-sandboxd-windows-$arch.exe
             if ($arch -eq 'amd64') {
               Move-Item dist\fly.exe dist\fly-installer.exe
             } else {
