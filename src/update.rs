@@ -8,7 +8,7 @@ use std::process::Command;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use flate2::read::GzDecoder;
 
-use crate::http::{HttpClient, Proxy, Response};
+use crate::http::{HttpClient, Proxy};
 
 // SIGN_PUB_KEY 是发布产物的 ed25519 公钥（base64），与 Go 版 internal/update/verify.go 相同。
 const SIGN_PUB_KEY: &str = "YXpFqzZ8daPtFKwvpKTNoCkc8DIT2cG52cH3tvro9Go=";

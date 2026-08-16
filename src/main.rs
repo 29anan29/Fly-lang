@@ -77,8 +77,9 @@ fn main() -> ExitCode {
             println!("{}", USAGE);
             ExitCode::SUCCESS
         }
-        Some(cmd) if matches!(cmd, "sandbox" | "lsp") => {
-            eprintln!("error: 子命令 {} 尚未迁移到 Rust 核心（P1 已交付：version/help/error；P2 check；P3 build/run；P4 update 已迁移）", cmd);
+        Some("lsp") => cmd_lsp(&args[1..]),
+        Some(cmd) if cmd == "sandbox" => {
+            eprintln!("error: 子命令 sandbox 尚未迁移到 Rust 核心（P1-P4 已交付：version/help/error/check/build/run/update/lsp）");
             ExitCode::from(1)
         }
         Some(_) => {
@@ -726,3 +727,24 @@ update 选项:
   --check       仅检查新版本（有新版退出码 2）
   --force       同版本也强制更新
   --proxy <url> 走代理（http://、https://、socks5://）";
+fn cmd_lsp(args: &[String]) -> ExitCode {
+    if !args.is_empty() {
+        eprintln!("用法: fly lsp（stdio JSON-RPC，供编辑器 LSP 客户端调用）");
+        return ExitCode::from(2);
+    }
+    let server = match fly_lang::lsp::Server::new() {
+        Ok(s) => std::sync::Arc::new(s),
+        Err(e) => {
+            eprintln!("error: {}", e);
+            return ExitCode::from(1);
+        }
+    };
+    let mut stdin = std::io::stdin();
+    match server.run(&mut stdin) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("lsp: {}", e);
+            ExitCode::from(1)
+        }
+    }
+}

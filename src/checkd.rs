@@ -99,7 +99,63 @@ pub fn check_src(
     if bytes.len() < 4 + len {
         return Err("checkd 响应长度不符".to_string());
     }
-    let body = &bytes[4..4 + len];
+    parse_response(&bytes[4..4 + len])
+}
+
+// CheckdSession 长驻 checkd 进程：复用单进程处理多帧请求（LSP 场景，消除每次 spawn 开销）。
+pub struct CheckdSession {
+    _child: std::process::Child,
+    stdin: std::process::ChildStdin,
+    stdout: std::process::ChildStdout,
+}
+
+impl CheckdSession {
+    pub fn spawn(checkd: &PathBuf) -> Result<CheckdSession, String> {
+        let mut child = Command::new(checkd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| format!("启动 checkd 失败: {}", e))?;
+        let stdin = child.stdin.take().ok_or("checkd stdin 不可用")?;
+        let stdout = child.stdout.take().ok_or("checkd stdout 不可用")?;
+        Ok(CheckdSession {
+            _child: child,
+            stdin,
+            stdout,
+        })
+    }
+
+    pub fn check(&mut self, src: &str, path: &str, color: bool) -> Result<CheckdResult, String> {
+        let mut payload = Vec::new();
+        payload.push(color as u8);
+        push_be32(&mut payload, path.len() as u32);
+        payload.extend_from_slice(path.as_bytes());
+        push_be32(&mut payload, src.len() as u32);
+        payload.extend_from_slice(src.as_bytes());
+
+        let mut frame = Vec::new();
+        push_be32(&mut frame, payload.len() as u32);
+        frame.extend_from_slice(&payload);
+        self.stdin
+            .write_all(&frame)
+            .and_then(|_| self.stdin.flush())
+            .map_err(|e| format!("写入 checkd 失败: {}", e))?;
+
+        let mut len_buf = [0u8; 4];
+        self.stdout
+            .read_exact(&mut len_buf)
+            .map_err(|e| format!("读取 checkd 失败: {}", e))?;
+        let len = be32(&len_buf) as usize;
+        let mut body = vec![0u8; len];
+        self.stdout
+            .read_exact(&mut body)
+            .map_err(|e| format!("读取 checkd 失败: {}", e))?;
+        parse_response(&body)
+    }
+}
+
+pub fn parse_response(body: &[u8]) -> Result<CheckdResult, String> {
     if body.is_empty() {
         return Err("checkd 响应为空".to_string());
     }
@@ -139,7 +195,7 @@ pub fn check_src(
     })
 }
 
-fn read_str(body: &[u8], off: usize) -> Result<String , String> {
+fn read_str(body: &[u8], off: usize) -> Result<String, String> {
     if off + 4 > body.len() {
         return Err("checkd 字段长度截断".to_string());
     }

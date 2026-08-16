@@ -9,6 +9,8 @@ pub mod lexer;
 pub mod parser;
 pub mod gen;
 pub mod http;
+pub mod json;
+pub mod lsp;
 pub mod typeinfer;
 pub mod update;
 pub mod version;
