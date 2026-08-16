@@ -25,7 +25,7 @@ Fly-Lang 由人与 AI 结对开发：**人做决策，AI 写代码**。
 [![Release](https://img.shields.io/github/v/release/29anan29/Fly-lang)](https://github.com/29anan29/Fly-lang/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/29anan29/Fly-lang/release.yml?label=Release%20CI)](https://github.com/29anan29/Fly-lang/actions)
 
-Fly 是 Python 3.10+ 的安全受限超集：用 Go 实现的转译器，把 `.fly` 源码转译为 Python。任何合法 Python 中违反安全规则的模式（危险内建/反射链/危险模块，见 docs/THREAT-MODEL.md §6.2 不兼容清单）会被编译期拦截，其余安全子集零改造可编译；新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
+Fly 是 Python 3.10+ 的安全受限超集：用 Go 实现的转译器，把 `.fly` 源码转译为 Python。任何合法 Python 中违反安全规则的模式（危险内建/反射链/危险模块，见 [docs/THREAT-MODEL.md §6.2 不兼容清单](docs/THREAT-MODEL.md#62-不兼容模式清单安全受限超集的精确边界)）会被编译期拦截，其余安全子集零改造可编译；新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
 
 详细设计见 [方案.md](方案.md)（语言设计）与 [Plan.md](Plan.md)（实现方案）。
 
@@ -131,9 +131,9 @@ python3 out.py
 | `seal` | 冻结对象，禁止增删改属性 | 对象属性被篡改（编译期生成 `__setattr__` 拦截） |
 | `trace` | 强制审计日志 | 关键操作无记录（编译期插入 logging） |
 
-安全模型与威胁分析：**[SECURITY.md](SECURITY.md)** · **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**（含污点规则 R1-R5 形式化、对抗实测表、与 Bandit/Semgrep/Ruff 定位差异）
+安全模型与威胁分析：**[SECURITY.md](SECURITY.md)** · **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)**（含污点规则 R1-R5 形式化、逃逸面 E1-E12 枚举、对抗实测表、与 Bandit/Semgrep/Ruff 定位差异） · **[关键字交互矩阵](docs/关键字交互矩阵.md)**（8 关键字任意组合 + escape 全局扫描的优先级规则，22 组合测试锁定）
 CVE 对照演示：**[pickle RCE——Python 被打穿 vs Fly 编译期拦截](docs/demo/cve-pickle.md)**（`bash examples/cve-pickle/run-demo.sh`，5 幕含 fly-sandbox 运行时兜底）
-性能基准：**[docs/bench/bench.md](docs/bench/bench.md)**（CPython / PyPy / Fly 转译三列对比，`bash bench/run.sh`）
+性能基准：**[docs/bench/bench.md](docs/bench/bench.md)**（CPython / PyPy / Fly 转译三列对比，`bash bench/run.sh`。摘要：纯算术 ≈0 税、内建代理 2.6-3.7×、启动税 ~75ms、顶层代码零税——详见护栏成本构成节）
 语法兼容矩阵：**[docs/compat.md](docs/compat.md)**（Python 3.10+ 语法实测，当前 74%）
 
 ## CVE 演示：pickle 反序列化 RCE（实机截图）
