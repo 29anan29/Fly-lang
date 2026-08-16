@@ -557,6 +557,18 @@ func (g *Gen) stmt(s ast.Stmt) {
 		}
 		if len(t.Left) == 1 {
 			if l, ok := t.Left[0].(*ast.SubscriptExpr); ok {
+				if _, isSlice := l.Index.(*ast.SliceExpr); !isSlice && g.types.plainSubscr(l.Index, g.curFn) {
+					g.indentLine()
+					g.w("_fly_set_plain(")
+					g.expr(l.X, precCond)
+					g.w(", ")
+					g.expr(l.Index, precCond)
+					g.w(", ")
+					g.expr(t.Right, precCond)
+					g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
+					g.w("\n")
+					break
+				}
 				g.indentLine()
 				g.w("_fly_set(")
 				g.expr(l.X, precCond)
@@ -569,6 +581,16 @@ func (g *Gen) stmt(s ast.Stmt) {
 				break
 			}
 			if l, ok := t.Left[0].(*ast.AttrExpr); ok {
+				if g.types.plainAttr(l.X, l.Name, g.curFn) {
+					g.indentLine()
+					g.w("_fly_setattr_plain(")
+					g.expr(l.X, precCond)
+					g.w(fmt.Sprintf(", %q, ", l.Name))
+					g.expr(t.Right, precCond)
+					g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
+					g.w("\n")
+					break
+				}
 				g.indentLine()
 				g.w("_fly_setattr(")
 				g.expr(l.X, precCond)
@@ -682,9 +704,15 @@ func (g *Gen) stmt(s ast.Stmt) {
 		g.indentLine()
 		g.w("for ")
 		g.expr(t.Target, precLowest)
-		g.w(" in _fly_iter(")
-		g.expr(t.Iter, precCond)
-		g.w(fmt.Sprintf(", %d, %d):", t.Pos_.Line, t.Pos_.Col))
+		if g.plain || g.types.plainIter(t.Iter, g.curFn) {
+			g.w(" in ")
+			g.expr(t.Iter, precCond)
+			g.w(":")
+		} else {
+			g.w(" in _fly_iter(")
+			g.expr(t.Iter, precCond)
+			g.w(fmt.Sprintf(", %d, %d):", t.Pos_.Line, t.Pos_.Col))
+		}
 		g.suite(t.Body)
 		if len(t.Else) > 0 {
 			g.indentLine()
@@ -1339,6 +1367,12 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 			g.w("." + t.Name)
 			break
 		}
+		if g.types.plainAttr(t.X, t.Name, g.curFn) {
+			g.w("_fly_attr_plain(")
+			g.expr(t.X, precCond)
+			g.w(fmt.Sprintf(", %q, %d, %d)", t.Name, t.Pos_.Line, t.Pos_.Col))
+			break
+		}
 		g.w("_fly_attr(")
 		g.expr(t.X, precCond)
 		g.w(fmt.Sprintf(", %q, %d, %d)", t.Name, t.Pos_.Line, t.Pos_.Col))
@@ -1348,6 +1382,14 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 			g.w("[")
 			g.expr(t.Index, precLowest)
 			g.w("]")
+			break
+		}
+		if _, isSlice := t.Index.(*ast.SliceExpr); !isSlice && g.types.plainSubscr(t.Index, g.curFn) {
+			g.w("_fly_get_plain(")
+			g.expr(t.X, precCond)
+			g.w(", ")
+			g.expr(t.Index, precCond)
+			g.w(fmt.Sprintf(", %d, %d)", t.Pos_.Line, t.Pos_.Col))
 			break
 		}
 		g.w("_fly_get(")
@@ -1484,7 +1526,7 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 		for _, cl := range t.Clauses {
 			g.w(" for ")
 			g.expr(cl.Target, precCond)
-			if g.plain {
+			if g.plain || g.types.plainIter(cl.Iter, g.curFn) {
 				g.w(" in ")
 				g.expr(cl.Iter, precCond)
 			} else {

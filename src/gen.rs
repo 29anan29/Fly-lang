@@ -779,6 +779,20 @@ impl Gen<'_> {
                 }
                 if left.len() == 1 {
                     if let Expr::Subscript { x, index, .. } = &left[0] {
+                        if self.types.plain_subscr(x, index, &self.cur_fn)
+                            && !matches!(index.as_ref(), Expr::Slice { .. })
+                        {
+                            self.indent_line();
+                            self.w("_fly_set_plain(");
+                            self.expr(x, PREC_COND);
+                            self.w(", ");
+                            self.expr(index, PREC_COND);
+                            self.w(", ");
+                            self.expr(right, PREC_COND);
+                            self.w(&format!(", {}, {})", pos.line, pos.col));
+                            self.w("\n");
+                            return;
+                        }
                         self.indent_line();
                         self.w("_fly_set(");
                         self.expr(x, PREC_COND);
@@ -791,6 +805,16 @@ impl Gen<'_> {
                         return;
                     }
                     if let Expr::Attr { x, name, .. } = &left[0] {
+                        if self.types.plain_attr(x, name, &self.cur_fn) {
+                            self.indent_line();
+                            self.w("_fly_setattr_plain(");
+                            self.expr(x, PREC_COND);
+                            self.w(&format!(", {}, ", py_quote(name)));
+                            self.expr(right, PREC_COND);
+                            self.w(&format!(", {}, {})", pos.line, pos.col));
+                            self.w("\n");
+                            return;
+                        }
                         self.indent_line();
                         self.w("_fly_setattr(");
                         self.expr(x, PREC_COND);
@@ -915,9 +939,15 @@ impl Gen<'_> {
                 self.indent_line();
                 self.w("for ");
                 self.expr(target, PREC_LOWEST);
-                self.w(" in _fly_iter(");
-                self.expr(iter, PREC_COND);
-                self.w(&format!(", {}, {}):", pos.line, pos.col));
+                if self.plain || self.types.plain_iter(iter, &self.cur_fn) {
+                    self.w(" in ");
+                    self.expr(iter, PREC_COND);
+                    self.w(":");
+                } else {
+                    self.w(" in _fly_iter(");
+                    self.expr(iter, PREC_COND);
+                    self.w(&format!(", {}, {}):", pos.line, pos.col));
+                }
                 self.suite(body);
                 if !els.is_empty() {
                     self.indent_line();
@@ -1137,6 +1167,12 @@ impl Gen<'_> {
                     self.w(name);
                     return;
                 }
+                if self.types.plain_attr(x, name, &self.cur_fn) {
+                    self.w("_fly_attr_plain(");
+                    self.expr(x, PREC_COND);
+                    self.w(&format!(", {}, {}, {})", py_quote(name), pos.line, pos.col));
+                    return;
+                }
                 self.w("_fly_attr(");
                 self.expr(x, PREC_COND);
                 self.w(&format!(", {}, {}, {})", py_quote(name), pos.line, pos.col));
@@ -1147,6 +1183,16 @@ impl Gen<'_> {
                     self.w("[");
                     self.expr(index, PREC_LOWEST);
                     self.w("]");
+                    return;
+                }
+                if self.types.plain_subscr(x, index, &self.cur_fn)
+                    && !matches!(index.as_ref(), Expr::Slice { .. })
+                {
+                    self.w("_fly_get_plain(");
+                    self.expr(x, PREC_COND);
+                    self.w(", ");
+                    self.expr(index, PREC_COND);
+                    self.w(&format!(", {}, {})", pos.line, pos.col));
                     return;
                 }
                 self.w("_fly_get(");
@@ -1295,7 +1341,7 @@ impl Gen<'_> {
                 for cl in clauses {
                     self.w(" for ");
                     self.expr(&cl.target, PREC_COND);
-                    if self.plain {
+                    if self.plain || self.types.plain_iter(&cl.iter, &self.cur_fn) {
                         self.w(" in ");
                         self.expr(&cl.iter, PREC_COND);
                     } else {

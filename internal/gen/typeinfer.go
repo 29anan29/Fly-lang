@@ -492,3 +492,46 @@ func (ti *TypeInfer) plainBinOp(op string, x, y ast.Expr, fn string) bool {
 	}
 	return false
 }
+
+// flySBReflect 与 internal/runtime/fly_runtime.py 的 _FLY_SB_REFLECT 同步
+// （Rust 侧 src/typeinfer.rs FLY_SB_REFLECT，三处必须一致）。
+var flySBReflect = map[string]bool{
+	"__class__": true, "__bases__": true, "__base__": true, "__mro__": true,
+	"__subclasses__": true, "__globals__": true, "__code__": true,
+	"__closure__": true, "__dict__": true, "__reduce__": true,
+	"__reduce_ex__": true, "__getattribute__": true, "__setattr__": true,
+	"__delattr__": true, "__init_subclass__": true, "__prepare__": true,
+	"__builtins__": true, "__traceback__": true, "gi_frame": true,
+	"ag_frame": true, "cr_frame": true, "f_globals": true, "f_locals": true,
+	"__loader__": true,
+}
+
+// plainAttr 判定属性访问可原生生成（豁免 _fly_attr）：x 推导类型非
+// Unknown（typeinfer 只会从字面量/内建调用/容器推导出非模块类型，
+// import 绑定恒 Unknown）+ name 不在反射名单。
+func (ti *TypeInfer) plainAttr(x ast.Expr, name, fn string) bool {
+	return ti.exprType(x, nil, fn) != TUnknown && !flySBReflect[name]
+}
+
+// plainSubscr 判定下标访问可原生生成（豁免 _fly_get/_fly_set）：
+// index 推导类型非 Unknown 且非 Str——反射名单全为字符串。
+func (ti *TypeInfer) plainSubscr(index ast.Expr, fn string) bool {
+	kt := ti.exprType(index, nil, fn)
+	return kt != TUnknown && kt != TStr
+}
+
+// plainIter 判定 for 迭代可原生生成（豁免 _fly_iter）：_fly_iter 只做
+// 迭代包装与错误行列号包装，无安全拦截——容器类型与 range 调用恒可迭代，
+// 豁免仅可能改变错误信息，不影响沙箱安全。
+func (ti *TypeInfer) plainIter(iter ast.Expr, fn string) bool {
+	switch ti.exprType(iter, nil, fn) {
+	case TList, TDict, TSet, TTuple, TStr:
+		return true
+	}
+	if c, ok := iter.(*ast.CallExpr); ok {
+		if n, ok := c.Func.(*ast.Name); ok && n.Name == "range" {
+			return true
+		}
+	}
+	return false
+}

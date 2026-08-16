@@ -1,5 +1,15 @@
 import operator as _fly_op
 
+_FLY_OPS = {
+    "add": _fly_op.add, "sub": _fly_op.sub, "mul": _fly_op.mul,
+    "truediv": _fly_op.truediv, "floordiv": _fly_op.floordiv, "mod": _fly_op.mod,
+    "pow": _fly_op.pow, "lshift": _fly_op.lshift, "rshift": _fly_op.rshift,
+    "and_": _fly_op.and_, "or_": _fly_op.or_, "xor": _fly_op.xor,
+    "matmul": _fly_op.matmul, "neg": _fly_op.neg, "pos": _fly_op.pos,
+    "invert": _fly_op.invert, "lt": _fly_op.lt, "le": _fly_op.le,
+    "gt": _fly_op.gt, "ge": _fly_op.ge, "contains": _fly_op.contains,
+}
+
 
 class FlyRuntimeError(RuntimeError):
     """Fly 运行时兜底：动态错误统一携带源码行列号"""
@@ -58,7 +68,7 @@ def _fly_binop(a, b, op, line, col):
         if isinstance(a, int) and isinstance(b, int):
             return a != b
     try:
-        return _fly_sb_builtins.getattr(_fly_op, op)(a, b)
+        return _FLY_OPS[op](a, b)
     except _FLY_SAFE_ERRORS as e:
         raise FlyRuntimeError(
             "%s: 运算 %s 失败: %s" % (_fly_loc(line, col), op, e)
@@ -67,7 +77,7 @@ def _fly_binop(a, b, op, line, col):
 
 def _fly_unary(x, op, line, col):
     try:
-        return _fly_sb_builtins.getattr(_fly_op, op)(x)
+        return _FLY_OPS[op](x)
     except _FLY_SAFE_ERRORS as e:
         raise FlyRuntimeError(
             "%s: 运算 %s 失败: %s" % (_fly_loc(line, col), op, e)
@@ -108,7 +118,11 @@ def _fly_attr(x, name, line, col):
         raise FlyRuntimeError(
             "%s: 沙箱: 禁止反射访问 %s" % (_fly_loc(line, col), name)
         )
-    _fly_sb_check_modattr(x, name, line, col)
+    if type(x) is _fly_sb_types.ModuleType and (
+        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS
+    ):
+        _fly_sb_audit("禁止访问模块属性 " + name, line, col)
+        raise FlyRuntimeError("沙箱: 禁止访问模块属性 " + name)
     try:
         return _fly_sb_builtins.getattr(x, name)
     except _FLY_SAFE_ERRORS as e:
@@ -123,7 +137,11 @@ def _fly_setattr(x, name, v, line, col):
         raise FlyRuntimeError(
             "%s: 沙箱: 禁止反射赋值 %s" % (_fly_loc(line, col), name)
         )
-    _fly_sb_check_modattr(x, name, line, col)
+    if type(x) is _fly_sb_types.ModuleType and (
+        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS
+    ):
+        _fly_sb_audit("禁止访问模块属性 " + name, line, col)
+        raise FlyRuntimeError("沙箱: 禁止访问模块属性 " + name)
     try:
         _fly_sb_builtins.setattr(x, name, v)
     except _FLY_SAFE_ERRORS as e:
@@ -132,10 +150,50 @@ def _fly_setattr(x, name, v, line, col):
         ) from None
 
 
+# plain 版护栏（gen 类型推断豁免路径）：编译期已保证 name 非反射名单、
+# x 非模块（typeinfer 非 Unknown 类型恒非模块）、key 非 str，故移除
+# 运行时检查；保留 try/except 错误行列号包装（与 _fly_binop 成功快路径
+# + fallback 包装的豁免语义一致——错误路径恒带行列号）。
+def _fly_attr_plain(x, name, line, col):
+    try:
+        return _fly_sb_builtins.getattr(x, name)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 属性访问 %s 失败: %s" % (_fly_loc(line, col), name, e)
+        ) from None
+
+
+def _fly_setattr_plain(x, name, v, line, col):
+    try:
+        _fly_sb_builtins.setattr(x, name, v)
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 属性赋值 %s 失败: %s" % (_fly_loc(line, col), name, e)
+        ) from None
+
+
+def _fly_get_plain(x, k, line, col):
+    try:
+        return x[k]
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 下标访问失败: %s" % (_fly_loc(line, col), e)
+        ) from None
+
+
+def _fly_set_plain(x, k, v, line, col):
+    try:
+        x[k] = v
+    except _FLY_SAFE_ERRORS as e:
+        raise FlyRuntimeError(
+            "%s: 下标赋值失败: %s" % (_fly_loc(line, col), e)
+        ) from None
+
+
 def _fly_cmp(a, b, op, line, col):
     x, y = a(), b()
     try:
-        return _fly_sb_builtins.getattr(_fly_op, op)(x, y)
+        return _FLY_OPS[op](x, y)
     except _FLY_SAFE_ERRORS as e:
         raise FlyRuntimeError(
             "%s: 比较失败: %s" % (_fly_loc(line, col), e)
@@ -174,7 +232,7 @@ def _fly_sb_audit(msg, line=None, col=None):
 
 
 def _fly_sb_is_module(x):
-    return isinstance(x, _fly_sb_types.ModuleType)
+    return type(x) is _fly_sb_types.ModuleType
 
 
 def _fly_sb_check_modattr(x, name, line=None, col=None):
@@ -264,11 +322,17 @@ class _FlySandbox:
             _fly_sb_audit("禁止访问内建 " + name)
             raise FlyRuntimeError("沙箱: 禁止访问内建 " + name)
         if name in ("FlyRuntimeError", "GuardError", "ResourceExhaustedError"):
-            return _fly_sb_module_globals[name]
-        return _fly_sb_builtins.getattr(_fly_sb_builtins, name)
+            v = _fly_sb_module_globals[name]
+        else:
+            v = _fly_sb_builtins.getattr(_fly_sb_builtins, name)
+        self.__dict__[name] = v
+        return v
 
     def __getitem__(self, name):
-        return self.__getattr__(name)
+        try:
+            return self.__dict__[name]
+        except KeyError:
+            return self.__getattr__(name)
 
 
 __builtins__ = _FlySandbox()
@@ -277,7 +341,7 @@ def counter():
     n = [0]
     def inc():
         _fly_set(n, 0, _fly_binop(_fly_get(n, 0, 4, 10), 1, "add", 4, 10), 4, 10)
-        return _fly_get(n, 0, 5, 17)
+        return _fly_get_plain(n, 0, 5, 17)
     return inc
 def compose(f, g):
     def h(x):

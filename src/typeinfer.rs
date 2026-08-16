@@ -81,7 +81,54 @@ impl TypeInfer {
             _ => false,
         }
     }
+
+    // PlainAttr 判定属性访问可原生生成（豁免 _fly_attr）：
+    // x 推导类型非 Unknown（typeinfer 只会从字面量/内建调用/容器推导出
+    // Int/Str/Bool/Float/None/List/Dict/Set/Tuple，import 绑定恒 Unknown，
+    // 故非 Unknown 恒为非模块对象）+ name 字面量不在反射名单
+    // （名单必须与 fly_runtime.py 的 _FLY_SB_REFLECT 一致，见下方单测）。
+    pub fn plain_attr(&self, x: &Expr, name: &str, fn_name: &str) -> bool {
+        let xt = expr_type(self, x, None, fn_name);
+        xt != Type::Unknown && !FLY_SB_REFLECT.iter().any(|r| *r == name)
+    }
+
+// PlainSubscr 判定下标访问可原生生成（豁免 _fly_get/_fly_set）：
+    // index 推导类型非 Unknown 且非 Str——反射名单全为字符串，
+    // 非 str 的 key 恒不在名单（_fly_get 运行时拦截仅针对 str key）。
+    pub fn plain_subscr(&self, _x: &Expr, index: &Expr, fn_name: &str) -> bool {
+        let kt = expr_type(self, index, None, fn_name);
+        kt != Type::Unknown && kt != Type::Str
+    }
+
+    // PlainIter 判定 for 迭代可原生生成（豁免 _fly_iter）：
+    // _fly_iter 只做迭代包装与错误行列号包装，无安全拦截——
+    // 容器类型（List/Dict/Set/Tuple/Str）与 range 调用恒可迭代，
+    // 豁免仅可能改变错误信息（TypeError 不带行列号），不影响沙箱安全。
+    pub fn plain_iter(&self, iter: &Expr, fn_name: &str) -> bool {
+        let it = expr_type(self, iter, None, fn_name);
+        if matches!(
+            it,
+            Type::List | Type::Dict | Type::Set | Type::Tuple | Type::Str
+        ) {
+            return true;
+        }
+        matches!(iter, Expr::Call { func, .. } if matches!(
+            func.as_ref(),
+            Expr::Name { name, .. } if name == "range"
+        ))
+    }
 }
+
+// FLY_SB_REFLECT 与 internal/runtime/fly_runtime.py 的 _FLY_SB_REFLECT 同步。
+// gen 豁免属性访问护栏时静态检查名单；名单不同步会导致豁免绕过运行时拦截，
+// 修改任一处必须同步（单测 reflect_list_sync 断言一致）。
+pub const FLY_SB_REFLECT: [&str; 24] = [
+    "__class__", "__bases__", "__base__", "__mro__", "__subclasses__",
+    "__globals__", "__code__", "__closure__", "__dict__", "__reduce__",
+    "__reduce_ex__", "__getattribute__", "__setattr__", "__delattr__",
+    "__init_subclass__", "__prepare__", "__builtins__", "__traceback__",
+    "gi_frame", "ag_frame", "cr_frame", "f_globals", "f_locals", "__loader__",
+];
 
 fn merge_type(a: Type, b: Type) -> Type {
     if a == Type::Unknown || b == Type::Unknown || a != b {
@@ -516,5 +563,52 @@ fn trim_aug(op: &str) -> &str {
         &op[..op.len() - 1]
     } else {
         op
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 名单与 internal/runtime/fly_runtime.py 的 _FLY_SB_REFLECT 逐项同步，
+    // gen 豁免依赖此名单（豁免仅对不在名单的 name 生效）。
+    #[test]
+    fn reflect_list_sync() {
+        let runtime = include_str!("../internal/runtime/fly_runtime.py");
+        let mut runtime_names: Vec<&str> = Vec::new();
+        let mut in_block = false;
+        for line in runtime.lines() {
+            let t = line.trim();
+            if t.starts_with("_FLY_SB_REFLECT") {
+                in_block = true;
+                continue;
+            }
+            if in_block && t == "))" {
+                break;
+            }
+            if in_block && t.starts_with('"') {
+                for part in t.split(',') {
+                    let p = part.trim().trim_matches('"');
+                    if !p.is_empty() {
+                        runtime_names.push(p);
+                    }
+                }
+            }
+        }
+        let mut expect: Vec<&str> = FLY_SB_REFLECT.to_vec();
+        expect.sort_unstable();
+        runtime_names.sort_unstable();
+        let got: Vec<&str> = runtime_names
+            .into_iter()
+            .filter(|n| {
+                (n.starts_with("__") && n.ends_with("__"))
+                    || *n == "gi_frame"
+                    || *n == "ag_frame"
+                    || *n == "cr_frame"
+                    || *n == "f_globals"
+                    || *n == "f_locals"
+            })
+            .collect();
+        assert_eq!(got, expect, "FLY_SB_REFLECT 与 fly_runtime.py 名单不一致");
     }
 }
