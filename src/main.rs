@@ -575,7 +575,6 @@ fn parse_proxy_arg(proxy: &str) -> Result<Proxy, String> {
 }
 
 struct CheckOutcome {
-    path: String,
     blocks: Vec<String>,
 }
 
@@ -664,7 +663,6 @@ fn check_one(checkd: &PathBuf, path: &str, color: bool) -> CheckOutcome {
             let src = String::new();
             let block = format::format_error(path, &src, &d, color);
             CheckOutcome {
-                path: path.to_string(),
                 blocks: vec![block],
             }
         }
@@ -681,12 +679,10 @@ fn check_one(checkd: &PathBuf, path: &str, color: bool) -> CheckOutcome {
                             .collect()
                     };
                     CheckOutcome {
-                        path: path.to_string(),
                         blocks,
                     }
                 }
                 Err(e) => CheckOutcome {
-                    path: path.to_string(),
                     blocks: vec![format!("error: {}: {}", path, e)],
                 },
             }

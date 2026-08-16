@@ -539,7 +539,7 @@ mod tests {
     }
 
     fn recv(child: &mut std::process::Child) -> String {
-        let mut stdout = child.stdout.as_mut().unwrap();
+        let stdout = child.stdout.as_mut().unwrap();
         let mut header = String::new();
         let mut buf = [0u8; 1];
         loop {

@@ -172,6 +172,7 @@ impl<'a> Parser<'a> {
     }
 
     fn number(&mut self) -> Result<Json, String> {
+        let start = self.i;
         while self.i < self.s.len() {
             let c = self.s.as_bytes()[self.i];
             if c.is_ascii_digit() || c == b'-' || c == b'+' || c == b'.' || c == b'e' || c == b'E' {

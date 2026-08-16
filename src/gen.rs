@@ -1345,7 +1345,8 @@ fn py_quote(s: &str) -> String {
     out
 }
 
-// needs_runtime 判断是否需要注入运行时兜底（_fly_binop/_fly_get 等）。
+#[allow(dead_code)]
+// needs_runtime 判断是否需要注入运行时兜底（_fly_binop/_fly_get 等，与 Go 版对齐保留）。
 fn needs_runtime(stmts: &[Stmt]) -> bool {
     fn walk_expr(e: &Expr, found: &mut bool) {
         if *found {
