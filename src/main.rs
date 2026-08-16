@@ -1,4 +1,4 @@
-// main.rs：Rust CLI 入口——check/version/error 子命令（P1/P2 已交付，checker 走 checkd 桥接）。
+// main.rs：Rust CLI 入口——check/version/error/build/run 子命令（P1-P3 已交付，checker 走 checkd 桥接）。
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -44,13 +44,15 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("check") => cmd_check(&args[1..]),
+        Some("build") => cmd_build(&args[1..]),
+        Some("run") => cmd_run(&args[1..]),
         Some("error") => cmd_error(&args[1..]),
         Some("help") | Some("-h") | Some("--help") => {
             println!("{}", USAGE);
             ExitCode::SUCCESS
         }
-        Some(cmd) if matches!(cmd, "build" | "run" | "sandbox" | "update" | "lsp") => {
-            eprintln!("error: 子命令 {} 尚未迁移到 Rust 核心（P1 已交付：version/help/error；P2 check 已迁移）", cmd);
+        Some(cmd) if matches!(cmd, "sandbox" | "update" | "lsp") => {
+            eprintln!("error: 子命令 {} 尚未迁移到 Rust 核心（P1 已交付：version/help/error；P2 check；P3 build/run 已迁移）", cmd);
             ExitCode::from(1)
         }
         Some(_) => {
@@ -60,6 +62,223 @@ fn main() -> ExitCode {
         None => {
             eprintln!("{}", USAGE);
             ExitCode::from(2)
+        }
+    }
+}
+
+// cmd_build 转译 .fly 为 .py（与 Go 版逐字节对照：-o/默认 build/ 目录/--keep-annotations）。
+fn cmd_build(args: &[String]) -> ExitCode {
+    let mut out = String::new();
+    let mut keep_ann = false;
+    let mut file: Option<String> = None;
+    let mut i = 0usize;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" => {
+                if i + 1 >= args.len() {
+                    eprintln!("-o 需要文件名参数");
+                    return ExitCode::from(2);
+                }
+                i += 1;
+                out = args[i].clone();
+            }
+            "--keep-annotations" => keep_ann = true,
+            _ => {
+                if file.is_some() {
+                    eprintln!("只能指定一个输入文件");
+                    return ExitCode::from(2);
+                }
+                file = Some(args[i].clone());
+            }
+        }
+        i += 1;
+    }
+    let Some(file) = file else {
+        eprintln!("用法: fly build [-o out.py] <file.fly>");
+        return ExitCode::from(2);
+    };
+
+    let src = match std::fs::read(&file) {
+        Ok(b) => String::from_utf8_lossy(&b).into_owned(),
+        Err(e) => {
+            let op = if std::fs::metadata(&file).map(|m| m.is_dir()).unwrap_or(false) {
+                "read"
+            } else {
+                "open"
+            };
+            let errno = e.raw_os_error().unwrap_or(-1);
+            eprintln!("error: {}: {} {}: {}", file, op, file, format::errno_text(errno));
+            return ExitCode::from(1);
+        }
+    };
+
+    let color = std::io::stdout().is_terminal() && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+    let Some(checkd) = checkd::find_checkd() else {
+        eprintln!("error: 找不到 fly-checkd（设置 FLY_CHECKD 环境变量指定路径）");
+        return ExitCode::from(1);
+    };
+    match checkd::check_src(&checkd, &src, &file, color) {
+        Ok(r) => {
+            if let Some(e) = r.server_error {
+                eprintln!("error: {}: {}", file, e);
+                return ExitCode::from(1);
+            }
+            for d in &r.diags {
+                eprintln!("{}", format::format_error(&file, &src, d, color));
+            }
+            if !r.diags.is_empty() {
+                return ExitCode::from(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {}: {}", file, e);
+            return ExitCode::from(1);
+        }
+    }
+
+    let (module, perr) = fly_lang::parser::parse(&src);
+    let Some(module) = module else {
+        if let Some(d) = perr {
+            eprintln!("{}", format::format_error(&file, &src, &d, color));
+        } else {
+            eprintln!("error: {}: 解析失败", file);
+        }
+        return ExitCode::from(1);
+    };
+
+    let code = fly_lang::gen::generate_opts(module, fly_lang::gen::GenOpts { keep_annotations: keep_ann });
+    let out = if out.is_empty() {
+        default_out_path(&file)
+    } else {
+        out
+    };
+    if let Some(dir) = Path::new(&out).parent() {
+        if !dir.as_os_str().is_empty() {
+            if let Err(e) = std::fs::create_dir_all(dir) {
+                eprintln!("error: 创建目录 {} 失败: {}", dir.display(), e);
+                return ExitCode::from(1);
+            }
+        }
+    }
+    if let Err(e) = std::fs::write(&out, &code) {
+        eprintln!("error: 写入 {} 失败: {}", out, e);
+        return ExitCode::from(1);
+    }
+    println!("ok: {} -> {}", file, out);
+    ExitCode::SUCCESS
+}
+
+// default_out_path 复刻 Go defaultOutPath：默认输出到 build/ 目录，保留相对路径。
+fn default_out_path(file: &str) -> String {
+    let p = Path::new(file);
+    let rel = if p.is_absolute() {
+        match std::env::current_dir() {
+            Ok(cwd) => match p.strip_prefix(&cwd) {
+                Ok(r) => {
+                    let r = r.to_string_lossy().into_owned();
+                    if !r.starts_with("..") {
+                        r
+                    } else {
+                        String::new()
+                    }
+                }
+                Err(_) => String::new(),
+            },
+            Err(_) => String::new(),
+        }
+    } else {
+        file.to_string()
+    };
+    let rel = if rel.is_empty() {
+        p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+    } else {
+        rel
+    };
+    let mut out = PathBuf::from("build");
+    out.push(Path::new(&rel).with_extension("py"));
+    out.to_string_lossy().into_owned()
+}
+
+// cmd_run 转译并在沙箱内执行（临时 .py + python3，退出码透传）。
+fn cmd_run(args: &[String]) -> ExitCode {
+    if args.len() != 1 {
+        eprintln!("用法: fly run <file.fly>");
+        return ExitCode::from(2);
+    }
+    let file = &args[0];
+    let src = match std::fs::read(file) {
+        Ok(b) => String::from_utf8_lossy(&b).into_owned(),
+        Err(e) => {
+            let op = if std::fs::metadata(&file).map(|m| m.is_dir()).unwrap_or(false) {
+                "read"
+            } else {
+                "open"
+            };
+            let errno = e.raw_os_error().unwrap_or(-1);
+            eprintln!("error: {}: {} {}: {}", file, op, file, format::errno_text(errno));
+            return ExitCode::from(1);
+        }
+    };
+
+    let color = std::io::stdout().is_terminal() && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+    let Some(checkd) = checkd::find_checkd() else {
+        eprintln!("error: 找不到 fly-checkd（设置 FLY_CHECKD 环境变量指定路径）");
+        return ExitCode::from(1);
+    };
+    match checkd::check_src(&checkd, &src, file, color) {
+        Ok(r) => {
+            if let Some(e) = r.server_error {
+                eprintln!("error: {}: {}", file, e);
+                return ExitCode::from(1);
+            }
+            for d in &r.diags {
+                eprintln!("{}", format::format_error(file, &src, d, color));
+            }
+            if !r.diags.is_empty() {
+                return ExitCode::from(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {}: {}", file, e);
+            return ExitCode::from(1);
+        }
+    }
+
+    let (module, perr) = fly_lang::parser::parse(&src);
+    let Some(module) = module else {
+        if let Some(d) = perr {
+            eprintln!("{}", format::format_error(file, &src, &d, color));
+        } else {
+            eprintln!("error: {}: 解析失败", file);
+        }
+        return ExitCode::from(1);
+    };
+
+    let code = fly_lang::gen::generate(module);
+    let tmp = std::env::temp_dir().join(format!(
+        "fly-{}-{}.py",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0)
+    ));
+    if let Err(e) = std::fs::write(&tmp, &code) {
+        eprintln!("error: {}", e);
+        return ExitCode::from(1);
+    }
+    let status = std::process::Command::new("python3")
+        .arg(&tmp)
+        .status();
+    let _ = std::fs::remove_file(&tmp);
+    match status {
+        Ok(st) => match st.code() {
+            Some(c) => ExitCode::from(c as u8),
+            None => ExitCode::from(1),
+        },
+        Err(e) => {
+            eprintln!("error: 无法执行 python3: {}", e);
+            ExitCode::from(1)
         }
     }
 }

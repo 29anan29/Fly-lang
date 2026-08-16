@@ -49,11 +49,11 @@ Go 版 CLI 现状（`cmd/fly/`，共 1075 行）：
 - 并发：`std::thread::scope` + 自实现信号量（Mutex+Condvar，std 无 Semaphore），对齐 Go `NumCPU()*2`
 - 验收：testdata/errors 52 个反例 diff 零差异；多文件混合/目录递归/空目录/不存在文件/无参数/golden 全场景零差异
 
-### P3 build / run（R2 gen 交付后）
-- Rust：lexer → parser → **gen 注入展开**（纯 AST 变换，不依赖 checker）→ 输出 .py；语义检查同样走 checkd（与 check 同管线）
-- `-o <out.py>` 与默认 `build/` 目录保留相对路径逻辑
+### P3 build / run ✅ 已交付（R2 gen 交付）
+- Rust：lexer → parser → **gen 注入展开**（src/gen.rs，纯 AST 变换，不依赖 checker）→ 输出 .py；语义检查同样走 checkd（与 check 同管线）
+- `-o <out.py>` 与默认 `build/` 目录保留相对路径逻辑（default_out_path 复刻 Go defaultOutPath）
 - `fly run`：生成临时 .py → `python3` 执行，临时文件清理
-- 验收：testdata/golden 全部 .py 与 Go 版逐字节一致；`python3` 实跑行为一致
+- 验收：testdata/golden 全部 .py 与 Go 版逐字节一致（tests/build_golden.rs 固化）；`python3` 实跑行为一致；errors 52 反例 build/run 报错 stdout/stderr/退出码零差异
 
 ### P4 update / lsp
 - `update`：GitHub API（D1 决策：std-only 优先，必要时 ureq）、`AssetFor` 产物命名、tar.gz/zip 解包、原子替换、sudo 提权重试、SOCKS5 代理（手写协议翻译）、交互确认与 ANSI（isTTY 移植）

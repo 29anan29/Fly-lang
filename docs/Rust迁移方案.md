@@ -129,9 +129,10 @@ pub struct Report { pub errors: Vec<Diagnostic> }   // 聚合，上限 MAX_ERROR
 - ⬜ ast 节点枚举 + Box 树；parser 递归下降
 - 验收：golden 测试 **全绿**（输出与 Go 版逐字节一致）；反例 syntax/with/string 等报错行号一致
 
-### R2 compile 管线 + gen
-- 管线编排、错误聚合、`fly build/check/run` 全功能
-- 验收：所有 golden 通过；`fly run testdata/golden/*.fly` 行为一致
+### R2 compile 管线 + gen（✅ 已交付）
+- ✅ 管线编排、错误聚合、`fly build/check/run` 全功能
+- ✅ `src/gen.rs`（~1800 行直译）：8 安全关键字展开（guard/only/trace/cage/seal）、runtime/sandbox 六节按需注入（fly_runtime.py include_str! 内嵌 + section 提取）、类型推导热路径豁免（src/typeinfer.rs，5 轮不动点 + 调用点参数聚合）
+- ✅ 验收：golden 15 个 .py **逐字节一致**（tests/build_golden.rs 固化）；testdata/errors 52 反例 build 报错零差异；`fly run` 输出/退出码一致；python3 实跑行为一致；`--keep-annotations` 一致
 
 ### R3 update + version 子命令
 - GitHub API（ureq 或 std-only 手写 HTTP，见 D1）、AssetFor、tar.gz/zip 解包、原子替换
