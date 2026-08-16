@@ -7,6 +7,8 @@ use std::process::Command;
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use flate2::read::GzDecoder;
+#[cfg(test)]
+use flate2::write::GzEncoder;
 
 use crate::http::{HttpClient, Proxy};
 
@@ -110,36 +112,36 @@ impl Updater {
         let exe = self.executable()?;
         let exe_real = fs::canonicalize(&exe).unwrap_or(exe.clone());
         log("解包校验");
-        let data = extract_binary(&resp.body, &a.name)?;
-        let mut bin_name = exe_real
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "fly".to_string());
-        if std::env::consts::OS == "windows" && !bin_name.ends_with(".exe") {
-            bin_name.push_str(".exe");
-        }
+        // 安装包内含 fly + fly-checkd + fly-sandboxd 三个二进制，全部替换到 exe 同目录。
+        let files = extract_binaries(&resp.body, &a.name)?;
         let dir = exe_real.parent().unwrap_or(Path::new("."));
-        let new_path = dir.join(format!(".{}.new", bin_name));
-        log(&format!("写入 {}", new_path.display()));
-        fs::write(&new_path, &data).map_err(|e| format!("写入新版本失败: {}", e))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&new_path, fs::Permissions::from_mode(0o755))
-                .map_err(|e| format!("设置权限失败: {}", e))?;
-        }
-        log(&format!("原子替换 {}", exe_real.display()));
-        fs::rename(&new_path, &exe_real).map_err(|e| {
-            let _ = fs::remove_file(&new_path);
-            if std::env::consts::OS == "windows" {
-                format!(
-                    "Windows 下无法替换正在运行的进程，请关闭后手动覆盖: {}",
-                    exe_real.display()
-                )
-            } else {
-                format!("替换可执行文件失败: {}", e)
+        let mut installed = Vec::new();
+        for (name, data) in &files {
+            let target = dir.join(name);
+            let new_path = dir.join(format!(".{}.new", name));
+            log(&format!("写入 {}", new_path.display()));
+            fs::write(&new_path, data).map_err(|e| format!("写入新版本失败: {}", e))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&new_path, fs::Permissions::from_mode(0o755))
+                    .map_err(|e| format!("设置权限失败: {}", e))?;
             }
-        })
+            log(&format!("原子替换 {}", target.display()));
+            fs::rename(&new_path, &target).map_err(|e| {
+                let _ = fs::remove_file(&new_path);
+                if std::env::consts::OS == "windows" {
+                    format!(
+                        "Windows 下无法替换正在运行的进程，请关闭后手动覆盖: {}",
+                        target.display()
+                    )
+                } else {
+                    format!("替换可执行文件失败: {}", e)
+                }
+            })?;
+            installed.push(target);
+        }
+        Ok(())
     }
 
     fn verify_asset(&self, a: &Asset, data: &[u8], log: &mut dyn FnMut(&str)) -> Result<(), String> {
@@ -352,38 +354,49 @@ pub fn verify_signed(data: &[u8], sig: &[u8]) -> Result<(), String> {
         .map_err(|_| "签名验证失败：产物可能被篡改或来源不可信".to_string())
 }
 
-// extract_binary 从 tar.gz/zip 安装包中提取可执行文件（fly/fly.exe）。
-fn extract_binary(archive: &[u8], name: &str) -> Result<Vec<u8>, String> {
+// extract_binaries 从 tar.gz/zip 安装包提取全部可执行文件（fly/fly.exe、fly-checkd、fly-sandboxd）。
+fn extract_binaries(archive: &[u8], name: &str) -> Result<Vec<(String, Vec<u8>)>, String> {
+    let want: &[&str] = if name.ends_with(".zip") {
+        &["fly.exe", "fly-checkd.exe", "fly-sandboxd.exe"]
+    } else {
+        &["fly", "fly-checkd", "fly-sandboxd"]
+    };
+    let mut out = Vec::new();
     if name.ends_with(".zip") {
         let reader = std::io::Cursor::new(archive);
         let mut z = zip::ZipArchive::new(reader).map_err(|e| format!("zip 解析失败: {}", e))?;
         for i in 0..z.len() {
             let mut f = z.by_index(i).map_err(|e| format!("zip 读取失败: {}", e))?;
-            let fname = f.name().to_string();
-            if is_binary_name(&fname) {
+            let fname = base_name(f.name());
+            if want.contains(&fname.as_str()) {
                 let mut data = Vec::new();
                 f.read_to_end(&mut data).map_err(|e| format!("zip 解压失败: {}", e))?;
-                return Ok(data);
+                out.push((fname, data));
             }
         }
+    } else {
+        let gz = GzDecoder::new(archive);
+        let mut tar = gz;
+        loop {
+            let header = read_tar_header(&mut tar)?;
+            let Some(h) = header else { break };
+            let fname = base_name(&h.name);
+            if h.is_file && want.contains(&fname.as_str()) {
+                let mut data = vec![0u8; h.size];
+                tar.read_exact(&mut data).map_err(|e| format!("tar 解压失败: {}", e))?;
+                out.push((fname, data));
+            }
+            skip_tar_padding(&mut tar, h.size)?;
+        }
+    }
+    if out.is_empty() {
         return Err("安装包内未找到可执行文件".to_string());
     }
-    let gz = GzDecoder::new(archive);
-    let mut tar = tar_reader(gz);
-    loop {
-        let header = read_tar_header(&mut tar)?;
-        if header.is_none() {
-            break;
-        }
-        let h = header.unwrap();
-        if h.is_file && is_binary_name(&h.name) {
-            let mut data = vec![0u8; h.size];
-            tar.read_exact(&mut data).map_err(|e| format!("tar 解压失败: {}", e))?;
-            return Ok(data);
-        }
-        skip_tar_padding(&mut tar, h.size)?;
-    }
-    Err("安装包内未找到可执行文件".to_string())
+    Ok(out)
+}
+
+fn base_name(name: &str) -> String {
+    name.rsplit('/').next().unwrap_or(name).to_string()
 }
 
 struct TarHeader {
@@ -419,14 +432,7 @@ fn skip_tar_padding(r: &mut impl Read, size: usize) -> Result<(), String> {
     r.read_exact(&mut buf).map_err(|e| format!("tar 填充读取失败: {}", e))
 }
 
-fn tar_reader(r: impl Read) -> impl Read {
-    r
-}
 
-fn is_binary_name(name: &str) -> bool {
-    let base = name.rsplit('/').next().unwrap_or(name);
-    base == "fly" || base == "fly.exe"
-}
 
 mod base64_engine {
     // 手写 base64 解码（std-only）：产物公钥长度 32 字节。
@@ -520,5 +526,35 @@ mod tests {
     fn verify_signed_rejects_bad() {
         let r = verify_signed(b"data", &[0u8; 64]);
         assert!(r.is_err());
+    }
+
+    #[test]
+    fn extract_targz_multi() {
+        // 手工构造 tar.gz：fly + fly-checkd + fly-sandboxd 三个文件
+        let mut tar = Vec::new();
+        for (name, content) in [
+            ("fly", b"#!/bin/sh\necho fly".as_slice()),
+            ("fly-checkd", b"checkd".as_slice()),
+            ("fly-sandboxd", b"sandboxd".as_slice()),
+        ] {
+            let mut block = [0u8; 512];
+            block[..name.len()].copy_from_slice(name.as_bytes());
+            let size = format!("{:o}", content.len());
+            block[124..124 + size.len()].copy_from_slice(size.as_bytes());
+            block[156] = b'0';
+            tar.extend_from_slice(&block);
+            tar.extend_from_slice(content);
+            let pad = (512 - (content.len() % 512)) % 512;
+            tar.extend_from_slice(&vec![0u8; pad]);
+        }
+        let mut gz = GzEncoder::new(Vec::new(), flate2::Compression::default());
+        use std::io::Write as _;
+        gz.write_all(&tar).unwrap();
+        let data = gz.finish().unwrap();
+        let files = extract_binaries(&data, "fly-linux-amd64.tar.gz").unwrap();
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|(n, _)| n == "fly"));
+        assert!(files.iter().any(|(n, _)| n == "fly-checkd"));
+        assert!(files.iter().any(|(n, _)| n == "fly-sandboxd"));
     }
 }
