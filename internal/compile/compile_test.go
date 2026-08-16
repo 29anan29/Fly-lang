@@ -84,7 +84,7 @@ func TestRuntimeCatch(t *testing.T) {
 		t.Skip("python3 不可用")
 	}
 	cases := []struct {
-		name string
+		name   string
 		src  string
 		want string
 	}{
@@ -116,25 +116,26 @@ func TestSandboxEscape(t *testing.T) {
 		t.Skip("python3 不可用")
 	}
 	cases := []struct {
-		name string
-		src  string
-		want string
+		name   string
+		src    string
+		want   string
+		module string // 依赖第三方模块；环境缺失则跳过
 	}{
-		{"subclass_key", "x = []\nk = \"__subclasses__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __subclasses__"},
-		{"class_key", "x = []\nk = \"__class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__"},
-		{"dict_key", "x = {}\nk = \"__dict__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __dict__"},
-		{"setattr_key", "x = []\nk = \"__class__\"\nx[k] = 1\n", "沙箱: 禁止反射下标赋值 __class__"},
-		{"func_param_key", "def f(k):\n    x = []\n    return x[k]\n\nprint(f(\"__bases__\"))\n", "沙箱: 禁止反射下标访问 __bases__"},
-		{"escape_unicode_key", "x = []\nk = \"\\u005f_class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__"},
-		{"whiteout_mod", "import tkinter\nprint(\"loaded\")\n", "沙箱: 模块 tkinter 不在白名单"},
-		{"modattr_indirect", "import logging\nm = logging\nprint(m.os)\n", "沙箱: 禁止访问模块属性 os"},
-		{"modattr_indirect_attrgetter", "import operator\nm = operator\nprint(m.attrgetter)\n", "沙箱: 禁止访问模块属性 attrgetter"},
-		{"allow_mod", "import math\nfrom math import sqrt as sq\nprint(sq(16))\n", "4.0"},
-		{"allow_dangerous_name_var", "os = 5\nprint(os)\n", "5"},
-		{"allow_modattr_safe", "import math\nimport json\nprint(math.floor(2.9), json.dumps([1]))\n", "2 [1]"},
-		{"allow_requests_s6", "import requests\nprint(\"loaded\")\n", "loaded"},
-		{"fn_import_math", "def use():\n    import math\n    return math.sqrt(9)\n\nprint(use())\n", "3.0"},
-		{"fn_import_dep_mod", "def use():\n    import posixpath\n    return len(posixpath.dirname(\"/a/b\"))\n\nprint(use())\n", "2"},
+		{"subclass_key", "x = []\nk = \"__subclasses__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __subclasses__", ""},
+		{"class_key", "x = []\nk = \"__class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__", ""},
+		{"dict_key", "x = {}\nk = \"__dict__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __dict__", ""},
+		{"setattr_key", "x = []\nk = \"__class__\"\nx[k] = 1\n", "沙箱: 禁止反射下标赋值 __class__", ""},
+		{"func_param_key", "def f(k):\n    x = []\n    return x[k]\n\nprint(f(\"__bases__\"))\n", "沙箱: 禁止反射下标访问 __bases__", ""},
+		{"escape_unicode_key", "x = []\nk = \"\\u005f_class__\"\nprint(x[k])\n", "沙箱: 禁止反射下标访问 __class__", ""},
+		{"whiteout_mod", "import tkinter\nprint(\"loaded\")\n", "沙箱: 模块 tkinter 不在白名单", ""},
+		{"modattr_indirect", "import logging\nm = logging\nprint(m.os)\n", "沙箱: 禁止访问模块属性 os", ""},
+		{"modattr_indirect_attrgetter", "import operator\nm = operator\nprint(m.attrgetter)\n", "沙箱: 禁止访问模块属性 attrgetter", ""},
+		{"allow_mod", "import math\nfrom math import sqrt as sq\nprint(sq(16))\n", "4.0", ""},
+		{"allow_dangerous_name_var", "os = 5\nprint(os)\n", "5", ""},
+		{"allow_modattr_safe", "import math\nimport json\nprint(math.floor(2.9), json.dumps([1]))\n", "2 [1]", ""},
+		{"allow_requests_s6", "import requests\nprint(\"loaded\")\n", "loaded", "requests"},
+		{"fn_import_math", "def use():\n    import math\n    return math.sqrt(9)\n\nprint(use())\n", "3.0", ""},
+		{"fn_import_dep_mod", "def use():\n    import posixpath\n    return len(posixpath.dirname(\"/a/b\"))\n\nprint(use())\n", "2", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
