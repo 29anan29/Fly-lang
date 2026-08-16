@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 type Lexer struct {

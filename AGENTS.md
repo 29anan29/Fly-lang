@@ -2,7 +2,7 @@
 
 每次更新必须发布CI和releases
 
-Fly-Lang 是用 Rust 实现的 Python 安全超集转译器（CLI 全 Rust，checker/沙箱为 Go 守护进程，P0-P6 已全部交付）。**总览唯一真源是 ROADMAP.md**（L/R/P/S 各阶段整合视图）；核心文件是 Plan.md（实现方案）、方案.md（语言设计）、docs/长期规划.md（L0-L5 生态细节）、docs/THREAT-MODEL.md（威胁模型与安全边界，含外部评估回应）、docs/Rust迁移方案.md（R0-R5 迁移）、docs/CLI-Rust转型方案.md（CLI 子命令 P0-P6 迁移，checker 留 Go 走 checkd 桥接）。
+PyFly 是用 Rust 实现的 Python 安全超集转译器（CLI 全 Rust，checker/沙箱为 Go 守护进程，P0-P6 已全部交付）。**总览唯一真源是 ROADMAP.md**（L/R/P/S 各阶段整合视图）；核心文件是 Plan.md（实现方案）、方案.md（语言设计）、docs/长期规划.md（L0-L5 生态细节）、docs/THREAT-MODEL.md（威胁模型与安全边界，含外部评估回应）、docs/Rust迁移方案.md（R0-R5 迁移）、docs/CLI-Rust转型方案.md（CLI 子命令 P0-P6 迁移，checker 留 Go 走 checkd 桥接）。
 
 ## 构建与测试命令
 
@@ -11,7 +11,7 @@ Fly-Lang 是用 Rust 实现的 Python 安全超集转译器（CLI 全 Rust，che
 - 静态检查：`go vet ./...`
 - 版本注入：build.rs 读 `FLY_VERSION`/`FLY_COMMIT` 环境变量（CI 设 `VERSION=${github.ref_name}`、`SHA=${github.sha}`）
 - 手动验证：`./target/release/fly build testdata/xxx.fly`（默认输出到根目录 `build/` 并保留相对路径；可加 `-o out.py` 指定，用 `python3` 实跑行为测试）
-- VSCode 插件编译：`cd editor/vscode-fly && npm run compile`（改 src/ 后必须重编译）
+- VSCode 插件编译：`cd editor/vscode-pyfly && npm run compile`（改 src/ 后必须重编译）
 
 ## 架构概览
 
@@ -27,7 +27,7 @@ internal/gen/        代码生成 + 运行时注入
 internal/compile/    编译管线（CheckSource/FormatErrorColor，checkd 使用）
 internal/runtime/    go:embed 的 fly_runtime.py
 tools/icon/          图标生成器（assets/icon.png 产物）
-editor/vscode-fly/   VSCode 插件（TextMate 高亮 + vscode-languageclient 连 fly lsp）
+editor/vscode-pyfly/   VSCode 插件（TextMate 高亮 + vscode-languageclient 连 fly lsp）
 npm/fly-lang/       npm 包装器（预编译二进制打进 npm 包，npm install -g fly-lang）
 testdata/            正反例测试文件
 ```
@@ -39,7 +39,7 @@ testdata/            正反例测试文件
 - `fly lsp`：stdio JSON-RPC 2.0，`Content-Length` 帧；诊断由 checkd（Go 编译管线 CheckSource）驱动，与 `fly check` 同一管线——改 checker 行为自动同步编辑器诊断
 - 支持：initialize/initialized/shutdown/exit、didOpen/didChange(full)/didSave/didClose、publishDiagnostics、hover（8 关键字文档）、自定义通知 `fly/forceCheck`
 - 行号转换：诊断 `Line/Col`（1 基）→ LSP 0 基；severity 恒为 1（Error）
-- 客户端在 `editor/vscode-fly/src/extension.ts`（vscode-languageclient v10，`start()` 返回 `Promise<void>`，不 push disposable）
+- 客户端在 `editor/vscode-pyfly/src/extension.ts`（vscode-languageclient v10，`start()` 返回 `Promise<void>`，不 push disposable）
 - VSCode 插件 v0.2.0+ 要求 fly 含 `lsp` 子命令，旧二进制连接会失败
 
 ## 版本与发布
@@ -48,7 +48,7 @@ testdata/            正反例测试文件
 - 版本细分：`version.IsDev()` 判定（Version 空/`dev`/含 `-dev` → dev 版）；`fly version` 输出 `vX.Y.Z (release)` 或 `0.X.Y-dev (commit)`；`fly update` 只检查 GitHub 最新正式版（无渠道参数）
 - 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
 - npm 发布（`npm` job）：三平台 job 交叉编译二进制上传 artifact（`npm-*`）→ `npm` job 组装到 `npm/fly-lang/bin/` → `npm pack` 出 tgz → `npm publish`（账号 anan29_china）；版本号由 tag 注入 package.json；发布依赖 `NPM_TOKEN` secret，未配置时跳过发布只留 artifact
-- VSCode Marketplace 发布（`vsix` job 内）：`vsce package` 出 vsix（attach 到 GitHub Release）后 `vsce publish --skip-duplicate`（publisher 29anan29，扩展 `29anan29.fly-lang`）；版本号由 tag 注入 editor/vscode-fly/package.json（`sed "s/\"version\": \"[0-9][^\"]*\"/..."`）；依赖 `VSCE_PAT` secret（marketplace 管理页获取），未配置时跳过发布只留 vsix artifact
+- VSCode Marketplace 发布（`vsix` job 内）：`vsce package` 出 vsix（attach 到 GitHub Release）后 `vsce publish --skip-duplicate`（publisher 29anan29，扩展 `29anan29.pyfly-lang`）；版本号由 tag 注入 editor/vscode-pyfly/package.json（`sed "s/\"version\": \"[0-9][^\"]*\"/..."`）；依赖 `VSCE_PAT` secret（marketplace 管理页获取），未配置时跳过发布只留 vsix artifact
 - `fly error <E码>`：查询错误码示例报错/修复方法，支持 `E0031`/`31` 格式（自动补零到 EXXXX）；错误码 E0001 起连续编号，注册表源头 `internal/ast/errors.go`（每码含 Title/Help/Note/Example），Rust 版 `src/errorinfo.rs` 由 `tools/gen_errorinfo` 生成（改 errors.go 后需 `go run ./tools/gen_errorinfo` 重新生成，errorcode.rs 有全码抽查单测）
 - 新增 errorf 消息必须登记错误码（Go：internal/ast/errors.go codeForFormat；Rust：src/diagnostic.rs error_code 双份同步）
 - `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（src/update.rs asset_for），改 CI 产物名必须同步改这里；安装包内必须含 fly + fly-checkd + fly-sandboxd 三二进制（src/update.rs extract_binaries 按名解包）
@@ -95,7 +95,7 @@ testdata/            正反例测试文件
 
 ## VSCode 插件
 
-- `editor/vscode-fly/`：TypeScript，诊断走内置 LSP（`fly lsp` 子命令 + vscode-languageclient v10），TextMate 只管高亮
+- `editor/vscode-pyfly/`：TypeScript，诊断走内置 LSP（`fly lsp` 子命令 + vscode-languageclient v10），TextMate 只管高亮
 - 高亮走 `syntaxes/fly.tmLanguage.json`；诊断/hover 由 LSP 提供（与 `fly check` 同一编译管线，见"LSP 约定"）
 - 构建：`npm run compile`；调试：F5（Extension Development Host）；打包：`npx @vscode/vsce package`
 - `package.json` 中 `contributes.configuration` 含 `fly.path` 与 `fly.proxy`（v0.2.0 起，`fly.checkOnSave` 已移除——LSP 常驻无需该开关）

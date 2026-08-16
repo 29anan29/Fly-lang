@@ -1,6 +1,6 @@
-# Fly Lang for VSCode
+# PyFly for VSCode
 
-[Fly](https://github.com/29anan29/Fly-lang) 语言支持插件（v0.3.0+）：Python 3.10+ 安全增强超集的 LSP 编译期诊断 + 语法高亮。
+[PyFly](https://github.com/29anan29/PyFly-lang) 语言支持插件（v0.3.0+）：Python 3.10+ 安全增强超集的 LSP 编译期诊断 + 语法高亮。
 
 ## 功能
 
@@ -10,10 +10,10 @@
 - `.fly` 语法高亮（TextMate，8 个安全关键字分组着色）
 - hover：悬停在 `safe/only/lock/mask/cage/guard/seal/trace` 上显示语义说明
 - 命令（`Ctrl+Shift+P`）：
-  - `Fly: Check` 强制重检当前文件
-  - `Fly: Build to Python` 转译当前文件（终端输出）
-  - `Fly: Run` 集成终端运行
-  - `Fly: Check for Updates` 检查 / 更新编译器（支持 socks5 代理）
+  - `PyFly: Check` 强制重检当前文件
+  - `PyFly: Build to Python` 转译当前文件（终端输出）
+  - `PyFly: Run` 集成终端运行
+  - `PyFly: Check for Updates` 检查 / 更新编译器（支持 socks5 代理）
 
 ## 依赖
 
@@ -39,5 +39,5 @@ npm install
 npm run compile      # 编译 TypeScript
 F5                   # Extension Development Host 调试
 npx @vscode/vsce package   # 打包 .vsix
-code --install-extension fly-lang-*.vsix   # 安装
+code --install-extension pyfly-lang-*.vsix   # 安装
 ```

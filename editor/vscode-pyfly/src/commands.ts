@@ -29,8 +29,8 @@ export async function checkExtensionUpdate(context: vscode.ExtensionContext): Pr
 	let tag = '';
 	let vsixUrl = '';
 	try {
-		const res = await fetch('https://api.github.com/repos/29anan29/Fly-lang/releases/latest', {
-			headers: { 'User-Agent': 'fly-lang-vscode', Accept: 'application/vnd.github+json' }
+		const res = await fetch('https://api.github.com/repos/29anan29/PyFly-lang/releases/latest', {
+			headers: { 'User-Agent': 'pyfly-lang-vscode', Accept: 'application/vnd.github+json' }
 		});
 		if (!res.ok) {
 			throw new Error(`HTTP ${res.status}`);

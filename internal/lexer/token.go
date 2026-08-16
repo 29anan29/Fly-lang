@@ -2,7 +2,7 @@
 // 与 Rust 版 src/lexer 行为一致（CLI 对照验收），fuzz 目标见 fuzz_test.go。
 package lexer
 
-import "flylang/internal/ast"
+import "pyfly/internal/ast"
 
 type TokenType int
 

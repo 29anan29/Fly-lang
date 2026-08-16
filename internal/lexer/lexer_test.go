@@ -4,7 +4,7 @@ package lexer
 import (
 	"testing"
 
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 func tokenize(t *testing.T, src string) []Token {

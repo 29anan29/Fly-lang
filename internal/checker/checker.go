@@ -3,7 +3,7 @@ package checker
 import (
 	"fmt"
 
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 const maxErrs = 20

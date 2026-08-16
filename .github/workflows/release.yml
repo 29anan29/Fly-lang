@@ -78,7 +78,7 @@ jobs:
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -o pkg/usr/bin/fly-checkd ./cmd/fly-checkd
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -o pkg/usr/bin/fly-sandboxd ./cmd/fly-sandboxd
             cp assets/icon.png pkg/usr/share/pixmaps/fly.png
-            printf 'Package: flylang\nVersion: %s\nSection: devel\nPriority: optional\nArchitecture: %s\nMaintainer: 29anan29\nDescription: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）\n' "$VER" "$arch" > pkg/DEBIAN/control
+            printf 'Package: flylang\nVersion: %s\nSection: devel\nPriority: optional\nArchitecture: %s\nMaintainer: 29anan29\nDescription: PyFly - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）\n' "$VER" "$arch" > pkg/DEBIAN/control
             dpkg-deb --build --root-owner-group pkg dist/fly-linux-$arch.deb
             rm -rf pkg
           done
@@ -253,9 +253,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: editor/vscode-fly/package-lock.json
+          cache-dependency-path: editor/vscode-pyfly/package-lock.json
       - name: Package extension
-        working-directory: editor/vscode-fly
+        working-directory: editor/vscode-pyfly
         env:
           VERSION: ${{ github.ref_name }}
         run: |
@@ -263,7 +263,7 @@ jobs:
           VER=${VERSION#v}
           sed -i "s/\"version\": \"[0-9][^\"]*\"/\"version\": \"$VER\"/" package.json
           mkdir -p ../../dist
-          npx --yes @vscode/vsce package --out ../../dist/fly-lang-${VERSION#v}.vsix
+          npx --yes @vscode/vsce package --out ../../dist/pyfly-lang-${VERSION#v}.vsix
       - name: Delete stale artifact (rerun-safe)
         run: |
           curl -sS -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -279,7 +279,7 @@ jobs:
           if-no-files-found: error
       - name: Publish to VSCode Marketplace
         if: env.VSCE_PAT != ''
-        working-directory: editor/vscode-fly
+        working-directory: editor/vscode-pyfly
         run: |
           npx --yes @vscode/vsce publish --skip-duplicate -p "${VSCE_PAT}"
 
@@ -369,10 +369,10 @@ jobs:
           ls -la dist/
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "$GITHUB_REF_NAME" \
-            --notes "Fly-Lang $GITHUB_REF_NAME
+            --notes "PyFly $GITHUB_REF_NAME
             - Linux: .deb（amd64/arm64）、tar.gz
             - macOS: .pkg + .dmg（universal）、tar.gz
             - Windows: .zip（amd64/arm64）、自解压 exe
-            - VSCode 插件：fly-lang-*.vsix（LSP 编译期诊断，v0.2.0+ 要求）
+            - VSCode 插件：pyfly-lang-*.vsix（LSP 编译期诊断，v0.2.0+ 要求）
             - npm：\`npm install -g fly-lang\`（二进制全平台单包，见 npm job）
             更新命令：\`fly update\`（ed25519 签名验证：产物 .sig 由 SIGN_PRIVATE_KEY 签名，客户端内嵌公钥校验）"

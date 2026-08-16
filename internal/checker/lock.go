@@ -1,7 +1,7 @@
 // lock.go：lock 编译期检查——变量不可再赋值/删除/反射修改（E0033-E0038）。
 package checker
 
-import "flylang/internal/ast"
+import "pyfly/internal/ast"
 
 func (c *Checker) checkLock(t *ast.LockStmt) {
 	if t.Value != nil {

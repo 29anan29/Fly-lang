@@ -1,4 +1,4 @@
-# Fly-Lang 转译性能基准
+# PyFly 转译性能基准
 
 > 同一份源码（bench/benchmarks/，纯 Python 语法）：左列为 CPython 直接执行，
 > 中列为 PyPy JIT 直接执行，右列为经 `fly build` 转译后由 CPython 执行。

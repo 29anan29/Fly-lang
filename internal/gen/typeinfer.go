@@ -1,6 +1,6 @@
 package gen
 
-import "flylang/internal/ast"
+import "pyfly/internal/ast"
 
 // Type 是变量/表达式的推导类型。推导为已知类型时，gen 可豁免 _fly_*
 // 兜底、直接生成原生运算（热路径优化）；未知/冲突则保持运行时护栏。

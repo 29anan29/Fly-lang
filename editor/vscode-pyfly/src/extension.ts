@@ -28,10 +28,10 @@ export function activate(context: vscode.ExtensionContext): void {
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ scheme: 'file', language: 'fly' }],
 		initializationOptions: {},
-		outputChannel: vscode.window.createOutputChannel('Fly Language', { log: true })
+		outputChannel: vscode.window.createOutputChannel('PyFly Language', { log: true })
 	};
 
-	client = new LanguageClient('fly-lsp', 'Fly Language', serverOptions, clientOptions);
+	client = new LanguageClient('fly-lsp', 'PyFly Language', serverOptions, clientOptions);
 	void client.start().then(
 		() => { /* started */ },
 		err => { void vscode.window.showErrorMessage(`Fly LSP 启动失败: ${err.message ?? err}`); }

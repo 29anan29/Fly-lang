@@ -1,14 +1,14 @@
 {
-  "name": "fly-lang",
-  "displayName": "Fly Lang",
-  "description": "Fly 语言支持：Python 3.10+ 安全增强超集。LSP 编译期诊断（safe/only/lock/mask/cage/guard/seal/trace）+ 语法高亮",
+  "name": "pyfly-lang",
+  "displayName": "PyFly",
+  "description": "PyFly 语言支持：Python 3.10+ 安全增强超集。LSP 编译期诊断（safe/only/lock/mask/cage/guard/seal/trace）+ 语法高亮",
   "version": "0.3.0",
   "publisher": "29anan29",
   "license": "MIT",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/29anan29/Fly-lang"
+    "url": "https://github.com/29anan29/PyFly-lang"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -56,32 +56,32 @@
     "commands": [
       {
         "command": "fly.build",
-        "title": "Fly: Build to Python",
-        "category": "Fly"
+        "title": "PyFly: Build to Python",
+        "category": "PyFly"
       },
       {
         "command": "fly.check",
-        "title": "Fly: Check",
-        "category": "Fly"
+        "title": "PyFly: Check",
+        "category": "PyFly"
       },
       {
         "command": "fly.run",
-        "title": "Fly: Run",
-        "category": "Fly"
+        "title": "PyFly: Run",
+        "category": "PyFly"
       },
       {
         "command": "fly.update",
-        "title": "Fly: Check for Updates",
-        "category": "Fly"
+        "title": "PyFly: Check for Updates",
+        "category": "PyFly"
       },
       {
         "command": "fly.updateExtension",
         "title": "Check Extension Update",
-        "category": "Fly"
+        "category": "PyFly"
       }
     ],
     "configuration": {
-      "title": "Fly",
+      "title": "PyFly",
       "properties": {
         "fly.path": {
           "type": "string",

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"flylang/internal/ast"
-	"flylang/internal/runtime"
+	"pyfly/internal/ast"
+	"pyfly/internal/runtime"
 )
 
 type Gen struct {

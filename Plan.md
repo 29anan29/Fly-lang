@@ -1,4 +1,4 @@
-# Fly-Lang 实现方案
+# PyFly 实现方案
 
 Fly = Python 3.10+ 安全增强超集，用 Go 实现转译器（Fly → Python，类似 TypeScript → JavaScript）。
 新增 8 个安全关键字，编译期检查 + 展开删除，输出纯净 Python。

@@ -1,7 +1,7 @@
 // guard.go：guard 编译期检查——声明式值校验（无代码块），校验引用名字必须先定义（E0043）。
 package checker
 
-import "flylang/internal/ast"
+import "pyfly/internal/ast"
 
 func (c *Checker) checkGuard(t *ast.GuardStmt) {
 	if t.Name != "" {

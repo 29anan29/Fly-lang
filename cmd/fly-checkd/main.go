@@ -18,8 +18,8 @@ import (
 	"io"
 	"os"
 
-	"flylang/internal/ast"
-	"flylang/internal/compile"
+	"pyfly/internal/ast"
+	"pyfly/internal/compile"
 )
 
 func main() {

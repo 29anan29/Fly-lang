@@ -1,4 +1,4 @@
-# Fly-Lang CLI Rust 转型方案
+# PyFly CLI Rust 转型方案
 
 > 状态：定稿
 > 配套文档：[Rust迁移方案.md](./Rust迁移方案.md)（核心管线迁移，含 D6：checker 留 Go）

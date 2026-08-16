@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"flylang/internal/ast"
-	"flylang/internal/checker"
-	"flylang/internal/gen"
-	"flylang/internal/parser"
+	"pyfly/internal/ast"
+	"pyfly/internal/checker"
+	"pyfly/internal/gen"
+	"pyfly/internal/parser"
 )
 
 type Result struct {

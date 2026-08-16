@@ -1,7 +1,7 @@
 package checker
 
 import (
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 type Taint struct {

@@ -1,8 +1,8 @@
 # fly-sandbox
 
-> **Fly-Lang 跨平台轻量沙箱** — Rust + Wasmtime + RustPython
+> **PyFly 跨平台轻量沙箱** — Rust + Wasmtime + RustPython
 >
-> 为 Fly-Lang 转译产物（`.py`）提供 **Linux / macOS / Windows** 三平台一致的
+> 为 PyFly 转译产物（`.py`）提供 **Linux / macOS / Windows** 三平台一致的
 > 轻量级安全隔离执行环境。
 
 ## 架构
@@ -13,7 +13,7 @@ Fly .fly → fly build → .py → RustPython(Wasm) → Wasmtime(Rust宿主)
                                           Rust 宿主进程
 ```
 
-| 层 | 机制 | 对应 Fly-Lang 关键字 |
+| 层 | 机制 | 对应 PyFly 关键字 |
 |---|---|---|
 | **L1 编译期** | Fly 转译器静态检查 | `safe` `only` `lock` `mask` `guard` |
 | **L2 Python 运行时** | `_FlyOnly` 代理、`@_fly_cage`、`_fly_seal` | `only` `cage` `seal` `trace` |
@@ -38,7 +38,7 @@ cargo build --release
 
 输出：`target/release/fly-sandbox`
 
-### 3. 运行 Fly-Lang 脚本
+### 3. 运行 PyFly 脚本
 
 ```bash
 # 无外部能力（最严格）
@@ -66,7 +66,7 @@ cargo build --release
 | `--max-memory-pages <n>` | Wasm 内存上限（页） | 1024 (64MB) |
 | `--no-audit` | 关闭审计日志 | 开启 |
 
-## 与 Fly-Lang 原生 fly-sandbox 对比
+## 与 PyFly 原生 fly-sandbox 对比
 
 | 维度 | Fly 原生 (seccomp) | 本方案 (Rust+Wasm) |
 |---|---|---|
@@ -102,4 +102,4 @@ cargo fmt --check
 
 ## 许可证
 
-与 Fly-Lang 主项目保持一致。
+与 PyFly 主项目保持一致。

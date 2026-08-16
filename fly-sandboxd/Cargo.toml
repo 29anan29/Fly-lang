@@ -2,7 +2,7 @@
 name = "fly-sandboxd"
 version = "0.1.0"
 edition = "2021"
-description = "Fly-Lang Linux 原生进程沙箱（Fast 模式）— namespaces + Landlock + seccomp + rlimit"
+description = "PyFly Linux 原生进程沙箱（Fast 模式）— namespaces + Landlock + seccomp + rlimit"
 
 [dependencies]
 libc = "0.2"

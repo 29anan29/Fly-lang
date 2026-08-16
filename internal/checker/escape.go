@@ -3,8 +3,8 @@ package checker
 import (
 	"strings"
 
-	"flylang/internal/ast"
-	"flylang/internal/parser"
+	"pyfly/internal/ast"
+	"pyfly/internal/parser"
 )
 
 // 沙箱逃逸拦截：与 fly_runtime.py sandbox 节的运行时名单保持一致（双保险）。

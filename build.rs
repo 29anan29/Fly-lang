@@ -30,7 +30,7 @@ fn main() {
     };
     println!("cargo:rustc-env=FLY_COMMIT={}", commit);
     println!("cargo:rustc-env=FLY_VERSION={}", version);
-    println!("cargo:rustc-env=FLY_REPO=29anan29/Fly-lang");
+    println!("cargo:rustc-env=FLY_REPO=29anan29/PyFly-lang");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=FLY_VERSION");
     println!("cargo:rerun-if-env-changed=FLY_COMMIT");

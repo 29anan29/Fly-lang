@@ -1,10 +1,10 @@
 # 贡献指南（Contributing Guide）
 
-感谢你愿意为 Fly-Lang 贡献代码！请阅读本指南，确保提交能顺利合并。
+感谢你愿意为 PyFly 贡献代码！请阅读本指南，确保提交能顺利合并。
 
 ## 项目定位
 
-Fly-Lang 是用 Go 实现的 Python 安全增强超集转译器（Fly → Python，类似 TypeScript → JavaScript）。设计文档：
+PyFly 是用 Go 实现的 Python 安全增强超集转译器（Fly → Python，类似 TypeScript → JavaScript）。设计文档：
 
 - [方案.md](方案.md)：语言设计（8 个安全关键字的语义）
 - [Plan.md](Plan.md)：实现方案与开发阶段（P0 → P6）

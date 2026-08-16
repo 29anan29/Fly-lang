@@ -1,4 +1,4 @@
-# Fly-Lang 运行时库（go:embed 注入生成代码）
+# PyFly 运行时库（go:embed 注入生成代码）
 # 节标记： # fly:section:<名称>   —— gen 按需提取注入
 
 # fly:section:guard

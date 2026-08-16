@@ -1,7 +1,7 @@
 // symbol.go：符号表——作用域、名字解析、污点传播（含 x.attr 属性污点，兑现威胁模型 R2）。
 package checker
 
-import "flylang/internal/ast"
+import "pyfly/internal/ast"
 
 type Kind int
 

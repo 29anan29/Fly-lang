@@ -2,7 +2,7 @@
 
   <img src="assets/logo.svg" alt="Fly Logo" width="200" />
 
-# Fly-Lang
+# PyFly
 
 **Python 3.10+ 的安全受限超集转译器**（Go 实现，Fly → Python，类似 TypeScript → JavaScript）
 
@@ -10,7 +10,7 @@
 
 ## 合伙宣言（AI × 人类）
 
-Fly-Lang 由人与 AI 结对开发：**人做决策，AI 写代码**。
+PyFly 由人与 AI 结对开发：**人做决策，AI 写代码**。
 
 - **代码主权在人**。AI 可以生成一万行代码，但每一行都要经过人的评审、测试与取舍才进入仓库。仓库里的每个 commit 背后，是人的判断。
 - **AI 是不知疲倦的合伙人**。它负责体力活：翻译、重构、查缺补漏、穷举边界用例；把人的精力留给真正需要智慧的事：语义、边界、取舍、方向。
@@ -22,8 +22,8 @@ Fly-Lang 由人与 AI 结对开发：**人做决策，AI 写代码**。
 
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/29anan29/Fly-lang)](https://github.com/29anan29/Fly-lang/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/29anan29/Fly-lang/release.yml?label=Release%20CI)](https://github.com/29anan29/Fly-lang/actions)
+[![Release](https://img.shields.io/github/v/release/29anan29/PyFly-lang)](https://github.com/29anan29/PyFly-lang/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/29anan29/PyFly-lang/release.yml?label=Release%20CI)](https://github.com/29anan29/PyFly-lang/actions)
 
 Fly 是 Python 3.10+ 的安全受限超集：用 Rust 实现的转译器（CLI 全 Rust，checker/沙箱以独立守护进程提供），把 `.fly` 源码转译为 Python。任何合法 Python 中违反安全规则的模式（危险内建/反射链/危险模块，见 [docs/THREAT-MODEL.md §6.2 不兼容清单](docs/THREAT-MODEL.md#62-不兼容模式清单安全受限超集的精确边界)）会被编译期拦截，其余安全子集零改造可编译；新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
 
@@ -140,12 +140,12 @@ CVE 对照演示：**[pickle RCE——Python 被打穿 vs Fly 编译期拦截](d
 
 ## CVE 演示：pickle 反序列化 RCE（实机截图）
 
-同一段反序列化恶意载荷的代码：原生 Python 上线即被打穿，Fly-Lang 在编译期拦截，即使绕过编译期也有 fly-sandbox seccomp 兜底：
+同一段反序列化恶意载荷的代码：原生 Python 上线即被打穿，PyFly 在编译期拦截，即使绕过编译期也有 fly-sandbox seccomp 兜底：
 
-![pickle RCE 演示：Python 被打穿 vs Fly-Lang 编译期拦截](docs/demo/img/cve-pickle-demo.png)
+![pickle RCE 演示：Python 被打穿 vs PyFly 编译期拦截](docs/demo/img/cve-pickle-demo.png)
 
 - **原生 Python**：`pickle.loads(payload)` → `os.system("touch /tmp/pwned_by_pickle")` 任意命令执行成功
-- **Fly-Lang**：`safe` 污点追踪在编译期报错 `未净化的外部输入 data 流入 pickle.loads（危险汇点）`，含 RCE 的版本无法部署
+- **PyFly**：`safe` 污点追踪在编译期报错 `未净化的外部输入 data 流入 pickle.loads（危险汇点）`，含 RCE 的版本无法部署
 - **纵深防御**：即使攻击者绕过编译期直接部署原生代码，`fly-sandbox`（seccomp 白名单）也会拦截 `openat` 写操作（SIGSYS），攻击命令失败
 
 完整 5 幕演示与"为什么运行时检测拦不住"分析见 [docs/demo/cve-pickle.md](docs/demo/cve-pickle.md)。
@@ -213,7 +213,7 @@ go vet ./...
 
 ## VSCode 插件
 
-`editor/vscode-fly/`（已发布 v0.2.0）：
+`editor/vscode-pyfly/`（已发布 v0.2.0）：
 
 - **LSP 编译期诊断**：内置 `fly lsp` 服务器，打开/编辑/保存实时检查，错误进 Problems 面板（与 `fly check` 同一管线）
 - `.fly` 语法高亮（TextMate），8 个安全关键字分色
@@ -226,15 +226,15 @@ go vet ./...
 插件未上架 VSCode 市场，随 GitHub Release 发布 `.vsix`，更新方式二选一：
 
 1. **命令面板**（推荐）：`Fly: Check Extension Update` —— 自动查询 GitHub 最新 Release，有新版时提示并打开下载页
-2. **手动安装**：到 [GitHub Releases](https://github.com/29anan29/Fly-lang/releases) 下载 `fly-lang-<版本>.vsix`，执行：
+2. **手动安装**：到 [GitHub Releases](https://github.com/29anan29/PyFly-lang/releases) 下载 `pyfly-lang-<版本>.vsix`，执行：
 
 ```bash
-code --install-extension fly-lang-<版本>.vsix --force   # 覆盖旧版
+code --install-extension pyfly-lang-<版本>.vsix --force   # 覆盖旧版
 ```
 
-`fly-lang-<版本>.vsix` 由 CI 在打 tag 时自动构建；插件版本号与 Release tag 版本保持一致。编译器本身升级用 `fly update`。
+`pyfly-lang-<版本>.vsix` 由 CI 在打 tag 时自动构建；插件版本号与 Release tag 版本保持一致。编译器本身升级用 `fly update`。
 
-详见 [editor/vscode-fly/README.md](editor/vscode-fly/README.md)。
+详见 [editor/vscode-pyfly/README.md](editor/vscode-pyfly/README.md)。
 
 ## 目录结构
 
@@ -251,7 +251,7 @@ internal/compile/  编译管线入口（check/build，checkd 使用）
 internal/runtime/  fly_runtime.py 运行时支持库（runtime + sandbox 两节）
 tools/icon/        图标生成器
 assets/            logo.svg + icon.png
-editor/vscode-fly/ VSCode 插件
+editor/vscode-pyfly/ VSCode 插件
 docs/              长期规划（L0-L5 生态路线）、Rust 迁移方案
 example/            示例：Web 版（http.server）与 PyQt6 桌面版 FlyToDos 复刻
 testdata/          正反例测试文件

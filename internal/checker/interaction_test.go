@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"flylang/internal/parser"
+	"pyfly/internal/parser"
 )
 
 // interactionCase：关键字交互组合回归（对应 docs/关键字交互矩阵.md）。

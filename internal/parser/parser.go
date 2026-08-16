@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"flylang/internal/ast"
-	"flylang/internal/lexer"
+	"pyfly/internal/ast"
+	"pyfly/internal/lexer"
 )
 
 type Parser struct {

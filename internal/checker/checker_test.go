@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"flylang/internal/parser"
+	"pyfly/internal/parser"
 )
 
 func checkSrc(t *testing.T, src string) []string {

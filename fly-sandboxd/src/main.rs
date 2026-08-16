@@ -1,4 +1,4 @@
-//! fly-sandboxd: Fly-Lang Linux 原生进程沙箱（Fast 模式）
+//! fly-sandboxd: PyFly Linux 原生进程沙箱（Fast 模式）
 //!
 //! 隔离链（自内向外纵深）：
 //!   1. Landlock（路径级最小权限，非 root 可用）: 默认拒绝文件访问，

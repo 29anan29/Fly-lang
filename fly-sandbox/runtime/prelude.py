@@ -1,14 +1,14 @@
 """
 prelude.py — 注入到 Wasm 沙箱内的 Python 运行时
 
-提供 Fly-Lang 关键字对应的运行时兜底：
+提供 PyFly 关键字对应的运行时兜底：
   - _FlyOnly       (对应 only 关键字)
   - _fly_cage      (对应 cage 关键字)
   - _fly_seal      (对应 seal 关键字)
   - _fly_trace     (对应 trace 关键字)
   - _fly_mask      (对应 mask 关键字)
 
-这些在 Fly-Lang 转译产物中也会被注入，这里提供 Wasm 环境内的版本。
+这些在 PyFly 转译产物中也会被注入，这里提供 Wasm 环境内的版本。
 """
 
 import sys
@@ -26,7 +26,7 @@ from types import ModuleType
 class _FlyOnly:
     """
     白名单模块代理。只有显式声明的模块可被导入。
-    对应 Fly-Lang `only (json, math):` 编译期检查 + 运行时兜底。
+    对应 PyFly `only (json, math):` 编译期检查 + 运行时兜底。
     """
     _ALLOWED = frozenset({
         "json", "math", "random", "string", "re",
@@ -45,7 +45,7 @@ class _FlyOnly:
         if name in self._allowed:
             return __import__(name)
         raise ImportError(
-            f"[Fly-Lang] Module '{name}' not in allowlist. "
+            f"[PyFly] Module '{name}' not in allowlist. "
             f"Use 'only ({name}, ...):' to grant access."
         )
 
@@ -54,7 +54,7 @@ class _FlyOnly:
             super().__setattr__(name, value)
             return
         raise PermissionError(
-            f"[Fly-Lang] Cannot modify __builtins__: '{name}'"
+            f"[PyFly] Cannot modify __builtins__: '{name}'"
         )
 
 
@@ -73,7 +73,7 @@ def _fly_cage(max_time: str = "5s", max_memory: str = "100MB"):
     在 Wasm 环境中，实际限制由 host 的 fuel + memory pages 强制执行；
     此装饰器做 Python 层的软性检查（超时定时器）。
 
-    对应 Fly-Lang `cage(max_time="5s", max_memory="100MB"):`
+    对应 PyFly `cage(max_time="5s", max_memory="100MB"):`
     """
     def parse_time(s: str) -> float:
         s = s.strip()
@@ -95,7 +95,7 @@ def _fly_cage(max_time: str = "5s", max_memory: str = "100MB"):
                 timeout_sec,
                 lambda: (_ for _ in ()).throw(
                     ResourceExhaustedError(
-                        f"[Fly-Lang] cage: timeout after {max_time}"
+                        f"[PyFly] cage: timeout after {max_time}"
                     )
                 )
             )
@@ -117,7 +117,7 @@ _SEAL_TOKEN = object()
 def _fly_seal(cls):
     """
     禁止运行时修改类实例属性（初始化后）。
-    对应 Fly-Lang `seal class Foo:`
+    对应 PyFly `seal class Foo:`
 
     实现：用初始化令牌模式，__setattr__ 在初始化后拒绝修改。
     """
@@ -133,14 +133,14 @@ def _fly_seal(cls):
     def __setattr__(self, name: str, value):
         if getattr(self, "_sealed", False) and not name.startswith("_"):
             raise PermissionError(
-                f"[Fly-Lang] seal: cannot modify '{name}' on sealed {cls.__name__}"
+                f"[PyFly] seal: cannot modify '{name}' on sealed {cls.__name__}"
             )
         super(cls, self).__setattr__(name, value)
 
     def __delattr__(self, name: str):
         if getattr(self, "_sealed", False) and not name.startswith("_"):
             raise PermissionError(
-                f"[Fly-Lang] seal: cannot delete '{name}' on sealed {cls.__name__}"
+                f"[PyFly] seal: cannot delete '{name}' on sealed {cls.__name__}"
             )
         super(cls, self).__delattr__(name)
 
@@ -157,7 +157,7 @@ def _fly_seal(cls):
 def _fly_trace(level: str = "INFO", args: bool = False):
     """
     函数进出审计日志。
-    对应 Fly-Lang `trace(level="INFO", args=True):`
+    对应 PyFly `trace(level="INFO", args=True):`
 
     在 Wasm 沙箱内，日志通过 host function fly_log_trace 输出到宿主。
     """
@@ -209,7 +209,7 @@ _MASKED_NAMES = set()
 def _fly_mask(*names: str):
     """
     注册敏感变量名，后续 print/logging 中自动脱敏。
-    对应 Fly-Lang `mask password`
+    对应 PyFly `mask password`
     """
     _MASKED_NAMES.update(names)
     return names
@@ -228,7 +228,7 @@ def _apply_mask(text: str) -> str:
 # ─────────────────────────────────────────────
 
 def install():
-    """将 Fly-Lang 运行时注入到 Python 内置命名空间"""
+    """将 PyFly 运行时注入到 Python 内置命名空间"""
     builtins = sys.modules["builtins"]
     builtins._FlyOnly = _FlyOnly
     builtins._fly_cage = _fly_cage
@@ -238,7 +238,7 @@ def install():
     builtins.ResourceExhaustedError = ResourceExhaustedError
     # 默认安装白名单 __builtins__
     builtins.__builtins__ = _FlyOnly()
-    print("[Fly-Lang] Runtime installed: _FlyOnly, _fly_cage, _fly_seal, _fly_trace, _fly_mask")
+    print("[PyFly] Runtime installed: _FlyOnly, _fly_cage, _fly_seal, _fly_trace, _fly_mask")
 
 
 # 自动安装

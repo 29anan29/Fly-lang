@@ -1,4 +1,4 @@
-//! fly-sandbox: 为 Fly-Lang 转译产物提供跨平台轻量沙箱
+//! fly-sandbox: 为 PyFly 转译产物提供跨平台轻量沙箱
 //!
 //! 架构: Rust (host) + Wasmtime (Wasm runtime) + RustPython (Python-in-Wasm)
 //!
@@ -21,8 +21,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
 
-/// Fly-Lang 沙箱能力声明（capability set）
-/// 对应 Fly-Lang 关键字的运行时映射：
+/// PyFly 沙箱能力声明（capability set）
+/// 对应 PyFly 关键字的运行时映射：
 ///   only    → fs_read/fs_write 路径白名单
 ///   cage    → fuel + max_memory_pages + timeout_ms
 ///   trace   → audit_log = true
@@ -80,7 +80,7 @@ pub struct SandboxResult {
     pub audit_events: Vec<AuditEvent>,
 }
 
-/// 审计事件（对接 Fly-Lang `trace` 关键字）
+/// 审计事件（对接 PyFly `trace` 关键字）
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AuditEvent {
     pub timestamp_ms: u64,
@@ -112,7 +112,7 @@ pub fn create_engine() -> wasmtime::Result<wasmtime::Engine> {
     wasmtime::Engine::new(&config)
 }
 
-/// 将 Fly-Lang 转译产物（.py）打包为 Wasm 模块
+/// 将 PyFly 转译产物（.py）打包为 Wasm 模块
 ///
 /// 实际实现有两种路径：
 ///   A) RustPython → wasm32-wasip1 → 在 Wasmtime 中解释执行 .py
@@ -121,7 +121,7 @@ pub fn create_engine() -> wasmtime::Result<wasmtime::Engine> {
 /// 本骨架展示路径 A 的集成方式。
 ///
 /// # 参数
-/// - `python_source`: Fly-Lang 转译后的 .py 源码字符串
+/// - `python_source`: PyFly 转译后的 .py 源码字符串
 /// - `engine`: Wasmtime Engine
 ///
 /// # 返回
@@ -150,7 +150,7 @@ async fn build_python_wasm_module(
 
 /// 注册 host functions（capability 注入点）
 ///
-/// 每个 host function 对应一个 Fly-Lang 运行时能力，
+/// 每个 host function 对应一个 PyFly 运行时能力，
 /// 调用时检查 FlyCapabilities 白名单，拒绝则记录审计事件。
 fn register_host_functions(
     linker: &mut wasmtime::Linker<SandboxState>,
@@ -473,9 +473,9 @@ fn now_ms() -> u64 {
 // ─────────────────────────────────────────────
 
 #[derive(clap::Parser)]
-#[command(author, version, about = "Fly-Lang 跨平台轻量沙箱 (Rust + Wasmtime)")]
+#[command(author, version, about = "PyFly 跨平台轻量沙箱 (Rust + Wasmtime)")]
 struct Cli {
-    /// Fly-Lang 转译产物 (.py 文件)
+    /// PyFly 转译产物 (.py 文件)
     script: PathBuf,
 
     /// 允许读取的文件路径（可多次指定）
@@ -521,7 +521,7 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    // 读取 Fly-Lang 转译产物
+    // 读取 PyFly 转译产物
     let python_source = tokio::fs::read_to_string(&cli.script).await?;
     tracing::info!("加载脚本: {:?} ({} 字节)", cli.script, python_source.len());
 

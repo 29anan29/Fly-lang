@@ -107,7 +107,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fly-lang"
 version = "0.1.0"                    # 与你的 Go 版本保持同步
-description = "Fly-Lang: Python safety-constrained superset transpiler"
+description = "PyFly: Python safety-constrained superset transpiler"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "29anan29", email = "your-email@example.com"}]

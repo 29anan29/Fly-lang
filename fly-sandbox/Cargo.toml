@@ -2,8 +2,8 @@
 name = "fly-sandbox"
 version = "0.1.0"
 edition = "2021"
-description = "Fly-Lang 跨平台轻量沙箱 — Rust + Wasmtime + RustPython"
-authors = ["Fly-Lang Contributors"]
+description = "PyFly 跨平台轻量沙箱 — Rust + Wasmtime + RustPython"
+authors = ["PyFly Contributors"]
 
 [dependencies]
 wasmtime = "26"

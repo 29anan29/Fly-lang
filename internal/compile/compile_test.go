@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"flylang/internal/gen"
+	"pyfly/internal/gen"
 )
 
 func TestGolden(t *testing.T) {

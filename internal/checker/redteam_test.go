@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"flylang/internal/parser"
+	"pyfly/internal/parser"
 )
 
 // redTeamCase：对抗方式回归表（对应 docs/THREAT-MODEL.md §5 实测表）。

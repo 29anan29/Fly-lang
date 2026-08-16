@@ -1,3 +1,3 @@
-module flylang
+module pyfly
 
 go 1.25.0

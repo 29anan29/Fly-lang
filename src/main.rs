@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::{Condvar, Mutex};
 
-use fly_lang::checkd;
-use fly_lang::errorcode;
-use fly_lang::format;
-use fly_lang::http::Proxy;
-use fly_lang::update::Updater;
+use pyfly_lang::checkd;
+use pyfly_lang::errorcode;
+use pyfly_lang::format;
+use pyfly_lang::http::Proxy;
+use pyfly_lang::update::Updater;
 
 // 报错渲染的彩色判定：走 stderr（诊断输出流）。stderr 是 TTY 或 FORCE_COLOR 非空 → 彩色；
 // NO_COLOR 非空 → 强制无色。
@@ -65,7 +65,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("version") => {
-            println!("{}", fly_lang::version::string());
+            println!("{}", pyfly_lang::version::string());
             ExitCode::SUCCESS
         }
         Some("check") => cmd_check(&args[1..]),
@@ -162,7 +162,7 @@ fn cmd_build(args: &[String]) -> ExitCode {
         }
     }
 
-    let (module, perr) = fly_lang::parser::parse(&src);
+    let (module, perr) = pyfly_lang::parser::parse(&src);
     let Some(module) = module else {
         if let Some(d) = perr {
             eprintln!("{}", format::format_error(&file, &src, &d, color));
@@ -172,7 +172,7 @@ fn cmd_build(args: &[String]) -> ExitCode {
         return ExitCode::from(1);
     };
 
-    let code = fly_lang::gen::generate_opts(module, fly_lang::gen::GenOpts { keep_annotations: keep_ann });
+    let code = pyfly_lang::gen::generate_opts(module, pyfly_lang::gen::GenOpts { keep_annotations: keep_ann });
     let out = if out.is_empty() {
         default_out_path(&file)
     } else {
@@ -270,7 +270,7 @@ fn cmd_run(args: &[String]) -> ExitCode {
         }
     }
 
-    let (module, perr) = fly_lang::parser::parse(&src);
+    let (module, perr) = pyfly_lang::parser::parse(&src);
     let Some(module) = module else {
         if let Some(d) = perr {
             eprintln!("{}", format::format_error(file, &src, &d, color));
@@ -280,7 +280,7 @@ fn cmd_run(args: &[String]) -> ExitCode {
         return ExitCode::from(1);
     };
 
-    let code = fly_lang::gen::generate(module);
+    let code = pyfly_lang::gen::generate(module);
     let tmp = std::env::temp_dir().join(format!(
         "fly-{}-{}.py",
         std::process::id(),
@@ -495,11 +495,11 @@ fn cmd_update(args: &[String]) -> ExitCode {
         }
     };
     if !u.is_outdated(&rel.tag_name) && !force {
-        println!("当前已是最新版本 {}", fly_lang::version::string());
+        println!("当前已是最新版本 {}", pyfly_lang::version::string());
         return ExitCode::SUCCESS;
     }
     if check_only {
-        println!("发现新版本 {}（当前 {}）", rel.tag_name, fly_lang::version::string());
+        println!("发现新版本 {}（当前 {}）", rel.tag_name, pyfly_lang::version::string());
         return ExitCode::from(2);
     }
     let asset = match u.asset_for(goos(), goarch(), &rel) {
@@ -532,7 +532,7 @@ fn cmd_update(args: &[String]) -> ExitCode {
     }
 
     println!("{}", yellow(&format!(
-        "发现新版本 {}（当前 {}）", rel.tag_name, fly_lang::version::string())));
+        "发现新版本 {}（当前 {}）", rel.tag_name, pyfly_lang::version::string())));
     if !rel.body.trim().is_empty() {
         println!("{}", cyan("更新内容："));
         for line in rel.body.lines() {
@@ -545,7 +545,7 @@ fn cmd_update(args: &[String]) -> ExitCode {
     }
     print!("是否安装？[Y/n] ");
     std::io::Write::flush(&mut std::io::stdout()).ok();
-    if !fly_lang::update::confirm() {
+    if !pyfly_lang::update::confirm() {
         println!("{}", green("bye"));
         return ExitCode::SUCCESS;
     }
@@ -704,7 +704,7 @@ fn walk_fly(dir: &Path, out: &mut Vec<String>) -> std::io::Result<()> {
     Ok(())
 }
 
-const USAGE: &str = "Fly-Lang 编译器
+const USAGE: &str = "PyFly 编译器
 
 用法:
   fly build [选项] <file.fly>   转译为 Python（含沙箱运行时，拦截逃逸）
@@ -733,7 +733,7 @@ fn cmd_lsp(args: &[String]) -> ExitCode {
         eprintln!("用法: fly lsp（stdio JSON-RPC，供编辑器 LSP 客户端调用）");
         return ExitCode::from(2);
     }
-    let server = match fly_lang::lsp::Server::new() {
+    let server = match pyfly_lang::lsp::Server::new() {
         Ok(s) => std::sync::Arc::new(s),
         Err(e) => {
             eprintln!("error: {}", e);
@@ -862,7 +862,7 @@ fn cmd_fmt(args: &[String]) -> ExitCode {
             dirty += 1;
             continue;
         }
-        let out = fly_lang::fmt::format(&src);
+        let out = pyfly_lang::fmt::format(&src);
         if out == src {
             continue;
         }
@@ -892,7 +892,7 @@ fn cmd_fmt(args: &[String]) -> ExitCode {
 #[derive(Clone)]
 struct Rep {
     path: String,
-    met: fly_lang::analyze::Metrics,
+    met: pyfly_lang::analyze::Metrics,
     bad: f64,
 }
 
@@ -949,11 +949,11 @@ fn cmd_analyze(args: &[String]) -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        let Some(met) = fly_lang::analyze::analyze(&src) else {
+        let Some(met) = pyfly_lang::analyze::analyze(&src) else {
             eprintln!("analyze: 跳过 {}（语法错误）", p);
             continue;
         };
-        let (s, b) = fly_lang::analyze::score(&met);
+        let (s, b) = pyfly_lang::analyze::score(&met);
         let r = Rep {
             path: p.clone(),
             met,
@@ -985,7 +985,7 @@ fn cmd_analyze(args: &[String]) -> ExitCode {
     }
     let avg = t_score / total;
     println!("🌸 屎山代码分析报告 🌸\n");
-    println!("  总体评分: {:.2} / 100 - {}", avg, fly_lang::analyze::level(avg));
+    println!("  总体评分: {:.2} / 100 - {}", avg, pyfly_lang::analyze::level(avg));
     println!("  已分析 {} 个文件\n", reps.len());
     println!("◆ 评分指标详情（平均分项）");
     let am = aggregate(&reps);
@@ -1052,14 +1052,14 @@ fn cmd_analyze(args: &[String]) -> ExitCode {
             }
         }
     }
-    println!("\n◆ 诊断结论\n  🌸 {}", fly_lang::analyze::level(avg));
+    println!("\n◆ 诊断结论\n  🌸 {}", pyfly_lang::analyze::level(avg));
     ExitCode::SUCCESS
 }
 
 // aggregate 汇总所有文件指标均值。
-fn aggregate(reps: &[Rep]) -> fly_lang::analyze::Metrics {
+fn aggregate(reps: &[Rep]) -> pyfly_lang::analyze::Metrics {
     let n = reps.len() as f64;
-    let mut m = fly_lang::analyze::Metrics::default();
+    let mut m = pyfly_lang::analyze::Metrics::default();
     for r in reps {
         m.cyclomatic += r.met.cyclomatic;
         m.cognitive += r.met.cognitive;

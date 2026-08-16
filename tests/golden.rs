@@ -1,5 +1,5 @@
-use fly_lang::lexer::lexer::Lexer;
-use fly_lang::lexer::token::TokenType;
+use pyfly_lang::lexer::lexer::Lexer;
+use pyfly_lang::lexer::token::TokenType;
 use std::path::{Path, PathBuf};
 
 fn testdata_dir() -> PathBuf {

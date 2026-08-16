@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 // gen_errorinfo：把 Go 版错误码注册表（internal/ast/errors.go 的 errorInfo）

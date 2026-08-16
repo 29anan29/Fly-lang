@@ -44,7 +44,7 @@ pub struct Updater {
 impl Updater {
     pub fn new(proxy: Option<Proxy>) -> Self {
         Updater {
-            repo: "29anan29/Fly-lang".to_string(),
+            repo: "29anan29/PyFly-lang".to_string(),
             base_url: "https://api.github.com".to_string(),
             current: crate::version::string(),
             insecure: false,

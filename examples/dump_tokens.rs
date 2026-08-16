@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use fly_lang::lexer::lexer::Lexer;
+use pyfly_lang::lexer::lexer::Lexer;
 
 fn main() {
     let path = env::args().nth(1).expect("usage: dump_tokens <file>");
@@ -9,8 +9,8 @@ fn main() {
     let mut l = Lexer::new(&src);
     loop {
         let t = l.next();
-        println!("{} {}", fly_lang::lexer::token::name(t.ty), t.lit);
-        if t.ty == fly_lang::lexer::token::TokenType::Eof {
+        println!("{} {}", pyfly_lang::lexer::token::name(t.ty), t.lit);
+        if t.ty == pyfly_lang::lexer::token::TokenType::Eof {
             break;
         }
     }

@@ -1,8 +1,8 @@
 [package]
-name = "fly-lang"
+name = "pyfly-lang"
 version = "0.1.0"
 edition = "2021"
-description = "Fly-Lang: Python 安全超集转译器（Rust 核心，checker 留 Go）"
+description = "PyFly: Python 安全超集转译器（Rust 核心，checker 留 Go）"
 license = "MIT"
 
 [[bin]]

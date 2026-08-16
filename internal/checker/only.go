@@ -4,7 +4,7 @@ package checker
 import (
 	"strings"
 
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 var onlyDeny = map[string]bool{

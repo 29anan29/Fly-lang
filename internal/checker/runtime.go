@@ -1,7 +1,7 @@
 package checker
 
 import (
-	"flylang/internal/ast"
+	"pyfly/internal/ast"
 )
 
 // runtimeCheck 一趟静态检查，覆盖可静态确定的运行时错误：

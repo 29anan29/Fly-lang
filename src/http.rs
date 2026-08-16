@@ -125,7 +125,7 @@ impl HttpClient {
             let _ = tcp.set_read_timeout(Some(Duration::from_secs(300)));
             let _ = tcp.set_write_timeout(Some(Duration::from_secs(60)));
             let mut s = self.tls_stream(&host, tcp)?;
-            let mut req = format!("GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: fly-lang/update\r\nAccept: */*\r\n", path, host);
+            let mut req = format!("GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: pyfly-lang/update\r\nAccept: */*\r\n", path, host);
             for (k, v) in headers {
                 req.push_str(&format!("{}: {}\r\n", k, v));
             }

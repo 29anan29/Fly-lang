@@ -1,8 +1,8 @@
 // build_golden.rs：R2 验收——Rust 本地 parse+gen 的 build 产物与 testdata/golden/*.py
 // 逐字节对比（Go 版产物快照，行号敏感：产物内嵌源码行列号）。
 // 覆盖：8 安全关键字注入、沙箱 runtime/sandbox 两节、类型推导豁免、--keep-annotations。
-use fly_lang::gen;
-use fly_lang::parser;
+use pyfly_lang::gen;
+use pyfly_lang::parser;
 use std::path::{Path, PathBuf};
 
 fn golden_dir() -> PathBuf {
