@@ -38,8 +38,31 @@ func cmdError(args []string) int {
 		fmt.Fprintf(os.Stderr, "未知错误码 %s\n\n全部错误码见 docs/报错清单.md\n", code)
 		return 1
 	}
-	fmt.Println(info.Example)
+	fmt.Println(colorizeExample(info.Example))
 	return 0
+}
+
+// colorizeExample 与 Rust 版 main.rs colorize_example 对齐：error[EXXXX] 亮红、箭头青、help 绿、note 黄。
+func colorizeExample(s string) string {
+	if !outOn {
+		return s
+	}
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(s, "\n") {
+		switch {
+		case strings.HasPrefix(line, "error[E"):
+			b.WriteString("\x1b[1;31m" + line + "\x1b[0m")
+		case strings.Contains(line, "--> "):
+			b.WriteString("\x1b[1;36m" + line + "\x1b[0m")
+		case strings.HasPrefix(line, "   = help:"):
+			b.WriteString("\x1b[32m" + line + "\x1b[0m")
+		case strings.HasPrefix(line, "   = note:"):
+			b.WriteString("\x1b[33m" + line + "\x1b[0m")
+		default:
+			b.WriteString(line)
+		}
+	}
+	return b.String()
 }
 
 func cmdLSP(args []string) int {
