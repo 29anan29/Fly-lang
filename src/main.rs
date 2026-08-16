@@ -78,10 +78,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("lsp") => cmd_lsp(&args[1..]),
-        Some(cmd) if cmd == "sandbox" => {
-            eprintln!("error: 子命令 sandbox 尚未迁移到 Rust 核心（P1-P4 已交付：version/help/error/check/build/run/update/lsp）");
-            ExitCode::from(1)
-        }
+        Some("sandbox") => cmd_sandbox(&args[1..]),
         Some(_) => {
             eprintln!("未知子命令 {:?}\n\n{}\n", args[0], USAGE);
             ExitCode::from(2)
@@ -740,6 +737,50 @@ fn cmd_lsp(args: &[String]) -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("lsp: {}", e);
+            ExitCode::from(1)
+        }
+    }
+}
+
+// cmd_sandbox：`fly sandbox` 桥接 fly-sandboxd（Go 保留组件，方案 B：安全关键代码不重写）。
+// 发现顺序：FLY_SANDBOXD 环境变量 → 同目录 fly-sandboxd → PATH。
+fn find_sandboxd() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("FLY_SANDBOXD") {
+        if !p.is_empty() {
+            return Some(PathBuf::from(p));
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let cand = dir.join("fly-sandboxd");
+            if cand.exists() {
+                return Some(cand);
+            }
+        }
+    }
+    if let Ok(path) = std::env::var("PATH") {
+        for dir in path.split(':') {
+            let cand = PathBuf::from(dir).join("fly-sandboxd");
+            if cand.exists() {
+                return Some(cand);
+            }
+        }
+    }
+    None
+}
+
+fn cmd_sandbox(args: &[String]) -> ExitCode {
+    let Some(sandboxd) = find_sandboxd() else {
+        eprintln!("error: 找不到 fly-sandboxd（设置 FLY_SANDBOXD 环境变量指定路径）");
+        return ExitCode::from(1);
+    };
+    let status = std::process::Command::new(&sandboxd)
+        .args(args)
+        .status();
+    match status {
+        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
+        Err(e) => {
+            eprintln!("error: 启动 fly-sandboxd 失败: {}", e);
             ExitCode::from(1)
         }
     }
