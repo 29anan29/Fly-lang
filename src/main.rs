@@ -297,7 +297,9 @@ fn cmd_error(args: &[String]) -> ExitCode {
     }
     match errorcode::info_for_code(&code) {
         Some(info) => {
-            println!("{}", info.example);
+            let color = std::io::stdout().is_terminal()
+                && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+            println!("{}", colorize_example(&info.example, color));
             ExitCode::SUCCESS
         }
         None => {
@@ -305,6 +307,36 @@ fn cmd_error(args: &[String]) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+// fly error 的示例报错渲染 ANSI（与 format_error 同风格：error[EXXXX] 亮红、箭头青、help 绿、note 黄）。
+fn colorize_example(s: &str, color: bool) -> String {
+    if !color {
+        return s.to_string();
+    }
+    let mut out = String::new();
+    for line in s.split_inclusive('\n') {
+        if line.starts_with("error[E") {
+            out.push_str("\x1b[1;31m");
+            out.push_str(line);
+            out.push_str("\x1b[0m");
+        } else if line.contains("--> ") {
+            out.push_str("\x1b[1;36m");
+            out.push_str(line);
+            out.push_str("\x1b[0m");
+        } else if line.starts_with("   = help:") {
+            out.push_str("\x1b[32m");
+            out.push_str(line);
+            out.push_str("\x1b[0m");
+        } else if line.starts_with("   = note:") {
+            out.push_str("\x1b[33m");
+            out.push_str(line);
+            out.push_str("\x1b[0m");
+        } else {
+            out.push_str(line);
+        }
+    }
+    out
 }
 
 struct CheckOutcome {
