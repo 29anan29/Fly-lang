@@ -272,6 +272,8 @@ _FLY_SB_BLOCKED_MODS = frozenset((
     "mmap", "fcntl", "select", "termios", "tty", "types", "trace",
     "tracemalloc", "faulthandler", "codeop", "code", "pkgutil", "py_compile",
     "compileall", "dbm", "email", "webbrowser", "cgi", "cgitb", "configparser",
+    # 公开名的二进制/原生模块（CPython C 扩展，可与字节码互操作逃逸）：
+    "pyexpat", "zlib",
 ))
 
 _FLY_SB_ALLOWED_MODS = frozenset((
@@ -287,12 +289,29 @@ _FLY_SB_ALLOWED_MODS = frozenset((
 ))
 
 
+# 白名单模块的无害纯 Python 依赖（sys.modules 缓存读取的显式替代——
+# 不再对"任意已加载模块"放行，枚举永远追不上，规则化显式清单才完备）。
+_FLY_SB_ALLOWED_DEP_MODS = frozenset((
+    "posixpath", "ntpath", "encodings",
+))
+
+# 私有模块规则：root 以下划线开头（CPython 内部实现/C 扩展，如 _json/_ssl/_ctypes）
+# 一律禁止导入（与编译期 escape.go checkModule 同步）。
 def _fly_sb_import(name, line=None, col=None, globals=None, locals=None, fromlist=(), level=0):
+    # gen 注入调用：_fly_sb_import(name, 行, 列)
+    # 但沙箱代理生效后由 CPython IMPORT_NAME 字节码发起的调用是 5 位置参数
+    # __import__(name, globals, locals, fromlist, level) —— 签名错位，需重排。
+    if isinstance(line, dict):
+        globals, locals, fromlist, level = line, col, globals, locals
+        line, col = None, None
     root = name.split(".")[0]
     if root in _FLY_SB_BLOCKED_MODS:
         _fly_sb_audit("禁止导入危险模块 " + root, line, col)
         raise FlyRuntimeError("沙箱: 禁止导入危险模块 " + root)
-    if root in _FLY_SB_ALLOWED_MODS or root in _fly_sb_sys.modules:
+    if root.startswith("_"):
+        _fly_sb_audit("禁止导入私有模块 " + root, line, col)
+        raise FlyRuntimeError("沙箱: 禁止导入私有模块 " + root)
+    if root in _FLY_SB_ALLOWED_MODS or root in _FLY_SB_ALLOWED_DEP_MODS:
         return _fly_sb_builtins.__import__(name, globals, locals, fromlist, level)
     _fly_sb_audit("模块 " + root + " 不在白名单", line, col)
     raise FlyRuntimeError("沙箱: 模块 " + root + " 不在白名单")

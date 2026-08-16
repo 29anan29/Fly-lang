@@ -12,6 +12,26 @@ env:
   VERSION_LDFLAGS: -X flylang/internal/version.Repo=29anan29/Fly-lang
 
 jobs:
+  python-matrix:
+    name: python ${{ matrix.py }} 产物实跑
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        py: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }}
+      - name: Go 全量测试（TestGolden/TestSandboxEscape/TestRuntimeCatch 走当前 python 实跑产物）
+        run: go test ./...
+      - name: Rust 测试（build_golden 逐字节 + lexer/parser）
+        run: cargo test
+
   linux:
     name: linux packages
     runs-on: ubuntu-latest

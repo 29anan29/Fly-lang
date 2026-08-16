@@ -119,6 +119,45 @@ B7 间接引用。
 - **B8 运行时代码注入**：`cgitb/importlib/` 等从外部读取并执行源码的路径。
   缓解：`only` + 文件系统只读沙箱。
 
+### 6.1 逃逸面逐项枚举与处置（2026-08 审计基线）
+
+三层防线命名：**编译期**（escape.go 静态拦截）→ **运行时**（_FlySandbox/_fly_sb_* 动态兜底）→
+**进程沙箱**（fly-sandboxd seccomp，可选）。两处名单必须逐项同步（redteam_test.go 锁定）。
+
+| # | 逃逸面 | 访问路径 | 编译期 | 运行时 | 处置策略 |
+| :- | :--- | :--- | :--- | :--- | :--- |
+| E1 | 属性反射链 | `__class__/__bases__/__base__/__mro__/__subclasses__/__globals__/__code__/__closure__/__dict__/__reduce__/__reduce_ex__/__getattribute__/__setattr__/__delattr__/__init_subclass__/__prepare__/__builtins__/__traceback__` | E0064 反射链扫描（含 f-string 内联二次解析） | `_fly_attr/_fly_get/_fly_set/_fly_getitem/_fly_setitem` 黑名单（下标/属性/赋值三通道） | 名单双同步 + 22 组合锁定 |
+| E2 | 帧/协程逃逸 | `gi_frame/ag_frame/cr_frame/f_globals/f_locals/__loader__`（生成器/协程/帧对象） | E0064 同名单 | 运行时同名单拦截 | 与 E1 同名单；生成器 `send/throw` 仅恢复执行、无法注入新名字空间，不构成独立通道（监控名单） |
+| E3 | 内建函数面 | `eval/exec/compile/open/getattr/globals/locals/vars/input/breakpoint/help/dir/memoryview/__import__` | E0063 危险内建（任何读取位置） | `_FLY_SB_DANGEROUS` 同名拦截 | 双拦截；`getattr/globals` 属合法高频 API，编译期即拒（见不兼容清单 §6.2） |
+| E4 | 模块导入面（黑名单） | `os/sys/subprocess/socket/ctypes/pickle/importlib/marshal/...` 80+ 模块 | E0066 黑名单 | `_FLY_SB_BLOCKED_MODS` 同名 | 双名单逐项同步（gen_errorinfo 风格抽查） |
+| E5 | 模块导入面（私有实现） | `_json/_ssl/_socket/_ctypes/_thread/...` 全部下划线开头模块 | E0066 规则化：`root 以 _ 开头` 一律拒 | `_fly_sb_import` 同规则 | **规则而非枚举**——CPython 私有模块无限增长，枚举不完备 |
+| E6 | 模块导入面（白名单外） | `numpy/requests 之外/任意未声明模块`（含 site-packages 二进制扩展） | 编译期放行（名单外不拦） | `_fly_sb_import` 白名单校验：不在 ALLOWED 一律拒 | ALLOWED 显式白名单是**最终闸门**；顶层/函数内 import 均经 gen 注入走 `_fly_sb_import`（含行列号审计） |
+| E7 | sys.modules 缓存读取 | `root in sys.modules` 隐式放行（pyexpat 曾经此绕过白名单） | — | **2026-08 移除**，改为 `_FLY_SB_ALLOWED_DEP_MODS` 显式无害依赖清单（posixpath/ntpath/encodings） | 已修复（escape_binary_mods 反例锁定） |
+| E8 | 公开名二进制模块 | `pyexpat/zlib`（CPython C 扩展） | E0066 黑名单新增 | `_FLY_SB_BLOCKED_MODS` 新增 | 已修复；公开名 C 扩展走枚举、私有名走 E5 规则 |
+| E9 | 模块属性穿透 | `attrgetter/itemgetter`（点路径穿透任意对象） | E0064 编译期拦截（白名单模块对象上） | `_fly_sb_check_modattr` 运行时拦截 | 双拦截；绑定名跟踪（modBinds）防别名绕过 |
+| E10 | 内建链重绑定 | `__builtins__` 属性/下标访问 | E0065 | `_FLY_SB_REFLECT` 含 `__builtins__` | 双拦截；`_FlySandbox/_FlyOnly` 均实现 `__getitem__`（CPython 对非 dict `__builtins__` 走下标） |
+| E11 | 进程逃逸（OS 面） | 网络/文件/进程/信号 | `cage` 编译期注入 | cage 装饰器 rlimit + `fly-sandboxd`（可选）clone ns + Landlock + seccomp 白名单 | 双层：rlimit 软限 + 内核级硬限 |
+| E12 | 供应链边界 | 白名单模块自身代码（requests/json/...）与 site-packages 编译产物 | 不审查（信任声明） | 模块属性拦截防止白名单模块暴露子模块 | 与 B3 同源；S6 受控包装模式（examples/third_party/） |
+
+**审计结论**：E1-E10 全部有编译期 + 运行时双覆盖；E7/E8 为 2026-08 审计新增修复。
+**持续维护要求**：CPython 新版本发布时，按"新内建/新模块/新属性"三栏逐项复核本表（见 CI 矩阵）。
+
+### 6.2 不兼容模式清单（"安全受限超集"的精确边界）
+
+Fly 不是"任何合法 Python 都能编译"——合法但违反安全规则的模式会被编译期拦截（编译失败），
+按迁移路径分三类：
+
+| 类别 | 拦截模式 | 错误码 | 迁移路径 |
+| :--- | :--- | :--- | :--- |
+| 危险 API | `eval/exec/compile/open/getattr/globals/locals/vars/input/dir/memoryview/breakpoint/help/__import__` 的**任何读取** | E0063 | 用安全等价物：`getattr`→`vars()/显式属性`（或 only 白名单下受限 `hasattr`）；`open`→文件读写走 sandbox 约定路径 |
+| 反射链 | `obj.__class__.__bases__` 等 22 项属性链、`gi_frame` 等帧访问 | E0064 | 数据类/鸭子类型替代反射；框架内省需求走 only 白名单 + 人工评审（B4） |
+| 危险模块 | 黑名单 80+ 模块、`_` 开头私有模块、白名单外模块（numpy 等） | E0066 | 白名单内替代（math/json/re/collections...）；第三方网络库用 S6 受控包装 |
+| 超集例外 | 黑名单模块属性 `attrgetter/itemgetter`、`__builtins__` 访问 | E0064/E0065 | 显式传参替代 attrgetter 式解包 |
+
+**不保证项**（照 §6 B1-B8）：跨文件污点、通配导入、第三方模块内部、动态反射的字符串拼装形式。
+**心智模型**：现有 Python 代码零改造可编译的占位是"安全子集"，超出部分需迁移；8 关键字是超集扩展。
+因此对外表述统一为 **"Python 3.10+ 的安全受限超集"**（README/方案.md 已同步）。
+
 ## 7. 与静态分析工具的定位差异
 
 | 维度 | Fly-Lang | Bandit | Semgrep | Ruff (S 规则) |

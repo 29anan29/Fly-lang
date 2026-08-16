@@ -133,6 +133,8 @@ func TestSandboxEscape(t *testing.T) {
 		{"allow_dangerous_name_var", "os = 5\nprint(os)\n", "5"},
 		{"allow_modattr_safe", "import math\nimport json\nprint(math.floor(2.9), json.dumps([1]))\n", "2 [1]"},
 		{"allow_requests_s6", "import requests\nprint(\"loaded\")\n", "loaded"},
+		{"fn_import_math", "def use():\n    import math\n    return math.sqrt(9)\n\nprint(use())\n", "3.0"},
+		{"fn_import_dep_mod", "def use():\n    import posixpath\n    return len(posixpath.dirname(\"/a/b\"))\n\nprint(use())\n", "2"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

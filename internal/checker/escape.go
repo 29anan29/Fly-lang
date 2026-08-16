@@ -58,6 +58,8 @@ var escapeModules = map[string]bool{
 	"code": true, "pkgutil": true, "py_compile": true, "compileall": true,
 	"dbm": true, "email": true, "webbrowser": true, "cgi": true,
 	"cgitb": true, "configparser": true,
+	// 公开名的二进制/原生模块（CPython C 扩展，可与字节码互操作逃逸）：
+	"pyexpat": true, "zlib": true,
 }
 
 // escapeCheck 一趟遍历：拦截危险内建调用、反射属性链、__builtins__ 访问、危险模块导入。
@@ -222,8 +224,10 @@ func (e *escapeCheck) assignTarget(x ast.Expr, inOnly int) {
 	}
 }
 
+// 私有模块规则：root 以下划线开头（CPython 内部实现/C 扩展，如 _json/_ssl/_ctypes）
+// 一律禁止导入——枚举永远追不上 CPython 内部模块，规则化才完备。
 func (e *escapeCheck) checkModule(name string, pos ast.Position) {
-	if root := moduleRoot(name); escapeModules[root] {
+	if root := moduleRoot(name); escapeModules[root] || strings.HasPrefix(root, "_") {
 		e.errorf(pos, "禁止导入危险模块 %s（沙箱逃逸风险）", root)
 	}
 }

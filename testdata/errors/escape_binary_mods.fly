@@ -1,0 +1,3 @@
+import pyexpat
+import _json
+import zlib

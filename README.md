@@ -4,7 +4,7 @@
 
 # Fly-Lang
 
-**Python 3.10+ 的安全增强超集转译器**（Go 实现，Fly → Python，类似 TypeScript → JavaScript）
+**Python 3.10+ 的安全受限超集转译器**（Go 实现，Fly → Python，类似 TypeScript → JavaScript）
 
 </div>
 
@@ -25,7 +25,7 @@ Fly-Lang 由人与 AI 结对开发：**人做决策，AI 写代码**。
 [![Release](https://img.shields.io/github/v/release/29anan29/Fly-lang)](https://github.com/29anan29/Fly-lang/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/29anan29/Fly-lang/release.yml?label=Release%20CI)](https://github.com/29anan29/Fly-lang/actions)
 
-Fly 是 Python 3.10+ 的安全增强超集：用 Go 实现的转译器，把 `.fly` 源码转译为 Python。新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
+Fly 是 Python 3.10+ 的安全受限超集：用 Go 实现的转译器，把 `.fly` 源码转译为 Python。任何合法 Python 中违反安全规则的模式（危险内建/反射链/危险模块，见 docs/THREAT-MODEL.md §6.2 不兼容清单）会被编译期拦截，其余安全子集零改造可编译；新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
 
 详细设计见 [方案.md](方案.md)（语言设计）与 [Plan.md](Plan.md)（实现方案）。
 

@@ -1,0 +1,27 @@
+error[E0066]: 禁止导入危险模块
+  --> escape_binary_mods.fly:1:1
+   |
+   1 | import pyexpat
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 pyexpat（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_binary_mods.fly:2:1
+   |
+   2 | import _json
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 _json（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
+error[E0066]: 禁止导入危险模块
+  --> escape_binary_mods.fly:3:1
+   |
+   3 | import zlib
+   | ^^^^^^
+   |
+   = help: 禁止导入危险模块 zlib（沙箱逃逸风险）。os/subprocess/sys/pickle 等模块可读写系统资源，禁止导入
+   = note: docs/报错清单.md#E0066
+
