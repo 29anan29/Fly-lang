@@ -19,12 +19,12 @@ Go 版 CLI 现状（`cmd/fly/`，共 1075 行）：
 
 ## 2. 目标形态
 
-- 最终 `fly` 单一二进制由 `cargo build --release` 产出（`target/release/fly`）
-- 9 个子命令行为、退出码、stdout/stderr 分流、错误格式与 Go 版**逐字节一致**
-- VSCode 插件（`fly.path` 指向）、`fly update` 契约、CI 产物命名**零改动**
-- **checker 不迁移**（D6）：Go 版 checker 以 `fly-checkd` 独立进程提供（stdio JSON-RPC，goroutine 并发），Rust CLI 通过 `checkd.rs` 桥接调用
-- `fly sandbox` 是唯一保留 Go 实现的候选（见 §4 决策）
-- `fly fmt` / `fly analyze`（2026-08 新增，Go 侧）：`internal/format`（token 流级空白重排，注释保留）与 `internal/analyze`（McCabe 循环复杂度/认知复杂度/嵌套/重复/注释比例等指标，仿 fuck-u-code 报告口径）；P 系列迁移未覆盖，L1 工具自举时按计划用 Fly 重写
+- **`fly` 单一二进制已由 `cargo build --release` 产出**（`target/release/fly`），Go 版 CLI（`cmd/fly/`）已退役删除
+- 9 个子命令行为、退出码、stdout/stderr 分流、错误格式**逐字节一致**
+- VSCode 插件（`fly.path` 指向）、`fly update` 契约、CI 产物命名**零改动**（安装包新增 fly-checkd/fly-sandboxd 两守护进程，Rust update 全量解包替换）
+- **checker 不迁移**（D6）：Go 版 checker 以 `fly-checkd` 独立进程提供（stdio 二进制帧，长驻复用），Rust CLI 通过 `checkd.rs` 桥接调用
+- **`fly sandbox` 保留 Go 实现**（§4 决策 B）：`fly-sandboxd` 独立进程，Rust CLI spawn 桥接
+- **`fly fmt` / `fly analyze` 已 Rust 化**：`src/fmt.rs`（token 流级空白重排，注释保留）+ `src/analyze.rs`（McCabe 循环复杂度/认知复杂度/嵌套/重复/注释比例/命名，fuck-u-code 报告口径），与 Go 版 diff 零差异后 Go 实现删除
 
 ## 3. 子命令迁移分阶段（P0 → P6）
 
@@ -55,16 +55,21 @@ Go 版 CLI 现状（`cmd/fly/`，共 1075 行）：
 - `fly run`：生成临时 .py → `python3` 执行，临时文件清理
 - 验收：testdata/golden 全部 .py 与 Go 版逐字节一致（tests/build_golden.rs 固化）；`python3` 实跑行为一致；errors 52 反例 build/run 报错 stdout/stderr/退出码零差异
 
-### P4 update / lsp
-- `update`：GitHub API（D1 决策：std-only 优先，必要时 ureq）、`AssetFor` 产物命名、tar.gz/zip 解包、原子替换、sudo 提权重试、SOCKS5 代理（手写协议翻译）、交互确认与 ANSI（isTTY 移植）
-- `lsp`：JSON-RPC over stdio 重写（诊断/hover/forceCheck），checker 部分经 checkd 复用
-- 验收：`fly update --check` 假服务器单测；LSP 与 VSCode 插件联调通过
+### P4 update / lsp ✅ 已交付
+- `update`（src/update.rs + src/http.rs）：GitHub API 手写 HTTP/1.1 + rustls(ring) TLS、`asset_for` 产物命名、tar.gz 手写解包 + zip 解包、ed25519 验签（手写 base64）、原子替换、sudo 提权重试、SOCKS5/HTTP 代理（手写协议）、交互确认与 ANSI；安装包解出 **fly + fly-checkd + fly-sandboxd 三二进制**全量替换
+- `lsp`（src/lsp.rs + src/json.rs）：JSON-RPC over stdio 重写（诊断/hover/forceCheck，debounce 120ms），checker 经 checkd 长驻复用（CheckdSession）
+- 验收：`fly update` 真实全链路（下载真产物→验签→解包→替换→version 输出 release）；LSP full_session 端到端测试
 
-### P5 sandbox（最后，决策见 §4）
-### P6 切换与退役
-- release.yml 切 Rust 构建（dtolnay/rust-toolchain + cross），产物命名不变（追加 `fly-checkd-<os>-<arch>`）
-- 删除 legacy-go/（checker/checkd 保留），AGENTS.md/README 更新
-- 打 v1.0.0 tag 验证全链路
+### P5 sandbox ✅ 已交付（决策见 §4）
+- `cmd/fly-sandboxd/`（Go 保留组件）：`fly sandbox` 拆分独立进程，stage2 re-exec 剥离 "sandbox" 前缀
+- Rust `cmd_sandbox`：FLY_SANDBOXD → 同目录 → PATH 自动发现，参数/stdio/退出码透传
+- 验收：正常 exit 0、超时 exit 124、逃逸拦截（os.system 被拒 32512）
+
+### P6 切换与退役 ✅ 已交付
+- release.yml 三平台构建切 Rust（dtolnay/rust-toolchain + FLY_VERSION/FLY_COMMIT 注入 + 交叉架构），Go 只构建 fly-checkd/fly-sandboxd
+- 安装包（tar.gz/zip/deb/pkg/dmg/7z/npm）内 **fly + fly-checkd + fly-sandboxd 三二进制**
+- `cmd/fly/` 退役删除；`internal/format`/`internal/analyze`/`internal/lsp`/`internal/update`/`internal/version` 随 Go CLI 一并删除（Rust 版为唯一实现）
+- `fly fmt` / `fly analyze` 迁 Rust（src/fmt.rs + src/analyze.rs），与 Go 版 golden/反例 diff 零差异
 
 ## 4. sandbox 子命令的迁移决策
 
@@ -80,9 +85,9 @@ Go 版 CLI 现状（`cmd/fly/`，共 1075 行）：
 
 ## 5. 双轨共存与对照
 
-- Go `fly`（构建：`go build -o fly ./cmd/fly`）与 Rust `fly`（`cargo build --release`）并行
-- 开发期对照工具：`examples/` 下 dump 工具（dump_tokens 已交付）+ `scripts/diff_cli.sh`：对同一组文件跑两版 `check/build`，diff stdout/stderr/退出码
-- 合并原则：**Rust 全绿才切**；CI 中 Go 版为主，Rust 版作为附加 job（`cargo test` + CLI diff）逐步接棒
+- **双轨期已结束**：Rust `fly`（`cargo build --release`）为唯一 CLI，Go 版 `cmd/fly` 已删除
+- 对照方法论（开发期使用，供回归）：对同一组文件跑 Go/Rust 两版 `check/build/fmt/analyze`，diff stdout/stderr/退出码（/tmp/opencode/p6 保留对照脚本）
+- 合并原则：**Rust 全绿才切**；CI 中 Rust 版为主，Go 只构建 checkd/sandboxd
 - golden/反例快照（testdata）为两版共用行为基线，禁止单方改动
 
 ## 6. 契约清单（不可破坏，逐项测试断言）
@@ -95,9 +100,9 @@ Go 版 CLI 现状（`cmd/fly/`，共 1075 行）：
 | ANSI | tty 彩色 / 管道无色（isTTY + NO_COLOR）；`FormatErrorColor` 语义 | script 模拟 tty |
 | version | `dev` / `dev (commit7)` / `vX.Y.Z (release)` | 单测 |
 | error 查询 | `E0031` / `31` 两种格式，补零到 EXXXX | 单测 |
-| update 产物 | `fly-<os>-<arch>.tar.gz\|.zip`、checkd 追加 `fly-checkd-<os>-<arch>` | AssetFor 单测 |
+| update 产物 | `fly-<os>-<arch>.tar.gz\|.zip` 内含 fly + fly-checkd + fly-sandboxd | AssetFor + extract_binaries 单测 |
 | lsp | stdio JSON-RPC 帧协议、publishDiagnostics | 集成测试 |
-| 沙箱 | Landlock+seccomp 兜底行为不变（Go 实现） | 既有安全测试 |
+| 沙箱 | Landlock+seccomp 兜底行为不变（Go 实现，fly-sandboxd） | 既有安全测试 |
 
 ## 7. 风险
 

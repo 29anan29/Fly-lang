@@ -1,8 +1,10 @@
 // lib.rs：Rust CLI 库入口——模块声明（lexer/ast/parser/checkd/format/errorcode/errorinfo）。
+pub mod analyze;
 pub mod ast;
 pub mod checkd;
 pub mod diagnostic;
 pub mod errorcode;
+pub mod fmt;
 pub mod errorinfo;
 pub mod format;
 pub mod lexer;

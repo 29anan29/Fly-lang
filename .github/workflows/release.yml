@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-env:
-  VERSION_LDFLAGS: -X flylang/internal/version.Repo=29anan29/Fly-lang
-
 jobs:
   python-matrix:
     name: python ${{ matrix.py }} 产物实跑
@@ -40,6 +37,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - name: Install cross-linker for aarch64
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - name: Build and package
         shell: bash
         env:
@@ -48,16 +50,31 @@ jobs:
         run: |
           set -euo pipefail
           VER=${VERSION#v}
-          ldflags="-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$SHA $VERSION_LDFLAGS"
           mkdir -p dist npm-bin
           for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o dist/fly ./cmd/fly
-            tar -czf dist/fly-linux-$arch.tar.gz -C dist fly
+            if [ "$arch" = "amd64" ]; then
+              FLY_VERSION=$VER FLY_COMMIT=$SHA cargo build --release
+              cp target/release/fly dist/fly
+            else
+              FLY_VERSION=$VER FLY_COMMIT=$SHA CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc cargo build --release --target aarch64-unknown-linux-gnu
+              cp target/aarch64-unknown-linux-gnu/release/fly dist/fly
+            fi
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -o dist/fly-checkd ./cmd/fly-checkd
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -o dist/fly-sandboxd ./cmd/fly-sandboxd
+            tar -czf dist/fly-linux-$arch.tar.gz -C dist fly fly-checkd fly-sandboxd
             cp dist/fly npm-bin/fly-linux-$arch
-            rm dist/fly
+            cp dist/fly-checkd npm-bin/fly-checkd-linux-$arch
+            cp dist/fly-sandboxd npm-bin/fly-sandboxd-linux-$arch
+            rm -f dist/fly dist/fly-checkd dist/fly-sandboxd
 
             mkdir -p pkg/usr/bin pkg/usr/share/pixmaps pkg/DEBIAN
-            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o pkg/usr/bin/fly ./cmd/fly
+            if [ "$arch" = "amd64" ]; then
+              cp target/release/fly pkg/usr/bin/fly
+            else
+              cp target/aarch64-unknown-linux-gnu/release/fly pkg/usr/bin/fly
+            fi
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -o pkg/usr/bin/fly-checkd ./cmd/fly-checkd
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -o pkg/usr/bin/fly-sandboxd ./cmd/fly-sandboxd
             cp assets/icon.png pkg/usr/share/pixmaps/fly.png
             printf 'Package: flylang\nVersion: %s\nSection: devel\nPriority: optional\nArchitecture: %s\nMaintainer: 29anan29\nDescription: Fly-Lang - Python 3.10+ 安全增强超集转译器（safe/only/lock/mask/cage/guard/seal/trace）\n' "$VER" "$arch" > pkg/DEBIAN/control
             dpkg-deb --build --root-owner-group pkg dist/fly-linux-$arch.deb
@@ -90,6 +107,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
       - name: Build and package
         shell: bash
         env:
@@ -98,24 +118,37 @@ jobs:
         run: |
           set -euo pipefail
           VER=${VERSION#v}
-          ldflags="-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$SHA $VERSION_LDFLAGS"
           mkdir -p dist perarch/amd64 perarch/arm64 npm-bin
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o perarch/amd64/fly ./cmd/fly
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o perarch/arm64/fly ./cmd/fly
-          tar -czf dist/fly-darwin-amd64.tar.gz -C perarch/amd64 fly
-          tar -czf dist/fly-darwin-arm64.tar.gz -C perarch/arm64 fly
+          FLY_VERSION=$VER FLY_COMMIT=$SHA cargo build --release
+          cp target/release/fly perarch/arm64/fly
+          FLY_VERSION=$VER FLY_COMMIT=$SHA cargo build --release --target x86_64-apple-darwin
+          cp target/x86_64-apple-darwin/release/fly perarch/amd64/fly
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -o perarch/amd64/fly-checkd ./cmd/fly-checkd
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -o perarch/arm64/fly-checkd ./cmd/fly-checkd
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -o perarch/amd64/fly-sandboxd ./cmd/fly-sandboxd
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -o perarch/arm64/fly-sandboxd ./cmd/fly-sandboxd
+          tar -czf dist/fly-darwin-amd64.tar.gz -C perarch/amd64 fly fly-checkd fly-sandboxd
+          tar -czf dist/fly-darwin-arm64.tar.gz -C perarch/arm64 fly fly-checkd fly-sandboxd
           cp perarch/amd64/fly npm-bin/fly-darwin-amd64
           cp perarch/arm64/fly npm-bin/fly-darwin-arm64
+          cp perarch/amd64/fly-checkd npm-bin/fly-checkd-darwin-amd64
+          cp perarch/arm64/fly-checkd npm-bin/fly-checkd-darwin-arm64
+          cp perarch/amd64/fly-sandboxd npm-bin/fly-sandboxd-darwin-amd64
+          cp perarch/arm64/fly-sandboxd npm-bin/fly-sandboxd-darwin-arm64
           lipo -create perarch/amd64/fly perarch/arm64/fly -output dist/fly-universal
 
           # .pkg 安装包（/usr/local/bin）
           mkdir -p pkgroot/usr/local/bin
           cp dist/fly-universal pkgroot/usr/local/bin/fly
+          cp perarch/amd64/fly-checkd pkgroot/usr/local/bin/fly-checkd
+          cp perarch/amd64/fly-sandboxd pkgroot/usr/local/bin/fly-sandboxd
           pkgbuild --root pkgroot --identifier com.flylang.fly --version "$VER" dist/fly-macos-universal.pkg
 
           # .dmg 磁盘映像
           mkdir -p dmgstage
           cp dist/fly-universal dmgstage/fly
+          cp perarch/amd64/fly-checkd dmgstage/fly-checkd
+          cp perarch/amd64/fly-sandboxd dmgstage/fly-sandboxd
           cp README.md dmgstage/README.md
           hdiutil create -volname "Fly $VER" -srcfolder dmgstage -ov -format UDZO dist/fly-macos-universal.dmg
 
@@ -147,6 +180,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
       - name: Build and package
         shell: pwsh
         env:
@@ -154,20 +190,30 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           $VER = $env:VERSION.TrimStart('v')
-          $ldflags = "-s -w -X flylang/internal/version.Version=$VER -X flylang/internal/version.Commit=$env:SHA $env:VERSION_LDFLAGS"
           New-Item -ItemType Directory -Force dist, npm-bin | Out-Null
           foreach ($arch in @('amd64', 'arm64')) {
+            if ($arch -eq 'amd64') {
+              $env:FLY_VERSION = $VER; $env:FLY_COMMIT = $env:SHA
+              cargo build --release
+              Copy-Item target\release\fly.exe dist\fly.exe
+            } else {
+              $env:FLY_VERSION = $VER; $env:FLY_COMMIT = $env:SHA
+              cargo build --release --target aarch64-pc-windows-msvc
+              Copy-Item target\aarch64-pc-windows-msvc\release\fly.exe dist\fly.exe
+            }
             $env:CGO_ENABLED = '0'
             $env:GOOS = 'windows'
             $env:GOARCH = $arch
-            go build -trimpath -ldflags $ldflags -o dist\fly.exe .\cmd\fly
-            Compress-Archive -Path dist\fly.exe -DestinationPath dist\fly-windows-$arch.zip
+            go build -trimpath -o dist\fly-checkd.exe .\cmd\fly-checkd
+            go build -trimpath -o dist\fly-sandboxd.exe .\cmd\fly-sandboxd
+            Compress-Archive -Path dist\fly.exe, dist\fly-checkd.exe, dist\fly-sandboxd.exe -DestinationPath dist\fly-windows-$arch.zip
             Copy-Item dist\fly.exe npm-bin\fly-windows-$arch.exe
             if ($arch -eq 'amd64') {
               Move-Item dist\fly.exe dist\fly-installer.exe
             } else {
               Remove-Item dist\fly.exe
             }
+            Remove-Item dist\fly-checkd.exe, dist\fly-sandboxd.exe
           }
           # SFX 自解压安装包（amd64）
           & 'C:\Program Files\7-Zip\7z.exe' a -t7z -sfx -mx9 dist\fly-windows-amd64-installer.exe dist\fly-installer.exe | Out-Null
@@ -259,8 +305,21 @@ jobs:
         run: |
           set -euo pipefail
           VER=${VERSION#v}
-          chmod +x npm-bin/fly-linux-* npm-bin/fly-darwin-*
-          cp npm-bin/* npm/fly-lang/bin/
+          chmod +x npm-bin/fly-linux-* npm-bin/fly-darwin-* npm-bin/fly-checkd-* npm-bin/fly-sandboxd-*
+          cp npm-bin/fly-linux-* npm-bin/fly-darwin-* npm-bin/fly-windows-* npm/fly-lang/bin/
+          cp npm-bin/fly-checkd-linux-amd64 npm/fly-lang/bin/fly-checkd
+          cp npm-bin/fly-checkd-linux-arm64 npm/fly-lang/bin/fly-checkd-arm64
+          cp npm-bin/fly-checkd-darwin-amd64 npm/fly-lang/bin/fly-checkd-darwin
+          cp npm-bin/fly-checkd-darwin-arm64 npm/fly-lang/bin/fly-checkd-darwin-arm64
+          cp npm-bin/fly-checkd-windows-amd64.exe npm/fly-lang/bin/fly-checkd.exe
+          cp npm-bin/fly-checkd-windows-arm64.exe npm/fly-lang/bin/fly-checkd-arm64.exe
+          cp npm-bin/fly-sandboxd-linux-amd64 npm/fly-lang/bin/fly-sandboxd
+          cp npm-bin/fly-sandboxd-linux-arm64 npm/fly-lang/bin/fly-sandboxd-arm64
+          cp npm-bin/fly-sandboxd-darwin-amd64 npm/fly-lang/bin/fly-sandboxd-darwin
+          cp npm-bin/fly-sandboxd-darwin-arm64 npm/fly-lang/bin/fly-sandboxd-darwin-arm64
+          cp npm-bin/fly-sandboxd-windows-amd64.exe npm/fly-lang/bin/fly-sandboxd.exe
+          cp npm-bin/fly-sandboxd-windows-arm64.exe npm/fly-lang/bin/fly-sandboxd-arm64.exe
+          rm -f npm-bin/fly-checkd-* npm-bin/fly-sandboxd-*
           ls -la npm/fly-lang/bin/
           sed -i "s/\"version\": \"0.0.0\"/\"version\": \"$VER\"/" npm/fly-lang/package.json
           cd npm/fly-lang && npm pack --dry-run 2>&1 | tail -15

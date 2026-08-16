@@ -2,36 +2,30 @@
 
 每次更新必须发布CI和releases
 
-Fly-Lang 是用 Go 实现的 Python 安全超集转译器，CLI 正按 docs/CLI-Rust转型方案.md 迁移 Rust（P1/P2 已交付）。**总览唯一真源是 ROADMAP.md**（L/R/P/S 各阶段整合视图）；核心文件是 Plan.md（实现方案）、方案.md（语言设计）、docs/长期规划.md（L0-L5 生态细节）、docs/THREAT-MODEL.md（威胁模型与安全边界，含外部评估回应）、docs/Rust迁移方案.md（R0-R5 迁移）、docs/CLI-Rust转型方案.md（CLI 子命令 P0-P6 迁移，checker 留 Go 走 checkd 桥接）。
+Fly-Lang 是用 Rust 实现的 Python 安全超集转译器（CLI 全 Rust，checker/沙箱为 Go 守护进程，P0-P6 已全部交付）。**总览唯一真源是 ROADMAP.md**（L/R/P/S 各阶段整合视图）；核心文件是 Plan.md（实现方案）、方案.md（语言设计）、docs/长期规划.md（L0-L5 生态细节）、docs/THREAT-MODEL.md（威胁模型与安全边界，含外部评估回应）、docs/Rust迁移方案.md（R0-R5 迁移）、docs/CLI-Rust转型方案.md（CLI 子命令 P0-P6 迁移，checker 留 Go 走 checkd 桥接）。
 
 ## 构建与测试命令
 
-- 构建 Go CLI：`go build -o fly ./cmd/fly`
-- 构建 Rust CLI：`cargo build --release`（产物 `target/release/fly`，并需同目录 `fly-checkd`：`go build -o target/release/fly-checkd ./cmd/fly-checkd`）
+- 构建 Rust CLI：`cargo build --release`（产物 `target/release/fly`，并需同目录 `fly-checkd`：`go build -o target/release/fly-checkd ./cmd/fly-checkd`、`fly-sandboxd`：`go build -o target/release/fly-sandboxd ./cmd/fly-sandboxd`）
 - Rust 测试：`cargo test`；Go 测试：`go test ./...`
 - 静态检查：`go vet ./...`
-- CLI 对照验收：Rust `fly` 与 Go `fly` 对 testdata 跑 `check`/`error`，stdout/stderr/退出码逐字节一致（P2 已验收 testdata/errors 52 反例 + 全场景零差异）
-- 手动验证：`./fly build testdata/xxx.fly`（默认输出到根目录 `build/` 并保留相对路径；可加 `-o out.py` 指定，用 `python3` 实跑行为测试）
+- 版本注入：build.rs 读 `FLY_VERSION`/`FLY_COMMIT` 环境变量（CI 设 `VERSION=${github.ref_name}`、`SHA=${github.sha}`）
+- 手动验证：`./target/release/fly build testdata/xxx.fly`（默认输出到根目录 `build/` 并保留相对路径；可加 `-o out.py` 指定，用 `python3` 实跑行为测试）
 - VSCode 插件编译：`cd editor/vscode-fly && npm run compile`（改 src/ 后必须重编译）
 
 ## 架构概览
 
 ```
-cmd/fly/main.go      Go CLI 入口（build/run/sandbox/update/lsp/fmt/analyze；check/version/error 由 Rust 版接棒）
-cmd/fly-checkd/      编译检查守护进程（Rust CLI 桥接，stdio 二进制帧协议，编译管线与 fly check 相同）
-src/                 Rust CLI 源码（lib.rs 各模块：lexer/ast/parser/checkd/format/errorcode/errorinfo）
-internal/format/     `fly fmt` 格式化器（token 流级空白重排，注释保留、语义不变；前置 check 必须通过）
-internal/analyze/    `fly analyze` 静态指标（McCabe 循环复杂度/认知复杂度/嵌套/重复/注释比例等）
-cmd/fly/sandbox.go   `fly sandbox` 进程级沙箱（clone ns 建 user/mount/pid/net/uts/ipc → Landlock → seccomp 白名单 → exec python3，rlimit 由注入 python wrapper 设置）
+src/                 Rust CLI 源码（lib.rs 各模块：lexer/ast/parser/checkd/fmt/analyze/format/errorcode/errorinfo/lsp/json/http/update/version）
+cmd/fly-checkd/      编译检查守护进程（Go，stdio 二进制帧协议，编译管线与 fly check 相同）
+cmd/fly-sandboxd/    沙箱守护进程（Go：clone ns 建 user/mount/pid/net/uts/ipc → Landlock → seccomp 白名单 → exec python3，rlimit 由注入 python wrapper 设置）
 internal/lexer/      词法分析
 internal/ast/        AST 节点（必须带 position，报错需要行列号）
 internal/parser/     递归下降解析器
 internal/checker/    编译期语义检查（报错在此阶段产生）
 internal/gen/        代码生成 + 运行时注入
-internal/lsp/        LSP 服务器（JSON-RPC over stdio，零依赖：诊断/hover/forceCheck）
+internal/compile/    编译管线（CheckSource/FormatErrorColor，checkd 使用）
 internal/runtime/    go:embed 的 fly_runtime.py
-internal/version/    版本注入（Version/Commit/Repo，ldflags -X flylang/internal/version.X）
-internal/update/     自更新（GitHub Releases API + SOCKS5/HTTP 代理，零第三方依赖）
 tools/icon/          图标生成器（assets/icon.png 产物）
 editor/vscode-fly/   VSCode 插件（TextMate 高亮 + vscode-languageclient 连 fly lsp）
 npm/fly-lang/       npm 包装器（预编译二进制打进 npm 包，npm install -g fly-lang）
@@ -42,7 +36,7 @@ testdata/            正反例测试文件
 
 ## LSP 约定
 
-- `fly lsp`：stdio JSON-RPC 2.0，`Content-Length` 帧；诊断由 `compile.CheckSource`（内存字符串编译）驱动，与 `fly check` 同一管线——改 checker 行为自动同步编辑器诊断
+- `fly lsp`：stdio JSON-RPC 2.0，`Content-Length` 帧；诊断由 checkd（Go 编译管线 CheckSource）驱动，与 `fly check` 同一管线——改 checker 行为自动同步编辑器诊断
 - 支持：initialize/initialized/shutdown/exit、didOpen/didChange(full)/didSave/didClose、publishDiagnostics、hover（8 关键字文档）、自定义通知 `fly/forceCheck`
 - 行号转换：诊断 `Line/Col`（1 基）→ LSP 0 基；severity 恒为 1（Error）
 - 客户端在 `editor/vscode-fly/src/extension.ts`（vscode-languageclient v10，`start()` 返回 `Promise<void>`，不 push disposable）
@@ -50,20 +44,20 @@ testdata/            正反例测试文件
 
 ## 版本与发布
 
-- 版本注入：`go build -ldflags "-X flylang/internal/version.Version=v1.2.3 -X flylang/internal/version.Commit=<sha> -X flylang/internal/version.Repo=29anan29/Fly-lang"`，CI 用 `VERSION_LDFLAGS` 环境变量传入（见 .github/workflows/release.yml）
+- 版本注入：build.rs 读 `FLY_VERSION`/`FLY_COMMIT` 环境变量（CI 设 `VERSION=${github.ref_name}`、`SHA=${github.sha}`）；Go 侧 `go build -ldflags "-X flylang/internal/version.Version=..."` 仅用于 checkd/sandboxd 场景
 - 版本细分：`version.IsDev()` 判定（Version 空/`dev`/含 `-dev` → dev 版）；`fly version` 输出 `vX.Y.Z (release)` 或 `0.X.Y-dev (commit)`；`fly update` 只检查 GitHub 最新正式版（无渠道参数）
 - 打 `v*` tag 触发 .github/workflows/release.yml：Linux deb/tar.gz、macOS pkg/dmg、Windows zip/7z SFX installer + GitHub Release 自动发布
 - npm 发布（`npm` job）：三平台 job 交叉编译二进制上传 artifact（`npm-*`）→ `npm` job 组装到 `npm/fly-lang/bin/` → `npm pack` 出 tgz → `npm publish`（账号 anan29_china）；版本号由 tag 注入 package.json；发布依赖 `NPM_TOKEN` secret，未配置时跳过发布只留 artifact
 - VSCode Marketplace 发布（`vsix` job 内）：`vsce package` 出 vsix（attach 到 GitHub Release）后 `vsce publish --skip-duplicate`（publisher 29anan29，扩展 `29anan29.fly-lang`）；版本号由 tag 注入 editor/vscode-fly/package.json（`sed "s/\"version\": \"[0-9][^\"]*\"/..."`）；依赖 `VSCE_PAT` secret（marketplace 管理页获取），未配置时跳过发布只留 vsix artifact
 - `fly error <E码>`：查询错误码示例报错/修复方法，支持 `E0031`/`31` 格式（自动补零到 EXXXX）；错误码 E0001 起连续编号，注册表源头 `internal/ast/errors.go`（每码含 Title/Help/Note/Example），Rust 版 `src/errorinfo.rs` 由 `tools/gen_errorinfo` 生成（改 errors.go 后需 `go run ./tools/gen_errorinfo` 重新生成，errorcode.rs 有全码抽查单测）
 - 新增 errorf 消息必须登记错误码（Go：internal/ast/errors.go codeForFormat；Rust：src/diagnostic.rs error_code 双份同步）
-- `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（internal/update.AssetFor），改 CI 产物名必须同步改这里
-- 产物签名（S2）：发布时 release.yml 用 `go run ./tools/sign` 对每个产物签 `.sig`（ed25519，私钥 `SIGN_PRIVATE_KEY` secret）；客户端 `fly update` 默认强制验签（公钥内嵌 `internal/update/verify.go` 的 `SignPubKey`，密钥对用 `go run ./tools/sign genkey` 生成，私钥存 `~/.fly-sign/priv.pem`）；缺 .sig 拒绝安装，`--insecure` 跳过（仅测试源）
+- `fly update` 依赖产物命名 `fly-<os>-<arch>.tar.gz|.zip`（src/update.rs asset_for），改 CI 产物名必须同步改这里；安装包内必须含 fly + fly-checkd + fly-sandboxd 三二进制（src/update.rs extract_binaries 按名解包）
+- 产物签名（S2）：发布时 release.yml 用 `go run ./tools/sign` 对每个产物签 `.sig`（ed25519，私钥 `SIGN_PRIVATE_KEY` secret）；客户端 `fly update` 默认强制验签（公钥内嵌 src/update.rs `SIGN_PUB_KEY`，密钥对用 `go run ./tools/sign genkey` 生成，私钥存 `~/.fly-sign/priv.pem`）；缺 .sig 拒绝安装，`--insecure` 跳过（仅测试源）
 - fuzz（S3）：`go test -fuzz FuzzParse -fuzztime 60s ./internal/parser/`（另有 FuzzLexer/FuzzCheckSource）；改 parser/checker 后先跑 fuzz 再提交
 - 关键字组合（S4）：改关键字行为后必须过 `internal/checker/interaction_test.go`（22 组合）与 `redteam_test.go`（19 对抗）
-- fmt/analyze：`fly fmt` 是 token 流级空白重排（注释保留、前置 check 必须通过，语法错误文件跳过）；`fly analyze` 输出 100 制评分（McCabe 循环复杂度/认知复杂度/嵌套/重复/注释比例/命名）；改 format/analyze 后跑 `go test ./internal/format/ ./internal/analyze/` 与 `./fly fmt --check testdata/golden/`（全仓 .fly 必须 fmt 干净）；注意产物内嵌源码行列号，fmt 改变行号后必须重新生成 golden .py（`fly build -o testdata/golden/x.py testdata/golden/x.fly`）
-- 交互式 update：先 `CheckWritable` 预检，不可写时终端（TTY）自动 `sudo <exe> update <原参数>` 提权重试，非 TTY 回退"建议 sudo 重试"提示；确认用 `update.Confirm`，ANSI 颜色由 `isTTY`（ioctl TIOCGWINSZ，见 cmd/fly/tty*.go）控制
-- 代理：`--proxy` 支持 `http://`/`https://`/`socks5://[user:pass@]host:port`（socks5.go 手写实现，带认证）
+- fmt/analyze：`fly fmt` 是 token 流级空白重排（注释保留、前置 check 必须通过，语法错误文件跳过）；`fly analyze` 输出 100 制评分（McCabe 循环复杂度/认知复杂度/嵌套/重复/注释比例/命名）；实现是 Rust `src/fmt.rs` + `src/analyze.rs`（Go 版已删除）；改 fmt/analyze 后跑 `cargo test` 与 `./target/release/fly fmt --check testdata/golden/`（全仓 .fly 必须 fmt 干净）；注意产物内嵌源码行列号，fmt 改变行号后必须重新生成 golden .py（`fly build -o testdata/golden/x.py testdata/golden/x.fly`）
+- 交互式 update：先 `check_writable` 预检，不可写时终端（TTY）自动 `sudo <exe> update <原参数>` 提权重试，非 TTY 回退"建议 sudo 重试"提示；确认用 `confirm`，ANSI 颜色由 stderr is_terminal + FORCE_COLOR/NO_COLOR 控制
+- 代理：`--proxy` 支持 `http://`/`https://`/`socks5://[user:pass@]host:port`（src/http.rs 手写实现，带认证）
 
 ## 编码约定
 
@@ -90,7 +84,7 @@ testdata/            正反例测试文件
 
 ## 并发 check
 
-- `fly check <file.fly>...` 支持多文件与目录递归（.fly），goroutine 并发（信号量 `runtime.NumCPU()*2`），结果按输入顺序输出，任一失败退出码 1
+- `fly check <file.fly>...` 支持多文件与目录递归（.fly），线程并发（信号量 `available_parallelism*2`），结果按输入顺序输出，任一失败退出码 1
 - LSP 诊断仍为单线程 CheckSource（协议串行）
 
 ## 测试约定

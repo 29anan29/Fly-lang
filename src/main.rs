@@ -73,6 +73,8 @@ fn main() -> ExitCode {
         Some("run") => cmd_run(&args[1..]),
         Some("error") => cmd_error(&args[1..]),
         Some("update") => cmd_update(&args[1..]),
+        Some("fmt") => cmd_fmt(&args[1..]),
+        Some("analyze") => cmd_analyze(&args[1..]),
         Some("help") | Some("-h") | Some("--help") => {
             println!("{}", USAGE);
             ExitCode::SUCCESS
@@ -709,12 +711,18 @@ const USAGE: &str = "Fly-Lang 编译器
   fly check <file.fly>...       编译检查（支持目录递归，goroutine 并发）
   fly run <file.fly>            转译并在沙箱内执行
   fly sandbox <script.py>       进程级沙箱运行 Python（Landlock+seccomp+ns）
+  fly fmt [选项] <file.fly>...  格式化代码（token 级空白重排，注释/语义不变）
+  fly analyze <file.fly>|<dir> 代码质量报告（复杂度/嵌套/重复/注释比例等）
   fly version                  显示版本
   fly error <E码>              查询错误码（示例报错与修复方法）
   fly update [选项]             检查/更新到最新版本
 
 build 选项:
   -o <out.py>   指定输出文件（默认输出到 build/ 目录，保留相对路径）
+
+fmt 选项:
+  -w, --write   写回文件（默认输出 stdout）
+  --check       只报告需要格式化的文件（CI 用，有差异退出码 1）
 
 update 选项:
   --check       仅检查新版本（有新版退出码 2）
@@ -784,4 +792,305 @@ fn cmd_sandbox(args: &[String]) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+// cmd_fmt 格式化 .fly 文件：-w 写回（默认输出 stdout），--check 只报告差异（CI 用）。
+// 前置 check 必须通过（语法错误文件跳过），与 Go 版行为一致。
+fn cmd_fmt(args: &[String]) -> ExitCode {
+    let mut write = false;
+    let mut check_only = false;
+    let mut files: Vec<String> = Vec::new();
+    for a in args {
+        match a.as_str() {
+            "-w" | "--write" => write = true,
+            "--check" => check_only = true,
+            "-h" | "--help" => {
+                eprintln!("用法: fly fmt [-w|--check] <file.fly>...（支持目录，递归查找 .fly）");
+                return ExitCode::SUCCESS;
+            }
+            _ => files.push(a.clone()),
+        }
+    }
+    if files.is_empty() {
+        eprintln!("用法: fly fmt [-w|--check] <file.fly>...（支持目录，递归查找 .fly）");
+        return ExitCode::from(2);
+    }
+    let mut paths: Vec<String> = Vec::new();
+    for a in &files {
+        match std::fs::metadata(a) {
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return ExitCode::from(1);
+            }
+            Ok(m) => {
+                if m.is_dir() {
+                    match walk_fly(Path::new(a), &mut paths) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            eprintln!("error: {}", e);
+                            return ExitCode::from(1);
+                        }
+                    }
+                } else {
+                    paths.push(a.clone());
+                }
+            }
+        }
+    }
+    let checkd = match checkd::find_checkd() {
+        Some(c) => c,
+        None => {
+            eprintln!("error: 找不到 fly-checkd（设置 FLY_CHECKD 环境变量指定路径）");
+            return ExitCode::from(1);
+        }
+    };
+    let mut dirty = 0usize;
+    for p in &paths {
+        let src = match std::fs::read_to_string(p) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return ExitCode::from(1);
+            }
+        };
+        let has_err = match checkd::check_src(&checkd, &src, p, false) {
+            Ok(r) => !r.diags.is_empty(),
+            Err(_) => true,
+        };
+        if has_err {
+            eprintln!("fmt: 跳过 {}（存在编译错误，格式化前请先修复）", p);
+            dirty += 1;
+            continue;
+        }
+        let out = fly_lang::fmt::format(&src);
+        if out == src {
+            continue;
+        }
+        dirty += 1;
+        if check_only {
+            println!("需要格式化: {}", p);
+            continue;
+        }
+        if write {
+            if let Err(e) = std::fs::write(p, out) {
+                eprintln!("error: 写入 {} 失败: {}", p, e);
+                return ExitCode::from(1);
+            }
+            println!("ok: {}", p);
+        } else {
+            print!("--- {} ---\n{}", p, out);
+        }
+    }
+    if check_only && dirty > 0 {
+        return ExitCode::from(1);
+    }
+    ExitCode::SUCCESS
+}
+
+// cmd_analyze 输出代码质量报告：循环复杂度/认知复杂度/嵌套/函数长度/参数/
+// 重复/错误处理/注释比例/命名规范，100 制评分（与 Go 版报告口径一致）。
+#[derive(Clone)]
+struct Rep {
+    path: String,
+    met: fly_lang::analyze::Metrics,
+    bad: f64,
+}
+
+fn cmd_analyze(args: &[String]) -> ExitCode {
+    let mut files: Vec<String> = Vec::new();
+    for a in args {
+        match a.as_str() {
+            "-h" | "--help" => {
+                eprintln!("用法: fly analyze <file.fly>|<dir>...（支持目录，递归查找 .fly）");
+                return ExitCode::SUCCESS;
+            }
+            _ => files.push(a.clone()),
+        }
+    }
+    if files.is_empty() {
+        eprintln!("用法: fly analyze <file.fly>|<dir>...（支持目录，递归查找 .fly）");
+        return ExitCode::from(2);
+    }
+    let mut paths: Vec<String> = Vec::new();
+    for a in &files {
+        match std::fs::metadata(a) {
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return ExitCode::from(1);
+            }
+            Ok(m) => {
+                if m.is_dir() {
+                    match walk_fly(Path::new(a), &mut paths) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            eprintln!("error: {}", e);
+                            return ExitCode::from(1);
+                        }
+                    }
+                } else {
+                    paths.push(a.clone());
+                }
+            }
+        }
+    }
+    if paths.is_empty() {
+        eprintln!("error: 未找到 .fly 文件");
+        return ExitCode::from(1);
+    }
+    let mut reps: Vec<Rep> = Vec::new();
+    let mut total = 0.0f64;
+    let mut t_score = 0.0f64;
+    let mut worst: Vec<Rep> = Vec::new();
+    for p in &paths {
+        let src = match std::fs::read_to_string(p) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return ExitCode::from(1);
+            }
+        };
+        let Some(met) = fly_lang::analyze::analyze(&src) else {
+            eprintln!("analyze: 跳过 {}（语法错误）", p);
+            continue;
+        };
+        let (s, b) = fly_lang::analyze::score(&met);
+        let r = Rep {
+            path: p.clone(),
+            met,
+            bad: b,
+        };
+        reps.push(r.clone());
+        total += 1.0;
+        t_score += s;
+        if worst.len() < 5 {
+            worst.push(r.clone());
+            let mut i = worst.len() - 1;
+            while i > 0 && worst[i].bad > worst[i - 1].bad {
+                worst.swap(i, i - 1);
+                i -= 1;
+            }
+        } else {
+            for i in 0..worst.len() {
+                if r.bad > worst[i].bad {
+                    worst.insert(i, r.clone());
+                    worst.pop();
+                    break;
+                }
+            }
+        }
+    }
+    if reps.is_empty() {
+        eprintln!("error: 没有可分析的文件");
+        return ExitCode::from(1);
+    }
+    let avg = t_score / total;
+    println!("🌸 屎山代码分析报告 🌸\n");
+    println!("  总体评分: {:.2} / 100 - {}", avg, fly_lang::analyze::level(avg));
+    println!("  已分析 {} 个文件\n", reps.len());
+    println!("◆ 评分指标详情（平均分项）");
+    let am = aggregate(&reps);
+    println!(
+        "  ✓✓ 循环复杂度    {:.1}%  平均 {}（目标 ≤ 10）",
+        rate_of(am.cyclomatic as f64, 10.0),
+        am.cyclomatic
+    );
+    println!(
+        "  ✓✓ 认知复杂度    {:.1}%  平均 {}（目标 ≤ 15）",
+        rate_of(am.cognitive as f64, 15.0),
+        am.cognitive
+    );
+    println!(
+        "  ✓✓ 嵌套深度      {:.1}%  最大 {}（目标 ≤ 4）",
+        rate_of(am.max_nest as f64, 4.0),
+        am.max_nest
+    );
+    println!(
+        "  ✓✓ 函数长度      {:.1}%  最长 {} 行（目标 ≤ 50）",
+        rate_of(am.max_func_len as f64, 50.0),
+        am.max_func_len
+    );
+    println!(
+        "  ✓✓ 文件长度      {:.1}%  平均 {} 行（目标 ≤ 500）",
+        rate_of(am.lines as f64, 500.0),
+        am.lines
+    );
+    println!(
+        "  ✓✓ 参数数量      {:.1}%  最多 {} 个（目标 ≤ 5）",
+        rate_of(am.max_params as f64, 5.0),
+        am.max_params
+    );
+    println!(
+        "  ✓✓ 代码重复      {:.1}%  重复 {:.1}%",
+        am.repeat_rate * 100.0,
+        am.repeat_rate * 100.0
+    );
+    println!(
+        "  ✓✓ 错误处理      {:.1}%  try {} / raise {}",
+        rate_of(am.try_count as f64, (am.func_count + 1) as f64),
+        am.try_count,
+        am.raise_count
+    );
+    println!(
+        "  ✓✓ 注释比例      {:.1}%  注释行 {:.1}%",
+        100.0 - am.comment_rate * 100.0,
+        am.comment_rate * 100.0
+    );
+    println!(
+        "  ✓✓ 命名规范      {:.1}%  非 snake_case {:.1}%",
+        100.0 - am.name_rate * 100.0,
+        am.name_rate * 100.0
+    );
+    println!("\n◆ 最屎代码排行榜（糟糕指数前 5）");
+    for (i, r) in worst.iter().enumerate() {
+        println!("  {}. {:<55} (糟糕指数: {:.2})", i + 1, r.path, r.bad);
+        for f in &r.met.functions {
+            if f.complex {
+                println!(
+                    "     🔄 {}() L{}: 循环复杂度 {} 认知 {} 嵌套 {} 长度 {}",
+                    f.name, f.line, f.cyclo, f.cognit, f.nest, f.length
+                );
+            }
+        }
+    }
+    println!("\n◆ 诊断结论\n  🌸 {}", fly_lang::analyze::level(avg));
+    ExitCode::SUCCESS
+}
+
+// aggregate 汇总所有文件指标均值。
+fn aggregate(reps: &[Rep]) -> fly_lang::analyze::Metrics {
+    let n = reps.len() as f64;
+    let mut m = fly_lang::analyze::Metrics::default();
+    for r in reps {
+        m.cyclomatic += r.met.cyclomatic;
+        m.cognitive += r.met.cognitive;
+        m.max_nest += r.met.max_nest;
+        m.max_func_len += r.met.max_func_len;
+        m.lines += r.met.lines;
+        m.max_params += r.met.max_params;
+        m.try_count += r.met.try_count;
+        m.raise_count += r.met.raise_count;
+        m.repeat_rate += r.met.repeat_rate;
+        m.comment_rate += r.met.comment_rate;
+        m.name_rate += r.met.name_rate;
+    }
+    let div = |v: i64| (v as f64 / n) as i64;
+    m.cyclomatic = div(m.cyclomatic);
+    m.cognitive = div(m.cognitive);
+    m.max_nest = div(m.max_nest);
+    m.max_func_len = div(m.max_func_len);
+    m.lines = div(m.lines);
+    m.max_params = div(m.max_params);
+    m.try_count = div(m.try_count);
+    m.raise_count = div(m.raise_count);
+    m.repeat_rate /= n;
+    m.comment_rate /= n;
+    m.name_rate /= n;
+    m
+}
+
+fn rate_of(v: f64, target: f64) -> f64 {
+    if v >= target {
+        return 0.0;
+    }
+    (1.0 - v / target) * 100.0
 }
