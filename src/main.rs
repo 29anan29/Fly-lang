@@ -7,6 +7,8 @@ use std::sync::{Condvar, Mutex};
 use fly_lang::checkd;
 use fly_lang::errorcode;
 use fly_lang::format;
+use fly_lang::http::Proxy;
+use fly_lang::update::Updater;
 
 // 报错渲染的彩色判定：走 stderr（诊断输出流）。stderr 是 TTY 或 FORCE_COLOR 非空 → 彩色；
 // NO_COLOR 非空 → 强制无色。
@@ -70,12 +72,13 @@ fn main() -> ExitCode {
         Some("build") => cmd_build(&args[1..]),
         Some("run") => cmd_run(&args[1..]),
         Some("error") => cmd_error(&args[1..]),
+        Some("update") => cmd_update(&args[1..]),
         Some("help") | Some("-h") | Some("--help") => {
             println!("{}", USAGE);
             ExitCode::SUCCESS
         }
-        Some(cmd) if matches!(cmd, "sandbox" | "update" | "lsp") => {
-            eprintln!("error: 子命令 {} 尚未迁移到 Rust 核心（P1 已交付：version/help/error；P2 check；P3 build/run 已迁移）", cmd);
+        Some(cmd) if matches!(cmd, "sandbox" | "lsp") => {
+            eprintln!("error: 子命令 {} 尚未迁移到 Rust 核心（P1 已交付：version/help/error；P2 check；P3 build/run；P4 update 已迁移）", cmd);
             ExitCode::from(1)
         }
         Some(_) => {
@@ -359,6 +362,215 @@ fn colorize_example(s: &str, color: bool) -> String {
         }
     }
     out
+}
+
+// ---- ANSI 输出工具（stdout 用 out_color，stderr 用 err_color）----
+fn paint(code: &str, s: &str, on: bool) -> String {
+    if !on {
+        return s.to_string();
+    }
+    format!("\x1b[{}m{}\x1b[0m", code, s)
+}
+fn green(s: &str) -> String  { paint("32", s, out_color()) }
+fn yellow(s: &str) -> String { paint("33", s, out_color()) }
+fn cyan(s: &str) -> String   { paint("36", s, out_color()) }
+fn bold(s: &str) -> String   { paint("1", s, out_color()) }
+fn err_red(s: &str) -> String    { paint("31", s, err_color()) }
+fn err_yellow(s: &str) -> String { paint("33", s, err_color()) }
+
+// goos/goarch 映射（std::env::consts 到 Go 的 runtime.GOOS/GOARCH 命名，对齐产物命名）。
+fn goos() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "darwin",
+        other => other,
+    }
+}
+fn goarch() -> &'static str {
+    match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "x86" => "386",
+        "aarch64" => "arm64",
+        other => other,
+    }
+}
+
+fn proxy_arg(proxy: &str) -> String {
+    if proxy.is_empty() {
+        String::new()
+    } else {
+        format!(" --proxy {}", proxy)
+    }
+}
+
+// retry_with_sudo：安装目录不可写时，TTY 下自动 sudo <exe> update <原参数> 提权重试。
+fn retry_with_sudo(exe_real: &str, args: &[String]) -> Option<i32> {
+    if !std::io::stdin().is_terminal() {
+        return None;
+    }
+    if is_root() {
+        return None;
+    }
+    let mut joined = String::new();
+    for a in args {
+        if !joined.is_empty() {
+            joined.push(' ');
+        }
+        joined.push_str(a);
+    }
+    println!("{}", yellow(&format!(
+        "安装目录不可写，将以 sudo 提权重试（{} {})", exe_real, joined)));
+    let status = std::process::Command::new("sudo")
+        .arg(exe_real)
+        .args(args)
+        .status();
+    match status {
+        Ok(s) => s.code(),
+        Err(_) => {
+            eprintln!("error: 无法执行 sudo");
+            Some(1)
+        }
+    }
+}
+
+fn is_root() -> bool {
+    if cfg!(unix) {
+        let out = std::process::Command::new("id").arg("-u").output();
+        if let Ok(o) = out {
+            if let Ok(s) = String::from_utf8(o.stdout) {
+                return s.trim() == "0";
+            }
+        }
+    }
+    false
+}
+
+// cmd_update：自更新（与 Go 版 cmdUpdate 行为对齐）。
+fn cmd_update(args: &[String]) -> ExitCode {
+    let mut check_only = false;
+    let mut force = false;
+    let mut insecure = false;
+    let mut proxy = String::new();
+    let mut i = 0usize;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--check" => check_only = true,
+            "--force" => force = true,
+            "--insecure" => insecure = true,
+            "--proxy" => {
+                if i + 1 >= args.len() {
+                    eprintln!("--proxy 需要代理地址参数");
+                    return ExitCode::from(2);
+                }
+                i += 1;
+                proxy = args[i].clone();
+            }
+            other => {
+                eprintln!("未知参数 {:?}", other);
+                return ExitCode::from(2);
+            }
+        }
+        i += 1;
+    }
+    let p = if proxy.is_empty() {
+        None
+    } else {
+        match parse_proxy_arg(&proxy) {
+            Ok(p) => Some(p),
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return ExitCode::from(1);
+            }
+        }
+    };
+    let mut u = Updater::new(p);
+    u.insecure = insecure;
+    if insecure {
+        eprintln!("{}", err_yellow("警告：--insecure 已跳过产物签名验证（仅建议自建测试源使用）"));
+    }
+    let rel = match u.latest() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("error: {}（可用 --proxy socks5://host:port 走代理）", e);
+            return ExitCode::from(1);
+        }
+    };
+    if !u.is_outdated(&rel.tag_name) && !force {
+        println!("当前已是最新版本 {}", fly_lang::version::string());
+        return ExitCode::SUCCESS;
+    }
+    if check_only {
+        println!("发现新版本 {}（当前 {}）", rel.tag_name, fly_lang::version::string());
+        return ExitCode::from(2);
+    }
+    let asset = match u.asset_for(goos(), goarch(), &rel) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("error: {}", e);
+            return ExitCode::from(1);
+        }
+    };
+    let exe = match u.executable() {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {}", e);
+            return ExitCode::from(1);
+        }
+    };
+    let exe_real = std::fs::canonicalize(&exe).unwrap_or(exe.clone());
+    let install_dir = exe_real.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+    if let Err(e) = u.check_writable(&install_dir) {
+        let sudo_args: Vec<String> = std::env::args().skip(1).collect();
+        if let Some(code) = retry_with_sudo(exe_real.to_string_lossy().as_ref(), &sudo_args) {
+            return ExitCode::from(code as u8);
+        }
+        eprintln!("{}", err_red(&e));
+        eprintln!("{}", err_yellow(&format!(
+            "建议：sudo {} update{} 重试（或把 fly 安装到用户可写目录）",
+            exe.display(),
+            proxy_arg(&proxy))));
+        return ExitCode::from(1);
+    }
+
+    println!("{}", yellow(&format!(
+        "发现新版本 {}（当前 {}）", rel.tag_name, fly_lang::version::string())));
+    if !rel.body.trim().is_empty() {
+        println!("{}", cyan("更新内容："));
+        for line in rel.body.lines() {
+            let line = line.trim();
+            if !line.is_empty() {
+                println!("  {}", line);
+            }
+        }
+        println!();
+    }
+    print!("是否安装？[Y/n] ");
+    std::io::Write::flush(&mut std::io::stdout()).ok();
+    if !fly_lang::update::confirm() {
+        println!("{}", green("bye"));
+        return ExitCode::SUCCESS;
+    }
+    println!("{}", green("开始安装..."));
+    let mut log = |step: &str| println!("{}", yellow(&format!("  {}", step)));
+    if let Err(e) = u.install(&asset, &mut log) {
+        eprintln!("error: {}", err_red(&e));
+        return ExitCode::from(1);
+    }
+    println!("{}", green(&bold(&format!(
+        "已更新到 {}，请重启后生效", rel.tag_name))));
+    ExitCode::SUCCESS
+}
+
+fn parse_proxy_arg(proxy: &str) -> Result<Proxy, String> {
+    if proxy.starts_with("http://") || proxy.starts_with("https://") {
+        Ok(Proxy::Http(proxy.to_string()))
+    } else if proxy.starts_with("socks5://") || proxy.starts_with("socks5h://") {
+        Ok(Proxy::Socks5(proxy.to_string()))
+    } else {
+        Err(format!(
+            "不支持的代理协议 {:?}（支持 http://、https://、socks5://）",
+            proxy
+        ))
+    }
 }
 
 struct CheckOutcome {

@@ -8,5 +8,7 @@ pub mod format;
 pub mod lexer;
 pub mod parser;
 pub mod gen;
+pub mod http;
 pub mod typeinfer;
+pub mod update;
 pub mod version;
