@@ -1,6 +1,7 @@
 package compile
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,6 +140,12 @@ func TestSandboxEscape(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if c.module != "" {
+				probe := fmt.Sprintf("import importlib.util; raise SystemExit(0 if importlib.util.find_spec(%q) else 1)", c.module)
+				if err := exec.Command("python3", "-c", probe).Run(); err != nil {
+					t.Skipf("python 环境无 %s，跳过", c.module)
+				}
+			}
 			code, errs, err := BuildSource(c.src)
 			if len(errs) > 0 || err != nil {
 				t.Fatalf("期望 check 通过（运行时兜底场景）: %v %v", errs, err)
