@@ -8,6 +8,29 @@ use fly_lang::checkd;
 use fly_lang::errorcode;
 use fly_lang::format;
 
+// 报错渲染的彩色判定：走 stderr（诊断输出流）。stderr 是 TTY 或 FORCE_COLOR 非空 → 彩色；
+// NO_COLOR 非空 → 强制无色。
+fn err_color() -> bool {
+    if !std::env::var("NO_COLOR").map_or(true, |v| v.is_empty()) {
+        return false;
+    }
+    if !std::env::var("FORCE_COLOR").map_or(true, |v| v.is_empty()) {
+        return true;
+    }
+    std::io::stderr().is_terminal()
+}
+
+// 普通输出（stdout 流）的彩色判定。
+fn out_color() -> bool {
+    if !std::env::var("NO_COLOR").map_or(true, |v| v.is_empty()) {
+        return false;
+    }
+    if !std::env::var("FORCE_COLOR").map_or(true, |v| v.is_empty()) {
+        return true;
+    }
+    std::io::stdout().is_terminal()
+}
+
 struct Semaphore {
     count: Mutex<usize>,
     cond: Condvar,
@@ -112,7 +135,7 @@ fn cmd_build(args: &[String]) -> ExitCode {
         }
     };
 
-    let color = std::io::stdout().is_terminal() && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+    let color = err_color();
     let Some(checkd) = checkd::find_checkd() else {
         eprintln!("error: 找不到 fly-checkd（设置 FLY_CHECKD 环境变量指定路径）");
         return ExitCode::from(1);
@@ -220,7 +243,7 @@ fn cmd_run(args: &[String]) -> ExitCode {
         }
     };
 
-    let color = std::io::stdout().is_terminal() && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+    let color = err_color();
     let Some(checkd) = checkd::find_checkd() else {
         eprintln!("error: 找不到 fly-checkd（设置 FLY_CHECKD 环境变量指定路径）");
         return ExitCode::from(1);
@@ -297,8 +320,7 @@ fn cmd_error(args: &[String]) -> ExitCode {
     }
     match errorcode::info_for_code(&code) {
         Some(info) => {
-            let color = std::io::stdout().is_terminal()
-                && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+            let color = out_color();
             println!("{}", colorize_example(&info.example, color));
             ExitCode::SUCCESS
         }
@@ -386,7 +408,7 @@ fn cmd_check(args: &[String]) -> ExitCode {
 
     let nproc = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
     let sem = Semaphore::new(nproc.saturating_mul(2));
-    let color = std::io::stdout().is_terminal() && std::env::var("NO_COLOR").map_or(true, |v| v.is_empty());
+    let color = err_color();
 
     let results: Vec<CheckOutcome> = std::thread::scope(|scope| {
         let mut handles = Vec::with_capacity(files.len());
