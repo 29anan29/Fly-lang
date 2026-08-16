@@ -175,7 +175,7 @@ func cmdCheck(args []string) int {
 	failed := 0
 	for _, r := range results {
 		for _, d := range r.errs {
-			fmt.Fprintln(os.Stderr, compile.FormatErrorColor(r.path, d, colorOn))
+			fmt.Fprintln(os.Stderr, compile.FormatErrorColor(r.path, d, errOn))
 		}
 		if len(r.errs) > 0 {
 			failed++
@@ -222,7 +222,7 @@ func cmdBuild(args []string) int {
 		return 1
 	}
 	for _, d := range errs {
-		fmt.Fprintln(os.Stderr, compile.FormatErrorColor(file, d, colorOn))
+		fmt.Fprintln(os.Stderr, compile.FormatErrorColor(file, d, errOn))
 	}
 	if len(errs) > 0 {
 		return 1
@@ -287,7 +287,7 @@ func cmdUpdate(args []string) int {
 	u := update.New()
 	u.Insecure = insecure
 	if u.Insecure {
-		fmt.Fprintln(os.Stderr, yellow("警告：--insecure 已跳过产物签名验证（仅建议自建测试源使用）"))
+		fmt.Fprintln(os.Stderr, errYellow("警告：--insecure 已跳过产物签名验证（仅建议自建测试源使用）"))
 	}
 	if proxy != "" {
 		if err := u.SetProxy(proxy); err != nil {
@@ -328,8 +328,8 @@ func cmdUpdate(args []string) int {
 		if code := retryWithSudo(exeReal, os.Args[1:]); code >= 0 {
 			return code
 		}
-		fmt.Fprintln(os.Stderr, red(err.Error()))
-		fmt.Fprintln(os.Stderr, yellow(fmt.Sprintf("建议：sudo %s update%s 重试（或把 fly 安装到用户可写目录）",
+		fmt.Fprintln(os.Stderr, errRed(err.Error()))
+		fmt.Fprintln(os.Stderr, errYellow(fmt.Sprintf("建议：sudo %s update%s 重试（或把 fly 安装到用户可写目录）",
 			exe, proxyArg(proxy))))
 		return 1
 	}
@@ -359,7 +359,7 @@ func cmdUpdate(args []string) int {
 	if err := u.InstallVerbose(asset, func(step string) {
 		fmt.Println(yellow("  " + step))
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", red(err.Error()))
+		fmt.Fprintf(os.Stderr, "error: %v\n", errRed(err.Error()))
 		return 1
 	}
 	fmt.Println(green(bold(fmt.Sprintf("已更新到 %s，请重启后生效", rel.TagName))))
@@ -403,20 +403,46 @@ const (
 	ansiBold   = "1"
 )
 
-var colorOn = isTTY(os.Stdout) && os.Getenv("NO_COLOR") == ""
+// errOn：stderr 输出（诊断/错误提示）着色；outOn：stdout 输出着色。
+// 判定：NO_COLOR 非空 → 无色；FORCE_COLOR 非空 → 强制彩色；否则按对应流的 isTTY。
+var errOn = errColor()
+var outOn = outColor()
 
-func paint(code, s string) string {
-	if !colorOn {
+func errColor() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if os.Getenv("FORCE_COLOR") != "" {
+		return true
+	}
+	return isTTY(os.Stderr)
+}
+
+func outColor() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if os.Getenv("FORCE_COLOR") != "" {
+		return true
+	}
+	return isTTY(os.Stdout)
+}
+
+func paint(code, s string, on bool) string {
+	if !on {
 		return s
 	}
 	return "\x1b[" + code + "m" + s + "\x1b[0m"
 }
 
-func red(s string) string    { return paint(ansiRed, s) }
-func green(s string) string  { return paint(ansiGreen, s) }
-func yellow(s string) string { return paint(ansiYellow, s) }
-func cyan(s string) string   { return paint(ansiCyan, s) }
-func bold(s string) string   { return paint(ansiBold, s) }
+func red(s string) string    { return paint(ansiRed, s, outOn) }
+func green(s string) string  { return paint(ansiGreen, s, outOn) }
+func yellow(s string) string { return paint(ansiYellow, s, outOn) }
+func cyan(s string) string   { return paint(ansiCyan, s, outOn) }
+func bold(s string) string   { return paint(ansiBold, s, outOn) }
+
+func errRed(s string) string    { return paint(ansiRed, s, errOn) }
+func errYellow(s string) string { return paint(ansiYellow, s, errOn) }
 
 func cmdRun(args []string) int {
 	if len(args) != 1 {
@@ -430,7 +456,7 @@ func cmdRun(args []string) int {
 		return 1
 	}
 	for _, d := range errs {
-		fmt.Fprintln(os.Stderr, compile.FormatErrorColor(file, d, colorOn))
+		fmt.Fprintln(os.Stderr, compile.FormatErrorColor(file, d, errOn))
 	}
 	if len(errs) > 0 {
 		return 1
