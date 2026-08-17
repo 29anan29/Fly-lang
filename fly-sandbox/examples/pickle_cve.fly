@@ -1,7 +1,7 @@
 """
 examples/pickle_cve.fly — pickle RCE 拦截测试
 
-对应 Fly-Lang 文档中的 CVE 演示第 5 幕：
+对应 PyFly 文档中的 CVE 演示第 5 幕：
 即使绕过编译期检查，运行时沙箱（Wasm + seccomp）也能拦截攻击。
 
 本示例在 Wasm 沙箱中运行，演示多层防御：
@@ -59,7 +59,7 @@ def demonstrate_l3_wasm():
 
 def main():
     print("=" * 60)
-    print("Fly-Lang + Wasm Sandbox: pickle CVE Demo")
+    print("PyFly + Wasm Sandbox: pickle CVE Demo")
     print("=" * 60)
     print()
     demonstrate_l1_compile_time()

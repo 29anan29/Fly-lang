@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fly-Lang 一键发布：打 tag → 推远程 → 触发 CI → 可选轮询等待 Release 发布
+# PyFly 一键发布：打 tag → 推远程 → 触发 CI → 可选轮询等待 Release 发布
 # 用法（版本号自动按最新正式版 patch+1，如 v0.2.0 → v0.2.1）:
 #   tools/release.sh            # 自动发正式版（0.2.0 → v0.2.1，release）
 #   tools/release.sh dev        # 自动发 dev 版（0.2.0 → v0.2.1-dev，prerelease）

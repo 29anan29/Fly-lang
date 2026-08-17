@@ -1,7 +1,7 @@
 """
 examples/safe_math.fly — 纯计算示例（无需任何外部能力）
 
-对应 Fly-Lang 编译期检查：
+对应 PyFly 编译期检查：
   safe   → 污点追踪（此处无外部输入）
   guard  → 参数校验
   trace  → 审计日志

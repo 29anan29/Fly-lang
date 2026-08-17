@@ -1,4 +1,4 @@
-# FlyToDos —— 用 Fly-Lang（Python 3.10+ 安全超集）像素级复刻，PyQt6 桌面版
+# FlyToDos —— 用 PyFly（Python 3.10+ 安全超集）像素级复刻，PyQt6 桌面版
 # 原版：Wails + Vue（Organic Biophilic 主题）；本版：PyQt6 纯标准库数据层，零 Web 依赖。
 # 用法：pip install PyQt6 && fly build example/flytodos_qt/flytodos_qt.fly -o flytodos_qt.py && python3 flytodos_qt.py
 
@@ -640,7 +640,7 @@ class MainWindow(QMainWindow):
         lay.addStretch(1)
         self.side_count = QLabel("")
         self.side_count.setObjectName("SideCount")
-        self.side_ver = QLabel("Fly-Lang \u00b7 PyQt6")
+        self.side_ver = QLabel("PyFly \u00b7 PyQt6")
         self.side_ver.setObjectName("SideVer")
         lay.addWidget(self.side_count)
         lay.addWidget(self.side_ver)

@@ -1,6 +1,6 @@
 # fly-lang (npm)
 
-Fly-Lang 的 npm 分发包：把预编译的 Go 二进制打进 npm 包，`npm install -g` 后直接获得 `fly` 命令。
+PyFly 的 npm 分发包：把预编译的 Go 二进制打进 npm 包，`npm install -g` 后直接获得 `fly` 命令。
 
 ## 安装
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 性能基准：CPython / PyPy / Fly-Lang 转译三列对比（同一源码，诚实对比护栏开销）
+# 性能基准：CPython / PyPy / PyFly 转译三列对比（同一源码，诚实对比护栏开销）
 # 用法: bash bench/run.sh
 #   PYPY 环境变量可指定 pypy3 路径（默认自动探测：pypy3 / uv python find pypy）
 set -euo pipefail
@@ -36,7 +36,7 @@ fi
 echo ""
 
 {
-    echo "# Fly-Lang 转译性能基准"
+    echo "# PyFly 转译性能基准"
     echo ""
     echo "> 同一份源码（bench/benchmarks/，纯 Python 语法）：左列为 CPython 直接执行，"
     if [ -n "$PYPY" ]; then
