@@ -98,6 +98,24 @@ func TestRedTeamEscape(t *testing.T) {
 			note: "modBinds 白名单模块上的危险子模块",
 		},
 		{
+			name: "from import 危险导入项",
+			src:  "from random import os\n",
+			want: "禁止导入危险模块 os",
+			note: "from random import os 的导入项是危险模块（E0066 同源）",
+		},
+		{
+			name: "from import 私有导入项",
+			src:  "from random import _os\n",
+			want: "禁止导入危险模块 _os",
+			note: "from random import _os：_os 是 random 内部绑定的 os 模块（下划线私有规则）",
+		},
+		{
+			name: "模块私有属性链",
+			src:  "import random\nrandom._os.system\n",
+			want: "禁止访问模块属性 _os",
+			note: "random._os 属性链：白名单模块上的下划线私有属性拦截",
+		},
+		{
 			name: "attrgetter 危险模块",
 			src:  "import operator\noperator.attrgetter('os')\n",
 			want: "禁止访问模块属性 attrgetter",

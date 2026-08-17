@@ -610,7 +610,7 @@ var errorInfo = map[string]ErrorInfo{
 			"   | ^^^^\n" +
 			"   |\n" +
 			"   = help: 禁止调用内建 eval（沙箱逃逸风险）。eval/exec/open/getattr 等内建可直接逃逸沙箱，全部禁止调用"},
-	"E0064": {"E0064", "禁止反射访问", "__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问", "docs/报错清单.md#E0064",
+	"E0064": {"E0064", "禁止反射访问", "__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__ 及 _ 前缀私有属性）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问", "docs/报错清单.md#E0064",
 		"error[E0064]: 禁止反射访问\n" +
 			"  --> example.fly:1:9\n" +
 			"   |\n" +

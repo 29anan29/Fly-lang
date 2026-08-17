@@ -183,7 +183,7 @@ def _fly_attr(x, name, line, col):
             "%s: 沙箱: 禁止反射访问 %s" % (_fly_loc(line, col), name)
         )
     if type(x) is _fly_sb_types.ModuleType and (
-        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS
+        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS or name.startswith("_")
     ):
         _fly_sb_audit("禁止访问模块属性 " + name, line, col)
         raise FlyRuntimeError("沙箱: 禁止访问模块属性 " + name)
@@ -202,7 +202,7 @@ def _fly_setattr(x, name, v, line, col):
             "%s: 沙箱: 禁止反射赋值 %s" % (_fly_loc(line, col), name)
         )
     if type(x) is _fly_sb_types.ModuleType and (
-        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS
+        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS or name.startswith("_")
     ):
         _fly_sb_audit("禁止访问模块属性 " + name, line, col)
         raise FlyRuntimeError("沙箱: 禁止访问模块属性 " + name)
@@ -301,7 +301,7 @@ def _fly_sb_is_module(x):
 
 def _fly_sb_check_modattr(x, name, line=None, col=None):
     if _fly_sb_is_module(x) and (
-        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS
+        name in _FLY_SB_BLOCKED_MODS or name in _FLY_SB_MOD_ATTRS or name.startswith("_")
     ):
         _fly_sb_audit("禁止访问模块属性 " + name, line, col)
         raise FlyRuntimeError("沙箱: 禁止访问模块属性 " + name)
@@ -373,6 +373,14 @@ def _fly_sb_import(name, line=None, col=None, globals=None, locals=None, fromlis
         _fly_sb_audit("禁止导入私有模块 " + root, line, col)
         raise FlyRuntimeError("沙箱: 禁止导入私有模块 " + root)
     if root in _FLY_SB_ALLOWED_MODS or root in _FLY_SB_ALLOWED_DEP_MODS:
+        # fromlist 逐项校验：from random import _os / from random import os
+        # 与编译期 FromImportStmt 逐项拦截保持一致（gen 注入与 CPython
+        # IMPORT_NAME 两条路径都经此）。
+        if fromlist:
+            for item in fromlist:
+                if item in _FLY_SB_BLOCKED_MODS or item.startswith("_"):
+                    _fly_sb_audit("禁止导入模块属性 " + item, line, col)
+                    raise FlyRuntimeError("沙箱: 禁止导入模块属性 " + item)
         return _fly_sb_builtins.__import__(name, globals, locals, fromlist, level)
     _fly_sb_audit("模块 " + root + " 不在白名单", line, col)
     raise FlyRuntimeError("沙箱: 模块 " + root + " 不在白名单")
@@ -421,21 +429,21 @@ def fib(n):
     return fib(n - 1) + fib(n - 2)
 import json
 _fly_ob_b = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
-__builtins__ = _FlyOnly(('json'))
+__builtins__ = _FlyOnly(('json',))
 def parse(raw):
     return _fly_attr(json, "loads", 31, 21)(raw)
-parse = _fly_patch_builtins(parse, ('json'))
+parse = _fly_patch_builtins(parse, ('json',))
 import math
 _fly_ob_c = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
-__builtins__ = _FlyOnly(('math'))
+__builtins__ = _FlyOnly(('math',))
 def sq(x):
     return _fly_attr(math, "sqrt", 35, 25)(x)
-sq = _fly_patch_builtins(sq, ('math'))
+sq = _fly_patch_builtins(sq, ('math',))
 data = sq(4.0)
 __builtins__ = _fly_ob_c
 def double(raw):
     return _fly_attr(json, "dumps", 40, 21)(raw)
-double = _fly_patch_builtins(double, ('json'))
+double = _fly_patch_builtins(double, ('json',))
 __builtins__ = _fly_ob_b
 uid = "42"
 def use_taint():

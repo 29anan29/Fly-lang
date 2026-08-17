@@ -99,6 +99,11 @@ func (e *escapeCheck) stmt(s ast.Stmt, inOnly int) {
 	case *ast.FromImportStmt:
 		if inOnly == 0 {
 			e.checkModule(t.Module, t.Pos_)
+			// 逐项拦截（from random import _os / from random import os）：
+			// 源模块白名单放行时导入项本身可能是危险模块或其私有别名。
+			for _, it := range t.Items {
+				e.checkModule(it.Name, t.Pos_)
+			}
 		}
 	case *ast.AssignStmt:
 		for _, l := range t.Left {
@@ -409,7 +414,7 @@ func (e *escapeCheck) expr(x ast.Expr, inOnly int) {
 			e.errorf(t.Pos_, "禁止反射访问属性 %s（沙箱逃逸风险）", t.Name)
 		} else if n, ok := t.X.(*ast.Name); ok && e.modBinds[n.Name] {
 			// 白名单模块对象上的危险子模块/属性（random.os、operator.attrgetter 等）
-			if escapeModules[t.Name] || escapeModAttrs[t.Name] {
+			if escapeModules[t.Name] || escapeModAttrs[t.Name] || strings.HasPrefix(t.Name, "_") {
 				e.errorf(t.Pos_, "禁止访问模块属性 %s（沙箱逃逸风险）", t.Name)
 			}
 		}

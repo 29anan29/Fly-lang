@@ -454,7 +454,7 @@ pub static ERROR_INFO: &[ErrorInfo] = &[
     ErrorInfo {
         code: "E0064",
         title: "禁止反射访问",
-        help: "__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问",
+        help: "__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__ 及 _ 前缀私有属性）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问",
         note: "docs/报错清单.md#E0064",
         example: "error[E0064]: 禁止反射访问\n  --> example.fly:1:9\n   |\n   1 | x = obj.__class__\n   |         ^^^^^^^^\n   |\n   = help: 禁止反射访问属性 __class__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链可绕过沙箱，禁止访问",
     },

@@ -4,7 +4,7 @@ error[E0064]: 禁止反射访问
    8 | d = json.__builtins__["eval"]
    |          ^^^^^^^^^^^^^^^^^^^^
    |
-   = help: 禁止反射访问属性 __builtins__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = help: 禁止反射访问属性 __builtins__（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__ 及 _ 前缀私有属性）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -13,7 +13,7 @@ error[E0064]: 禁止反射访问
    9 | m = logging.os
    |             ^^
    |
-   = help: 禁止访问模块属性 os（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = help: 禁止访问模块属性 os（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__ 及 _ 前缀私有属性）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -22,7 +22,7 @@ error[E0064]: 禁止反射访问
   10 | f = operator.attrgetter("__class__.__bases__[0].__subclasses__")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: 禁止访问模块属性 attrgetter（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = help: 禁止访问模块属性 attrgetter（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__ 及 _ 前缀私有属性）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 
 error[E0064]: 禁止反射访问
@@ -31,6 +31,6 @@ error[E0064]: 禁止反射访问
   11 | g = random.os
    |            ^^
    |
-   = help: 禁止访问模块属性 os（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
+   = help: 禁止访问模块属性 os（沙箱逃逸风险）。__class__/__bases__/__subclasses__ 等反射链、模块属性（os/attrgetter/__builtins__ 及 _ 前缀私有属性）、异常帧 __traceback__、f-string 内联表达式可绕过沙箱，全部禁止访问
    = note: docs/报错清单.md#E0064
 

@@ -135,11 +135,12 @@ B7 间接引用。
 | E7 | sys.modules 缓存读取 | `root in sys.modules` 隐式放行（pyexpat 曾经此绕过白名单） | — | **2026-08 移除**，改为 `_FLY_SB_ALLOWED_DEP_MODS` 显式无害依赖清单（posixpath/ntpath/encodings） | 已修复（escape_binary_mods 反例锁定） |
 | E8 | 公开名二进制模块 | `pyexpat/zlib`（CPython C 扩展） | E0066 黑名单新增 | `_FLY_SB_BLOCKED_MODS` 新增 | 已修复；公开名 C 扩展走枚举、私有名走 E5 规则 |
 | E9 | 模块属性穿透 | `attrgetter/itemgetter`（点路径穿透任意对象） | E0064 编译期拦截（白名单模块对象上） | `_fly_sb_check_modattr` 运行时拦截 | 双拦截；绑定名跟踪（modBinds）防别名绕过 |
+| E13 | 模块属性面（私有/危险子模块） | `random._os`/`from random import _os`（白名单模块内部绑定的危险模块） | E0064 `_` 前缀模块属性 + E0066 from-import 逐项拦截 | `_fly_sb_check_modattr` `_` 前缀 + `_fly_sb_import` fromlist 逐项 | 2026-08 审计新增：`from random import _os; _os.system()` 可逃逸（编译期/运行时/fromlist 三层）；单元素 fromlist/mods 尾逗号元组修复（`("a")` 字符串 bug） |
 | E10 | 内建链重绑定 | `__builtins__` 属性/下标访问 | E0065 | `_FLY_SB_REFLECT` 含 `__builtins__` | 双拦截；`_FlySandbox/_FlyOnly` 均实现 `__getitem__`（CPython 对非 dict `__builtins__` 走下标） |
 | E11 | 进程逃逸（OS 面） | 网络/文件/进程/信号 | `cage` 编译期注入 | cage 装饰器 rlimit + `fly-sandboxd`（可选）clone ns + Landlock + seccomp 白名单 | 双层：rlimit 软限 + 内核级硬限 |
 | E12 | 供应链边界 | 白名单模块自身代码（requests/json/...）与 site-packages 编译产物 | 不审查（信任声明） | 模块属性拦截防止白名单模块暴露子模块 | 与 B3 同源；S6 受控包装模式（examples/third_party/） |
 
-**审计结论**：E1-E10 全部有编译期 + 运行时双覆盖；E7/E8 为 2026-08 审计新增修复。
+**审计结论**：E1-E13 全部有编译期 + 运行时双覆盖；E7/E8/E13 为 2026-08 审计新增修复。
 **持续维护要求**：CPython 新版本发布时，按"新内建/新模块/新属性"三栏逐项复核本表（见 CI 矩阵）。
 
 ### 6.2 不兼容模式清单（"安全受限超集"的精确边界）

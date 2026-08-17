@@ -754,13 +754,10 @@ impl Gen<'_> {
                 self.indent_line();
                 let mod_var = format!("_fly_sb_mod_{}", module.replace('.', "_"));
                 let fromlist: Vec<&str> = items.iter().map(|it| it.name.as_str()).collect();
+                let fl = quote_tuple(&fromlist, "\"", ", ");
                 self.w(&format!(
-                    "{} = _fly_sb_import(\"{}\", {}, {}, fromlist=(\"{}\"))\n",
-                    mod_var,
-                    module,
-                    pos.line,
-                    pos.col,
-                    fromlist.join("\",\"")
+                    "{} = _fly_sb_import(\"{}\", {}, {}, fromlist=({}))\n",
+                    mod_var, module, pos.line, pos.col, fl
                 ));
                 for it in items {
                     self.indent_line();
@@ -1362,7 +1359,22 @@ impl Gen<'_> {
 
 fn mods_lit(mods: &[String]) -> String {
     let q: Vec<String> = mods.iter().map(|m| format!("'{}'", m)).collect();
-    format!("({})", q.join(", "))
+    format!("({})", quote_tuple(&q, "", ", "))
+}
+
+// quote_tuple 生成 Python 字符串元组字面量；单元素必须带尾逗号
+// （("a") 是字符串而非元组，fromlist/mods 都会静默出错）。
+// qmark 为 '' 时元素已带引号（mods_lit 传过来的是 'math' 形式）。
+fn quote_tuple<S: AsRef<str>>(ss: &[S], qmark: &str, joiner: &str) -> String {
+    let q: Vec<String> = ss
+        .iter()
+        .map(|s| format!("{}{}{}", qmark, s.as_ref(), qmark))
+        .collect();
+    let mut joined = q.join(joiner);
+    if q.len() == 1 {
+        joined.push(',');
+    }
+    joined
 }
 
 // py_quote 复刻 Go strconv.Quote 语义（产物是 Python，转义序列两者通用）。

@@ -541,7 +541,7 @@ func (g *Gen) stmt(s ast.Stmt) {
 		for i, it := range t.Items {
 			fromlist[i] = it.Name
 		}
-		g.w(fmt.Sprintf("%s = _fly_sb_import(\"%s\", %d, %d, fromlist=(\"%s\"))\n", modVar, t.Module, t.Pos_.Line, t.Pos_.Col, strings.Join(fromlist, "\",\"")))
+		g.w(fmt.Sprintf("%s = _fly_sb_import(\"%s\", %d, %d, fromlist=(%s))\n", modVar, t.Module, t.Pos_.Line, t.Pos_.Col, quoteTuple(fromlist, `"`, ", ")))
 		for _, it := range t.Items {
 			g.indentLine()
 			bind := it.Name
@@ -1059,11 +1059,21 @@ func (g *Gen) callArgs(params []ast.Param) {
 }
 
 func modsLit(mods []string) string {
-	q := make([]string, len(mods))
-	for i, m := range mods {
-		q[i] = "'" + m + "'"
+	return "(" + quoteTuple(mods, "'", ", ") + ")"
+}
+
+// quoteTuple 生成 Python 字符串元组字面量；单元素必须带尾逗号
+// （("a") 是字符串而非元组，fromlist/mods 都会静默出错）。
+func quoteTuple(ss []string, qmark, joiner string) string {
+	q := make([]string, len(ss))
+	for i, s := range ss {
+		q[i] = qmark + s + qmark
 	}
-	return "(" + strings.Join(q, ", ") + ")"
+	joined := strings.Join(q, joiner)
+	if len(q) == 1 {
+		joined += ","
+	}
+	return joined
 }
 
 func (g *Gen) slicePart(e ast.Expr) {
