@@ -163,6 +163,24 @@ func TestRedTeamEscape(t *testing.T) {
 			want: "敏感数据",
 			note: "mask 声明即敏感源，流入 print 输出上下文",
 		},
+		{
+			name: "only 块内 __builtins__ 访问",
+			src:  "only (json):\n    x = __builtins__\n",
+			want: "不在白名单",
+			note: "only 白名单代理的 __import__ 绕过入口，编译期直接拦",
+		},
+		{
+			name: "only 块内 escape 危险模块导入",
+			src:  "only (json):\n    import gc\n",
+			want: "不在白名单",
+			note: "gc 不在 onlyDeny 原名单但在 escapeModules（BLOCKED），编译期联合拦截",
+		},
+		{
+			name: "only 块内参数默认值危险名",
+			src:  "only (json):\n    def f(x=os):\n        return x\n",
+			want: "不在白名单",
+			note: "refCollector 必须遍历参数默认值",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

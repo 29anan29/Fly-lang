@@ -234,3 +234,22 @@ func TestEscapeNoFalsePositive(t *testing.T) {
 	noErr(t, "import math\nprint(f\"sqrt: {math.sqrt(2)}\")\n")
 	noErr(t, "def f():\n    s = \"__class__\"\n    return s\nprint(f())\n")
 }
+
+func TestCheckArgsStar(t *testing.T) {
+	noErr(t, "def f(a, *rest):\n    return a\nf(1, 2, 3, 4)\n")
+	noErr(t, "def f(a, *rest, **kw):\n    return a\nf(1, 2, 3, 4, 5)\n")
+	wantErr(t, "def f(a):\n    return a\nf(1, 2, 3)\n", "最多接受 1 个位置参数")
+	wantErr(t, "def f(a, **kw):\n    return a\nf(1, 2, 3)\n", "最多接受 1 个位置参数")
+}
+
+func TestAttrTaintWrongSymbol(t *testing.T) {
+	// 属性写污染必须记录到基对象符号：c.x = data 不得污染与属性同名的无关变量 x
+	msgs := checkSrc(t, "safe data\nclass C:\n    pass\nx = C()\nc = C()\nc.x = data\neval(x.x)\n")
+	for _, m := range msgs {
+		if strings.Contains(m, "危险汇点") {
+			t.Fatalf("x.x 未被污染却误报危险汇点: %v", msgs)
+		}
+	}
+	// 同符号的 attr 读仍必须追到污染（反向验证）
+	wantErr(t, "safe data\nclass C:\n    pass\nc = C()\nc.x = data\neval(c.x)\n", "危险汇点")
+}

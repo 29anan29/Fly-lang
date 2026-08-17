@@ -492,10 +492,14 @@ func (u *uCheck) checkArgs(t *ast.CallExpr) {
 	fn := sym.Func
 	req := 0
 	total := 0
+	hasStar := false
 	names := make([]string, 0, len(fn.Params))
 	for _, p := range fn.Params {
 		if p.Name == "" {
 			continue
+		}
+		if p.Star {
+			hasStar = true
 		}
 		if !p.DblStar {
 			names = append(names, p.Name)
@@ -519,7 +523,7 @@ func (u *uCheck) checkArgs(t *ast.CallExpr) {
 			return
 		}
 	}
-	if len(t.Args) > len(names) {
+	if !hasStar && len(t.Args) > len(names) {
 		u.errorf(t.Pos_, "函数 %s 最多接受 %d 个位置参数（实际 %d 个）", n.Name, len(names), len(t.Args))
 		return
 	}

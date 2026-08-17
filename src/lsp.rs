@@ -34,6 +34,8 @@ pub struct Server {
     checkd_path: PathBuf,
     shut_ok: Mutex<bool>,
     out: Mutex<Option<mpsc::Sender<Vec<u8>>>>,
+    pending: Mutex<HashMap<String, u64>>,
+    worker_on: Mutex<bool>,
 }
 
 impl Server {
@@ -45,6 +47,8 @@ impl Server {
             checkd_path: path,
             shut_ok: Mutex::new(false),
             out: Mutex::new(None),
+            pending: Mutex::new(HashMap::new()),
+            worker_on: Mutex::new(false),
         })
     }
 
@@ -239,14 +243,29 @@ impl Server {
         let version = doc.version;
         let uri = uri.to_string();
         drop(docs);
-        // debounce：120ms 后检查，期间再次改动则跳过（版本号对比）。
+        // debounce：单一工作线程 120ms 周期扫描待检清单，期间再次改动只更新版本号
+        // （避免每次编辑 spawn 线程，发布过期诊断的窗口由版本号对比消除）。
+        self.pending.lock().unwrap().insert(uri, version);
+        self.ensure_worker();
+    }
+
+    fn ensure_worker(self: &Arc<Server>) {
+        let mut w = self.worker_on.lock().unwrap();
+        if *w {
+            return;
+        }
+        *w = true;
+        drop(w);
         let this = Arc::clone(self);
-        std::thread::spawn(move || {
+        std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_millis(DEBOUNCE_MS));
-            let docs = this.docs.lock().unwrap();
-            if let Some(d) = docs.get(&uri) {
-                if d.version == version {
-                    drop(docs);
+            let jobs: Vec<(String, u64)> = {
+                let mut p = this.pending.lock().unwrap();
+                p.drain().collect()
+            };
+            for (uri, version) in jobs {
+                let cur = this.docs.lock().unwrap().get(&uri).map(|d| d.version);
+                if cur == Some(version) {
                     this.check_uri(&uri);
                 }
             }
@@ -510,7 +529,6 @@ fn write_message(w: &mut impl Write, msg: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
     use std::process::{Command, Stdio};
 
     fn start_lsp() -> std::process::Child {

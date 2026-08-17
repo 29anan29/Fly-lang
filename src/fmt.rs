@@ -273,7 +273,8 @@ fn decide_space(
         | TokenType::Ne
         | TokenType::And
         | TokenType::Or => return true,
-        TokenType::Is | TokenType::In => return pt != TokenType::Not,
+        TokenType::Is => return pt != TokenType::Not,
+        TokenType::In => return true,
         TokenType::Not => return true,
         _ => {}
     }
@@ -338,6 +339,13 @@ mod tests {
         let src = "x = 1\n\n\n\ny = 2\n";
         let out = format(src);
         assert_eq!(out, "x = 1\n\ny = 2\n");
+    }
+
+    #[test]
+    fn fmt_not_in_keeps_space() {
+        let src = "if x not in y:\n    pass\nz = 1 in (1, 2)\n";
+        let out = format(src);
+        assert_eq!(out, "if x not in y:\n    pass\nz = 1 in (1, 2)\n");
     }
 
     #[test]

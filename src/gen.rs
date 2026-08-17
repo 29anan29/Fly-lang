@@ -697,31 +697,35 @@ impl Gen<'_> {
         let base = op.trim_end_matches('=');
         if left.len() == 1 {
             if let Expr::Subscript { x, index, .. } = &left[0] {
+                self.nc += 1;
+                let tx = format!("_fly_aa_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
+                self.nc += 1;
+                let ti = format!("_fly_ab_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
                 self.indent_line();
-                self.w("_fly_set(");
+                self.w(&format!("{} = ", tx));
                 self.expr(x, PREC_COND);
-                self.w(", ");
-                self.index_arg(index);
-                self.w(", _fly_binop(_fly_get(");
-                self.expr(x, PREC_COND);
-                self.w(", ");
-                self.index_arg(index);
-                self.w(&format!(", {}, {}), ", pos.line, pos.col));
-                self.expr(right, PREC_COND);
-                self.w(&format!(", {:?}, {}, {}), {}, {})", op_name(base), pos.line, pos.col, pos.line, pos.col));
                 self.w("\n");
+                self.indent_line();
+                self.w(&format!("{} = ", ti));
+                self.index_arg(index);
+                self.w("\n");
+                self.indent_line();
+                self.w(&format!("_fly_set({}, {}, _fly_binop(_fly_get({}, {}, {}, {}), ", tx, ti, tx, ti, pos.line, pos.col));
+                self.expr(right, PREC_COND);
+                self.w(&format!(", {:?}, {}, {}), {}, {})\n", op_name(base), pos.line, pos.col, pos.line, pos.col));
                 return;
             }
             if let Expr::Attr { x, name, .. } = &left[0] {
+                self.nc += 1;
+                let tx = format!("_fly_aa_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
                 self.indent_line();
-                self.w("_fly_setattr(");
+                self.w(&format!("{} = ", tx));
                 self.expr(x, PREC_COND);
-                self.w(&format!(", {}, _fly_binop(_fly_attr(", py_quote(name)));
-                self.expr(x, PREC_COND);
-                self.w(&format!(", {}, {}, {}), ", py_quote(name), pos.line, pos.col));
-                self.expr(right, PREC_COND);
-                self.w(&format!(", {:?}, {}, {}), {}, {})", op_name(base), pos.line, pos.col, pos.line, pos.col));
                 self.w("\n");
+                self.indent_line();
+                self.w(&format!("_fly_setattr({}, {}, _fly_binop(_fly_attr({}, {}, {}, {}), ", tx, py_quote(name), tx, py_quote(name), pos.line, pos.col));
+                self.expr(right, PREC_COND);
+                self.w(&format!(", {:?}, {}, {}), {}, {})\n", op_name(base), pos.line, pos.col, pos.line, pos.col));
                 return;
             }
         }
@@ -1648,12 +1652,17 @@ fn needs_guard(stmts: &[Stmt]) -> bool {
                 }
             }
             Stmt::Only { body, .. } => {
-                if needs_only(body) {
+                if needs_guard(body) || needs_only(body) {
                     return true;
                 }
             }
             Stmt::Trace { body, .. } => {
-                if needs_trace(body) {
+                if needs_guard(body) || needs_trace(body) {
+                    return true;
+                }
+            }
+            Stmt::Cage { body, .. } => {
+                if needs_guard(body) || needs_cage(body) {
                     return true;
                 }
             }

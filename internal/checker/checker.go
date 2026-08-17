@@ -361,12 +361,14 @@ func (c *Checker) propagateTaint(l ast.Expr, rt Taint) {
 			sym.Taint.Mask = sym.Taint.Mask || rt.Mask
 		}
 	case *ast.AttrExpr:
-		if sym, ok := c.cur.Lookup(n.Name); ok && rt.dirty() {
-			if sym.Attrs == nil {
-				sym.Attrs = make(map[string]Taint)
+		if base, ok := n.X.(*ast.Name); ok {
+			if sym, ok := c.cur.Lookup(base.Name); ok && rt.dirty() {
+				if sym.Attrs == nil {
+					sym.Attrs = make(map[string]Taint)
+				}
+				cur := sym.Attrs[n.Name]
+				sym.Attrs[n.Name] = Taint{Safe: cur.Safe || rt.Safe, Mask: cur.Mask || rt.Mask}
 			}
-			cur := sym.Attrs[n.Name]
-			sym.Attrs[n.Name] = Taint{Safe: cur.Safe || rt.Safe, Mask: cur.Mask || rt.Mask}
 		}
 		c.taintObject(n.X, rt)
 	case *ast.TupleLit:

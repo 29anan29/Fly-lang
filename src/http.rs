@@ -50,6 +50,25 @@ fn parse_url(url: &str) -> (String, u16, String, String) {
     (host.to_string(), port, path.to_string(), url.to_string())
 }
 
+// resolve_redirect 拼接重定向 Location：绝对 https 原样；相对路径基于当前
+// URL 的 scheme/host/目录解析；http 明文拒绝（防降级）。
+fn resolve_redirect(cur: &str, loc: &str) -> Result<String, String> {
+    if loc.starts_with("https://") {
+        return Ok(loc.to_string());
+    }
+    if loc.starts_with("http://") {
+        return Err("拒绝 HTTP 明文重定向".to_string());
+    }
+    let (h, p, path, _) = parse_url(cur);
+    let prefix = format!("https://{}:{}", h, p);
+    if loc.starts_with('/') {
+        Ok(format!("{}{}", prefix, loc))
+    } else {
+        let dir = path.rsplit_once('/').map(|(d, _)| d.to_string()).unwrap_or_default();
+        Ok(format!("{}{}/{}", prefix, dir, loc))
+    }
+}
+
 impl HttpClient {
     pub fn new(proxy: Option<Proxy>) -> Self {
         HttpClient { proxy }
@@ -145,24 +164,7 @@ impl HttpClient {
             let resp = parse_http_response(&raw)?;
             if (300..400).contains(&resp.status) {
                 if let Some(loc) = resp.header("location") {
-                    let next = if loc.starts_with("http") {
-                        loc.to_string()
-                    } else {
-                        let (h, p, _, base) = parse_url(&cur);
-                        let (_, base_host) = base.rsplit_once("://").unwrap_or(("", &base));
-                        let prefix = format!("{}://{}:{}", "https", h, p);
-                        let joined = if loc.starts_with('/') {
-                            format!("{}{}", prefix, loc)
-                        } else {
-                            let dir = base_host
-                                .rsplit_once('/')
-                                .map(|(d, _)| d.to_string())
-                                .unwrap_or_else(|| base_host.to_string());
-                            format!("{}/{}", dir, loc)
-                        };
-                        joined
-                    };
-                    cur = next;
+                    cur = resolve_redirect(&cur, loc)?;
                     continue;
                 }
                 return Err(format!("重定向响应缺少 Location: HTTP {}", resp.status));
@@ -382,5 +384,26 @@ mod tests {
         let r = parse_http_response(raw).unwrap();
         assert_eq!(r.status, 302);
         assert_eq!(r.header("location"), Some("https://example.com/x"));
+    }
+
+    #[test]
+    fn resolve_redirect_relative() {
+        assert_eq!(
+            resolve_redirect("https://a.com/v1/api", "next").unwrap(),
+            "https://a.com:443/v1/next"
+        );
+        assert_eq!(
+            resolve_redirect("https://a.com/v1/api", "/root").unwrap(),
+            "https://a.com:443/root"
+        );
+        assert_eq!(
+            resolve_redirect("https://a.com", "x").unwrap(),
+            "https://a.com:443/x"
+        );
+        assert_eq!(
+            resolve_redirect("https://a.com/p", "https://b.com/z").unwrap(),
+            "https://b.com/z"
+        );
+        assert!(resolve_redirect("https://a.com/p", "http://b.com/z").is_err());
     }
 }

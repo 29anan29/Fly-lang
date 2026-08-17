@@ -296,14 +296,15 @@ impl Lexer {
             return self.scan_string("");
         }
         if c == b'.' && self.peek(1) == b'.' && self.peek(2) == b'.' {
+            let start = self.pos();
             self.advance();
             self.advance();
             self.advance();
             return Token {
                 ty: TokenType::Ellipsis,
                 lit: "...".to_string(),
-                line: self.line,
-                col: self.col,
+                line: start.line,
+                col: start.col,
             };
         }
         if c == b'.' && self.peek(1) >= b'0' && self.peek(1) <= b'9' {

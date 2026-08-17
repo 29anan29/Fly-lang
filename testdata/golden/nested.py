@@ -348,7 +348,9 @@ __builtins__ = _FlySandbox()
 def counter():
     n = [0]
     def inc():
-        _fly_set(n, 0, _fly_binop(_fly_get(n, 0, 4, 10), 1, "add", 4, 10), 4, 10)
+        _fly_aa_b = n
+        _fly_ab_c = 0
+        _fly_set(_fly_aa_b, _fly_ab_c, _fly_binop(_fly_get(_fly_aa_b, _fly_ab_c, 4, 10), 1, "add", 4, 10), 4, 10)
         return _fly_get_plain(n, 0, 5, 17)
     return inc
 def compose(f, g):

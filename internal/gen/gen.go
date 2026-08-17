@@ -386,11 +386,15 @@ func needsGuard(stmts []ast.Stmt) bool {
 				}
 			}
 		case *ast.OnlyStmt:
-			if needsOnly(t.Body) {
+			if needsGuard(t.Body) || needsOnly(t.Body) {
 				return true
 			}
 		case *ast.TraceStmt:
-			if needsTrace(t.Body) {
+			if needsGuard(t.Body) || needsTrace(t.Body) {
+				return true
+			}
+		case *ast.CageStmt:
+			if needsGuard(t.Body) || needsCage(t.Body) {
 				return true
 			}
 		}
@@ -1104,28 +1108,34 @@ func (g *Gen) augAssign(t *ast.AssignStmt) {
 	op := strings.TrimSuffix(t.Op, "=")
 	if len(t.Left) == 1 {
 		if l, ok := t.Left[0].(*ast.SubscriptExpr); ok {
+			g.nc++
+			tx := "_fly_aa_" + string(rune('a'+g.nc))
+			g.nc++
+			ti := "_fly_ab_" + string(rune('a'+g.nc))
 			g.indentLine()
-			g.w("_fly_set(")
+			g.w(tx + " = ")
 			g.expr(l.X, precCond)
-			g.w(", ")
+			g.w("\n")
+			g.indentLine()
+			g.w(ti + " = ")
 			g.indexArg(l.Index)
-			g.w(", _fly_binop(_fly_get(")
-			g.expr(l.X, precCond)
-			g.w(", ")
-			g.indexArg(l.Index)
-			g.w(fmt.Sprintf(", %d, %d), ", t.Pos_.Line, t.Pos_.Col))
+			g.w("\n")
+			g.indentLine()
+			g.w(fmt.Sprintf("_fly_set(%s, %s, _fly_binop(_fly_get(%s, %s, %d, %d), ", tx, ti, tx, ti, t.Pos_.Line, t.Pos_.Col))
 			g.expr(t.Right, precCond)
 			g.w(fmt.Sprintf(", %q, %d, %d), %d, %d)", opName(op), t.Pos_.Line, t.Pos_.Col, t.Pos_.Line, t.Pos_.Col))
 			g.w("\n")
 			return
 		}
 		if l, ok := t.Left[0].(*ast.AttrExpr); ok {
+			g.nc++
+			tx := "_fly_aa_" + string(rune('a'+g.nc))
 			g.indentLine()
-			g.w("_fly_setattr(")
+			g.w(tx + " = ")
 			g.expr(l.X, precCond)
-			g.w(fmt.Sprintf(", %q, _fly_binop(_fly_attr(", l.Name))
-			g.expr(l.X, precCond)
-			g.w(fmt.Sprintf(", %q, %d, %d), ", l.Name, t.Pos_.Line, t.Pos_.Col))
+			g.w("\n")
+			g.indentLine()
+			g.w(fmt.Sprintf("_fly_setattr(%s, %q, _fly_binop(_fly_attr(%s, %q, %d, %d), ", tx, l.Name, tx, l.Name, t.Pos_.Line, t.Pos_.Col))
 			g.expr(t.Right, precCond)
 			g.w(fmt.Sprintf(", %q, %d, %d), %d, %d)", opName(op), t.Pos_.Line, t.Pos_.Col, t.Pos_.Line, t.Pos_.Col))
 			g.w("\n")

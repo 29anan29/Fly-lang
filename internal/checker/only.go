@@ -15,6 +15,7 @@ var onlyDeny = map[string]bool{
 	"marshal": true, "importlib": true, "runpy": true, "code": true, "pty": true,
 	"requests": true, "urllib": true, "pathlib": true, "tempfile": true,
 	"sqlite3": true, "base64": true, "shelve": true, "dbm": true, "webbrowser": true,
+	"__builtins__": true,
 }
 
 func (c *Checker) checkOnly(t *ast.OnlyStmt) {
@@ -30,7 +31,7 @@ func (c *Checker) checkOnly(t *ast.OnlyStmt) {
 		if allowed[r.Name] {
 			continue
 		}
-		if onlyDeny[r.Name] {
+		if onlyDeny[r.Name] || escapeModules[r.Name] {
 			c.errorf(r.Pos(), "only 块禁止访问 %s（不在白名单 %v）", r.Name, t.Modules)
 		}
 	}
@@ -129,6 +130,9 @@ func (rc *refCollector) stmt(s ast.Stmt) {
 		for _, p := range t.Params {
 			if p.Name != "" {
 				rc.skip[p.Name] = true
+			}
+			if p.Default != nil {
+				rc.expr(p.Default)
 			}
 		}
 		for _, d := range t.Decorators {

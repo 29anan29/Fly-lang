@@ -20,6 +20,8 @@ class _FlyOnly:
         self._mods = frozenset(mods)
 
     def __getattr__(self, name):
+        if name == "__import__":
+            return _fly_sb_import
         if name.startswith("__") and name.endswith("__"):
             return _fly_sb_builtins.getattr(_fly_builtins, name)
         if name.startswith("_fly_") or name in ("FlyRuntimeError", "GuardError"):

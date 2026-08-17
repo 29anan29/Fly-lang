@@ -1,7 +1,7 @@
 """方案.md P3 验收：示例 2/7/8 生成与行为验证"""
 
 # ========== 2. only ==========
-only (json, math):
+only(json, math):
     def parse(raw):
         data = json.loads(raw)
         return math.sqrt(data["x"])

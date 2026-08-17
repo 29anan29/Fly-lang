@@ -20,7 +20,7 @@
 | 关键字 | 编译期检查（checker） | 运行时注入（gen） | 拦截时机 |
 |--------|----------------------|-------------------|----------|
 | `safe` | 污点数据流：`input()/request.*/os.environ/safe 参数` → 赋值/容器/属性/参数传播 → 危险汇点（pickle.loads、eval/exec/compile、os.system、subprocess.*、SQL execute）；`int()/float()/bool()` 清洗即放行；import 别名溯源（`pickle as p`、`from pickle import loads as l`） | 无（纯编译期） | 编译失败 |
-| `only` | 白名单块：访问黑名单名称（33 项，含 pickle/marshal/os/subprocess/eval）编译报错 | `__builtins__ = _FlyOnly(mods)` 白名单代理（运行时兜底） | 编译失败 + 运行时兜底 |
+| `only` | 白名单块：访问黑名单名称（onlyDeny 33 项 ∪ escapeModules 90 项，含 __builtins__/pickle/marshal/os/subprocess/eval/gc/inspect/io）编译报错；块内 import 逐项过 escape 名单 | `__builtins__ = _FlyOnly(mods)` 白名单代理（运行时兜底）；`_FlyOnly.__getattr__("__import__")` 恒返回受限 `_fly_sb_import` | 编译失败 + 运行时兜底 |
 | `lock` | 常量再赋值/删除、`globals()['X']`/`vars()['X']`/`setattr` 反射读写锁定名 | 无 | 编译失败 |
 | `mask` | 敏感数据流入输出上下文（print/logging/f-string 参数） | 无 | 编译失败 |
 | `cage` | 无（纯 gen+runtime） | `@_fly_cage(max_time, max_memory)`：SIGALRM + RLIMIT_AS | 运行时 |
@@ -139,8 +139,9 @@ B7 间接引用。
 | E10 | 内建链重绑定 | `__builtins__` 属性/下标访问 | E0065 | `_FLY_SB_REFLECT` 含 `__builtins__` | 双拦截；`_FlySandbox/_FlyOnly` 均实现 `__getitem__`（CPython 对非 dict `__builtins__` 走下标） |
 | E11 | 进程逃逸（OS 面） | 网络/文件/进程/信号 | `cage` 编译期注入 | cage 装饰器 rlimit + `fly-sandboxd`（可选）clone ns + Landlock + seccomp 白名单 | 双层：rlimit 软限 + 内核级硬限 |
 | E12 | 供应链边界 | 白名单模块自身代码（requests/json/...）与 site-packages 编译产物 | 不审查（信任声明） | 模块属性拦截防止白名单模块暴露子模块 | 与 B3 同源；S6 受控包装模式（examples/third_party/） |
+| E14 | only 代理 dunder 绕过 | only 块内 `__builtins__["__import__"]`/`__builtins__.__import__` 取原始 `builtins.__import__`（非 dict `__builtins__` 走 `__getitem__`→`__getattr__` dunder 分支放行）→ 绕过 BLOCKED 名单导入 os 并执行 | E0044：onlyDeny 纳入 `__builtins__`；onlyDeny ∪ escapeModules 联合拦截（gc/inspect/io 等原缺口） | `_FlyOnly.__getattr__` 特判 `__import__` → 返回受限 `_fly_sb_import` | 2026-08 审计新增：dunder 分支曾放行原始 `builtins.__import__`；编译期只拦 onlyDeny 33 项、`gc` 等 escapeModules 成员可编译通过（运行时仍拦）——现双层补齐 |
 
-**审计结论**：E1-E13 全部有编译期 + 运行时双覆盖；E7/E8/E13 为 2026-08 审计新增修复。
+**审计结论**：E1-E14 全部有编译期 + 运行时双覆盖；E7/E8/E13/E14 为 2026-08 审计新增修复。
 **持续维护要求**：CPython 新版本发布时，按"新内建/新模块/新属性"三栏逐项复核本表（见 CI 矩阵）。
 
 ### 6.2 不兼容模式清单（"安全受限超集"的精确边界）

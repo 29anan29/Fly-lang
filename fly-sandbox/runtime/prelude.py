@@ -90,15 +90,31 @@ def _fly_cage(max_time: str = "5s", max_memory: str = "100MB"):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Python 层软超时（实际硬限制由 Wasm fuel 提供）
-            timer = threading.Timer(
-                timeout_sec,
-                lambda: (_ for _ in ()).throw(
-                    ResourceExhaustedError(
-                        f"[PyFly] cage: timeout after {max_time}"
+            # Python 层软超时（实际硬限制由 Wasm fuel 提供）。
+            # threading.Timer 在后台线程抛异常无法中断被装饰函数，改为经
+            # PyThreadState_SetAsyncExc 把异常投递到主线程（Wasm 单线程
+            # 下即目标线程）；ctypes 不可用时静默回退（与 Wasm fuel 兜底一致）。
+            main_tid = threading.get_ident()
+
+            def _timeout():
+                try:
+                    import ctypes
+                    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                        ctypes.c_ulong(main_tid),
+                        ctypes.py_object(
+                            ResourceExhaustedError(
+                                f"[PyFly] cage: timeout after {max_time}"
+                            )
+                        ),
                     )
-                )
-            )
+                    if res > 1:
+                        ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                            ctypes.c_ulong(main_tid), ctypes.py_object(None)
+                        )
+                except Exception:
+                    pass
+
+            timer = threading.Timer(timeout_sec, _timeout)
             timer.start()
             try:
                 return func(*args, **kwargs)

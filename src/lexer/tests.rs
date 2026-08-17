@@ -250,6 +250,14 @@ fn positions() {
 }
 
 #[test]
+fn ellipsis_position() {
+    let toks = tokenize("x = ...\n");
+    assert_eq!(toks[2].ty, TokenType::Ellipsis);
+    assert_eq!((toks[2].line, toks[2].col), (1, 5));
+    assert_eq!(toks[2].lit, "...");
+}
+
+#[test]
 fn errors() {
     let cases = [
         ("unterminated string", "s = \"abc"),

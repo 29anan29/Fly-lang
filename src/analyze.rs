@@ -480,7 +480,7 @@ pub fn score(m: &Metrics) -> (f64, f64) {
     }
     deduct(m.repeat_rate * 20.0, &mut b);
     if m.func_count > 0 {
-        let covered = m.try_count as f64 / m.func_count as f64;
+        let covered = (m.try_count as f64 / m.func_count as f64).min(1.0);
         deduct((1.0 - covered) * 6.0, &mut b);
     }
     if m.comment_rate < 0.05 {
@@ -493,6 +493,9 @@ pub fn score(m: &Metrics) -> (f64, f64) {
     deduct(m.name_rate * 20.0, &mut b);
     if b > 100.0 {
         b = 100.0;
+    }
+    if b < 0.0 {
+        b = 0.0;
     }
     (100.0 - b, b)
 }
@@ -535,6 +538,25 @@ mod tests {
         let (s, b) = score(&m);
         assert_eq!(s, 96.0);
         assert_eq!(b, 4.0);
+    }
+
+    #[test]
+    fn score_coverage_never_negative() {
+        // try 块数超过函数数时覆盖度必须夹到 1.0，不得负扣分导致评分 >100
+        let m = Metrics {
+            func_count: 1,
+            try_count: 5,
+            ..Metrics::default()
+        };
+        let (s, _) = score(&m);
+        assert!(s <= 100.0, "评分 {} 超出 100 上限", s);
+        let m2 = Metrics {
+            try_count: 0,
+            func_count: 0,
+            ..Metrics::default()
+        };
+        let (s2, _) = score(&m2);
+        assert!((s2 - 96.0).abs() < 1e-9);
     }
 
     #[test]
