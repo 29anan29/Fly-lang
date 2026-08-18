@@ -14,7 +14,7 @@
 | :--- | :--- | :--- |
 | 语言 | 8 关键字（safe/only/lock/mask/cage/guard/seal/trace） | ✅ P0-P7 全部落地 |
 | 语言 | 污点引擎（R1-R5）、escape 全局扫描、运行时注入（guard/only/seal/trace/cage 节） | ✅ |
-| 语言 | 进程级沙箱 fly-sandbox（clone ns + Landlock + seccomp） | ✅ Linux only（win/mac 为空壳，见 §1.1） |
+| 语言 | 进程级沙箱 fly-sandbox（Linux=ns+Landlock+seccomp；macOS=Seatbelt；Windows=Job Object） | ✅ 三平台原生实现（v0.6.5） |
 | CLI | **全 Rust（P0-P6 完全交付，cmd/fly 退役）**：build/run/check/sandbox/version/error/update/lsp + fmt/analyze | ✅ |
 | Rust | lexer（R0/R1）、ast、parser、checkd 客户端、错误渲染 format、gen、typeinfer | ✅ |
 | 工程 | VSCode 插件（LSP）、npm 包、GitHub Actions 发布链、自更新 | ✅ |
@@ -34,11 +34,11 @@ LSP 单一 debounce 线程、prelude cage ctypes 投递、refCollector 参数默
 
 | # | 条目 | 类型 | 状态 |
 | :--- | :--- | :--- | :--- |
-| W1 | win/mac 无 OS 级沙箱（sandbox_other.go 直接 exit 2），release.yml 仍发三平台 sandboxd 空壳 | 平台 | 🔲 定调：声明"仅 Linux"或停发空壳（§8 建议 3） |
+| W1 | ~~win/mac 无 OS 级沙箱（空壳 exit 2）~~ | 平台 | ✅ v0.6.5：macOS=Seatbelt（sandbox-exec SBPL：禁网/限文件写/内存CPU上限），Windows=Job Object（kill-on-close+内存/时间/进程上限），强度声明入 README 平台表 |
 | W2 | 发布链依赖人工 secret：`SIGN_PRIVATE_KEY`/`VSCE_PAT`/`NPM_TOKEN` 未配即静默跳过 → `fly update` 无 .sig 自断链 | 发布 | 🔲 CI 显性告警；PR 门禁 CI（当前仅 tag 触发 release.yml） |
 | W3 | 安全核心（escape/taint/only/guard 拦截逻辑）无专项 fuzz | 质量 | 🔲 补 fuzz 目标 |
 | W4 | 错误码双真源（errors.go ↔ errorinfo.rs）靠人工同步 | 质量 | 🔲 CI 一致性校验 |
-| W5 | Wasm 沙箱 `fly-sandbox` 与进程级沙箱双叙事并行，未内嵌产物、未收口取舍 | 架构 | 🔲 定去留，单沙箱主线 + 白皮书对齐 |
+| W5 | ~~Wasm 沙箱 `fly-sandbox`~~ | 架构 | ✅ 已决（2026-08）：删除 Wasm 原型，单沙箱主线（进程级：Linux=ns+Landlock+seccomp，win/mac=平台原生隔离） |
 | W6 | 高频语法暂不支持：`with`（E0004）、字典/集合推导式（E0008）、字典解包（E0009）；兼容度 74% | 生态 | 🔲 按优先级补语法 |
 | W7 | 第三方库 wrapper 只完成 requests（S6"任一"），sqlalchemy 未做 | 生态 | 🔲 排期 |
 | W8 | 改名撞车（fly-lang/fly）未落地，repo/产物名/.deb 包名仍为 flylang | 品牌 | 🔲 v1.0 前评估（风险表） |
@@ -95,7 +95,7 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 - `fly doc`（docstring → Markdown）、`fly test`（目录级测试运行器）
 - Neovim/JetBrains LSP 客户端配置
 - 验收：`fly fmt` 格式化自身源码后 golden 无差异（dogfooding 自证）
-- 前置：§1.1 W1-W4 收尾（平台定调、CI 门禁、安全 fuzz、错误码校验）随 L2 并行
+- 前置：§1.1 W2-W4 收尾（CI 门禁、安全 fuzz、错误码校验）随 L2 并行（W1/W5 已于 v0.6.5 完成）
 
 ### L3 自举编译器（→ v2.0）
 - gen 发射器用 Fly 重写（参考实现，D-1 双实现互证）
@@ -131,7 +131,7 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 | :--- | :--- | :--- |
 | 安全保证被"改写产物"绕过（THREAT-MODEL §9.1） | 高 | 文档诚实声明 + 编译期零残留关键字为不可篡改层 |
 | S2/S3 拖延导致信任链缺口 | 高 | 插队规则：S2/S3 优先于 L1 功能 |
-| win/mac 沙箱承诺与实现不符（W1） | 高 | §1.1 W1 定调：声明"仅 Linux"或停发空壳 sandboxd |
+| win/mac 沙箱承诺与实现不符（W1） | 高 | ✅ 已解除（v0.6.5）：macOS Seatbelt / Windows Job Object 真实实现，强度声明入 README |
 | 发布 secret 未配 → update 断链 / 发布静默缺件（W2） | 高 | §1.1 W2：CI 显性告警 + PR 门禁 CI |
 | 双实现（Go checker/Rust CLI）语义漂移 | 中 | golden 逐字节对比 + LSP full_session 集成 + fuzz（W3/W9） |
 | Rust 迁移与工具链并行冲突 | 中 | ✅ 已解除：L1 已达成，L2 串行开始 |
@@ -143,7 +143,7 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 
 - ✅ v0.3.0（2026-08 达成，实际 v0.6.4）：8 关键字全落地 + S1-S3 完成（签名 + fuzz 就位）
 - ✅ v1.0.0（2026-08 达成）：Rust CLI 全量零差异（golden 逐字节 + full_session 集成），update 签名验证上线
-- 🔲 v1.1：`fly fmt` 自举（dogfooding 闭环）+ §1.1 W1-W4 收尾
+- 🔲 v1.1：`fly fmt` 自举（dogfooding 闭环）（W1-W4 已于 v0.6.5 收尾）
 - 🔲 v2.0：自举编译器 `flyc` 闭环
 - 🔲 v2.x+：示例库 10+、外部贡献 PR ≥ 1、合规试点 ≥ 1
 
@@ -151,7 +151,7 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 
 ```
 ✅ v0.3.0-v0.6.4 ──── L0 + S1-S3 + L1（Rust 全量，2026-08 达成）
-🔲 v1.1   ──── L2（工具链自举 + W1-W4 收尾）
+🔲 v1.1   ──── L2（工具链自举）
 🔲 v2.0   ──── L3（自举编译器 flyc）
 🔲 v2.x   ──── L4（开放协作）
 🔲 v3.0   ──── L5（生态与治理）

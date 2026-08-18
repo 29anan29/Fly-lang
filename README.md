@@ -128,7 +128,15 @@ python3 out.py
 
 ## 沙箱（所有编译产物默认在沙箱内运行）
 
-每个生成的 `.py` 恒注入 `runtime` + `sandbox` 两个运行时节，运行时兜底（内建代理/反射黑名单/受限导入）在任意 Python 3.10+ 环境生效；**OS 层进程隔离仅 Linux 支持**（`fly sandbox`：clone ns + Landlock + seccomp），macOS/Windows 仅进程内解释器代理，无 OS 层隔离。编译期拦截与运行时兜底双层防护：
+每个生成的 `.py` 恒注入 `runtime` + `sandbox` 两个运行时节，运行时兜底（内建代理/反射黑名单/受限导入）在任意 Python 3.10+ 环境生效；**OS 层进程隔离为平台原生实现**（`fly sandbox`）：
+
+| 平台 | OS 层机制 | 能力 | 强度声明 |
+| :--- | :--- | :--- | :--- |
+| Linux | clone ns + Landlock + seccomp + rlimit | 文件系统只读白名单、网络全禁、syscall 白名单、资源上限 | 最强（内核级隔离） |
+| macOS | Seatbelt（`sandbox-exec` SBPL 策略） | 文件写仅限临时/用户/当前目录、网络全禁、内存（RLIMIT_AS）/CPU 上限 | 用户态策略（Apple 标记 deprecated 但长期保留），不防御内核漏洞 |
+| Windows | Job Object（kill-on-close + 内存/时间/进程数上限） | 进程树生命周期强制终止、总内存上限、墙钟上限 | 用户态限制，不防御文件系统/网络越权 |
+
+编译期拦截与运行时兜底双层防护：
 
 | 逃逸途径 | 编译期（checker，E码） | 运行时（注入代理） |
 | :--- | :--- | :--- |

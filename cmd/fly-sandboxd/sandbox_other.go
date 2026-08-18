@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !darwin && !windows
 
 package main
 
@@ -7,9 +7,10 @@ import (
 	"os"
 )
 
-// cmdSandbox: 非 Linux 平台不支持（namespaces/Landlock/seccomp 均为 Linux 特性）。
-// 与 cmd/fly/sandbox.go（//go:build linux）同签名，保证 main.go 双平台可编译。
+// cmdSandbox: 其他平台不支持（Linux=namespaces/Landlock/seccomp、
+// macOS=Seatbelt、Windows=Job Object 之外无既有机制）。
+// 与各平台实现同签名，保证 main.go 跨平台可编译。
 func cmdSandbox(args []string) int {
-	fmt.Fprintln(os.Stderr, "fly sandbox 仅支持 Linux（x86_64）")
+	fmt.Fprintln(os.Stderr, "fly sandbox 仅支持 Linux/macOS/Windows")
 	return 2
 }

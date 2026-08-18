@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    name: Go (vet / test / fuzz smoke / errorinfo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test ./...
+      - name: errorinfo 双真源一致性
+        run: ./scripts/check-errorinfo.sh
+      - name: fuzz smoke（parser/compile/checker 安全核心）
+        run: |
+          go test -fuzz FuzzParse -fuzztime 8s ./internal/parser/
+          go test -fuzz FuzzLexer -fuzztime 8s ./internal/lexer/
+          go test -fuzz FuzzCheckSource -fuzztime 8s ./internal/compile/
+          go test -fuzz FuzzSecurityCheck -fuzztime 8s ./internal/checker/
+
+  rust:
+    name: Rust (build / test / fmt check / golden 行为)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: cargo build
+        run: cargo build --release
+      - name: go 守护进程
+        run: |
+          go build -o target/release/fly-checkd ./cmd/fly-checkd
+          go build -o target/release/fly-sandboxd ./cmd/fly-sandboxd
+      - name: cargo test
+        run: cargo test
+      - name: fly fmt --check（全仓 .fly 必须 fmt 干净）
+        run: ./target/release/fly fmt --check testdata/
+      - name: golden 产物行为（python3 实跑）
+        run: |
+          python3 testdata/golden/hello.py
+          python3 testdata/golden/edge.py
+
+  security_regression:
+    name: 安全反例回归（红队 + 交互矩阵）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: go test 安全专项
+        run: go test -run 'Redteam|Interaction|Only|Escape|Taint|Guard|AugAssign' -v ./internal/checker/ 2>&1 | tail -40
