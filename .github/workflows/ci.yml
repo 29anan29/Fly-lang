@@ -45,8 +45,8 @@ jobs:
           go build -o target/debug/fly-checkd ./cmd/fly-checkd
       - name: cargo test
         run: cargo test
-      - name: fly fmt --check（全仓 .fly 必须 fmt 干净）
-        run: ./target/release/fly fmt --check testdata/
+      - name: fly fmt --check（golden 正例必须 fmt 干净；errors/example 反例含预期编译错误跳过）
+        run: ./target/release/fly fmt --check testdata/golden/
       - name: golden 产物行为（python3 实跑）
         run: |
           python3 testdata/golden/hello.py
