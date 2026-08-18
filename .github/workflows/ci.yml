@@ -42,6 +42,7 @@ jobs:
         run: |
           go build -o target/release/fly-checkd ./cmd/fly-checkd
           go build -o target/release/fly-sandboxd ./cmd/fly-sandboxd
+          go build -o target/debug/fly-checkd ./cmd/fly-checkd
       - name: cargo test
         run: cargo test
       - name: fly fmt --check（全仓 .fly 必须 fmt 干净）
