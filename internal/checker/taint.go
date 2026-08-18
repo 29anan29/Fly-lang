@@ -192,6 +192,13 @@ func (c *Checker) callTaint(t *ast.CallExpr) (Taint, string) {
 			return Taint{Safe: true}, "requests." + name + "()"
 		}
 		return Taint{}, ""
+	case "sqlalchemy":
+		switch name {
+		case "text":
+			c.checkSafeSink(t, argTaint, argHint, "sqlalchemy.text")
+			return Taint{}, ""
+		}
+		return Taint{}, ""
 	case "urllib":
 		if name == "urlopen" {
 			return Taint{Safe: true}, "urllib." + name + "()"

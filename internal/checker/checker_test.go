@@ -142,6 +142,8 @@ func TestTaintIOSources(t *testing.T) {
 	wantErr(t, "import os\nout = os.popen('ls').read()\neval(out)\n", "未净化的外部输入")
 	wantErr(t, "import requests\nr = requests.get('http://x')\neval(r.text)\n", "未净化的外部输入")
 	wantErr(t, "import requests\neval(requests.post('http://x').json())\n", "未净化的外部输入")
+	wantErr(t, "from sqlalchemy import text\nq = text(input())\n", "未净化的外部输入")
+	noErr(t, "import sqlalchemy\nfrom sqlalchemy import text\nq = text('SELECT 1')\nprint(q)\n")
 	wantErr(t, "s = open('f')\nline = s.readline()\neval(line)\n", "未净化的外部输入")
 	noErr(t, "import requests\nr = requests.get('http://x')\nclean = int(r.text)\nprint(clean)\n")
 	noErr(t, "d = {}\nv = d.get('k')\nprint(v)\n")

@@ -343,7 +343,7 @@ _FLY_SB_ALLOWED_MODS = frozenset((
     "copy", "pprint", "reprlib", "difflib", "unicodedata", "enum", "abc",
     "typing", "dataclasses", "contextlib", "threading", "queue", "warnings",
     "ast", "token", "keyword", "symtable", "this", "exceptions", "html",
-    "xml", "unittest", "requests",
+    "xml", "unittest", "requests", "sqlalchemy",
 ))
 
 

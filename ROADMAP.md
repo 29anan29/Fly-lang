@@ -39,9 +39,9 @@ LSP 单一 debounce 线程、prelude cage ctypes 投递、refCollector 参数默
 | W3 | 安全核心（escape/taint/only/guard 拦截逻辑）无专项 fuzz | 质量 | 🔲 补 fuzz 目标 |
 | W4 | 错误码双真源（errors.go ↔ errorinfo.rs）靠人工同步 | 质量 | 🔲 CI 一致性校验 |
 | W5 | ~~Wasm 沙箱 `fly-sandbox`~~ | 架构 | ✅ 已决（2026-08）：删除 Wasm 原型，单沙箱主线（进程级：Linux=ns+Landlock+seccomp，win/mac=平台原生隔离） |
-| W6 | 高频语法暂不支持：`with`（E0004）、字典/集合推导式（E0008）、字典解包（E0009）；兼容度 74% | 生态 | 🔲 按优先级补语法 |
-| W7 | 第三方库 wrapper 只完成 requests（S6"任一"），sqlalchemy 未做 | 生态 | 🔲 排期 |
-| W8 | 改名撞车（fly-lang/fly）未落地，repo/产物名/.deb 包名仍为 flylang | 品牌 | 🔲 v1.0 前评估（风险表） |
+| W6 | ~~高频语法暂不支持（with/推导式/字典解包），兼容度 74%~~ | 生态 | ✅ 已决（2026-08）：暂不实现，写入 docs/compat.md（报错 E0004/E0008/E0009 + workaround），74% 接受 |
+| W7 | 第三方库 wrapper：requests 之后补 sqlalchemy | 生态 | ✅ v0.6.6：sqlalchemy 可用——`text()` 汇点编译期拦截（taint.go）+ `_FLY_SB_ALLOWED_MODS` 白名单 + execute 通用汇点；文档与反例锁定（checker_test TestTaintIOSources） |
+| W8 | ~~改名撞车（fly-lang/fly）~~ | 品牌 | ✅ 已决（2026-08）：**不改名**——品牌完全即 PyFly（repo PyFly-lang、产物 fly、npm fly-lang），撞车风险接受并记录风险表 |
 | W9 | Go（checker/沙箱）+ Rust（CLI）双实现并存，语义漂移风险靠 golden 对比兜底 | 维护 | 持续（D1/D6 已定，checker 留 Go） |
 
 ---
@@ -136,7 +136,7 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 | 双实现（Go checker/Rust CLI）语义漂移 | 中 | golden 逐字节对比 + LSP full_session 集成 + fuzz（W3/W9） |
 | Rust 迁移与工具链并行冲突 | 中 | ✅ 已解除：L1 已达成，L2 串行开始 |
 | 自举版漂移 | 中 | golden diff + 双实现互证 |
-| 改名撞车（fly 名称已被占用） | 中 | docs/规划.md 建议 FlySafe/PyFly 子品牌，v1.0 前评估（W8） |
+| 改名撞车（fly 名称已被占用） | 中 | ✅ 已决（2026-08，W8）：不改名——品牌完全即 PyFly，撞车风险接受（产物 fly/npm fly-lang 维持），用户安装走 `fly update` 官方渠道 |
 | 单人维护精力 | 低 | 全自动 CI/发布 + RFC 流程 |
 
 ## 5. 成功指标

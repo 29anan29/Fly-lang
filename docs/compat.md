@@ -30,8 +30,8 @@
 | 定义 lambda | ❌ | **P8 第一优先** |
 | 定义 生成器函数 `yield` | ❌ | P9 候选 |
 | 推导式 列表 `[x for x in ...]` | ✅ | 嵌套 for/if |
-| 推导式 dict `{k: v for ...}` | ❌ | P8 候选 |
-| 推导式 set `{x for ...}` | ❌ | P8 候选 |
+| 推导式 dict `{k: v for ...}` | ❌ | 已决（2026-08）：暂不支持，报错 E0008，workaround 为 for 循环逐项构建 |
+| 推导式 set `{x for ...}` | ❌ | 已决（2026-08）：暂不支持，报错 E0008 |
 | 生成器表达式 `(x for ...)` | ❌ | P9 候选 |
 | 切片 `a[1:3]` / `a[::-1]` | ✅ | 含负步长、slice() |
 | 下标/赋值/删除 | ✅ | 含 `del obj[k]` |
@@ -39,7 +39,7 @@
 | f-string（含嵌套表达式） | ✅ | `f"{a+b}"` |
 | 三引号字符串 | ✅ | 多行 |
 | import / from-import | ✅ | 含 as 别名、点分 `import os.path as p`、`*` |
-| with / with-as | ❌ | P8 候选（资源管理刚需） |
+| with / with-as | ❌ | 已决（2026-08）：暂不支持，报错 E0004，workaround 为 try/finally 显式管理资源 |
 | global / nonlocal | ❌ | P9 候选 |
 | 注解 `def f(a: int) -> str` | ✅ | 编译期忽略，透传 |
 | 魔法变量 `__name__`/`__file__` 等 | ✅ | `if __name__ == "__main__":` 可用 |
@@ -51,6 +51,8 @@
 - 缺失集中在四类：**函数式**（lambda、推导式变体、生成器表达式）、
   **上下文管理**（with）、**新语法**（match、walrus、async）、**杂项**（global/nonlocal、复数）。
 - 对日常脚本/后端主体逻辑的覆盖率：**>90%**（缺失项均为边缘语法，报错信息明确）。
+- **已决（2026-08，W6 收尾）**：with/dict、set 推导式/字典解包暂不实现，74% 兼容度接受；
+  上述行标记 E0004/E0008/E0009 报错与 workaround，避免静默误用。
 
 ## 缺失特性目标里程碑（roadmap）
 
