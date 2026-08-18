@@ -14,23 +14,42 @@
 | :--- | :--- | :--- |
 | 语言 | 8 关键字（safe/only/lock/mask/cage/guard/seal/trace） | ✅ P0-P7 全部落地 |
 | 语言 | 污点引擎（R1-R5）、escape 全局扫描、运行时注入（guard/only/seal/trace/cage 节） | ✅ |
-| 语言 | 进程级沙箱 fly-sandbox（clone ns + Landlock + seccomp） | ✅ Linux only |
-| CLI | `fly build/run/sandbox/version/error/update/lsp`（Go） | ✅ |
-| CLI | Rust 版 `version/help/error`（P1）+ `check`（P2，checkd 桥接） | ✅ 与 Go 零差异 |
-| Rust | lexer（R0/R1）、ast、parser、checkd 客户端、错误渲染 format | ✅ |
+| 语言 | 进程级沙箱 fly-sandbox（clone ns + Landlock + seccomp） | ✅ Linux only（win/mac 为空壳，见 §1.1） |
+| CLI | **全 Rust（P0-P6 完全交付，cmd/fly 退役）**：build/run/check/sandbox/version/error/update/lsp + fmt/analyze | ✅ |
+| Rust | lexer（R0/R1）、ast、parser、checkd 客户端、错误渲染 format、gen、typeinfer | ✅ |
 | 工程 | VSCode 插件（LSP）、npm 包、GitHub Actions 发布链、自更新 | ✅ |
-| 质量 | testdata 反例 52+、golden、checker 单测 | ✅ |
-| 安全 | 威胁模型、边界清单 B1-B8、外部评估回应（THREAT-MODEL §9/§10） | ✅ 本次落地 |
+| 质量 | testdata 反例 52+、golden、checker 单测、fuzz（lexer/parser/compile/checker） | ✅ |
+| 安全 | 威胁模型、边界清单 B1-B8、外部评估回应（THREAT-MODEL §9/§10）、逃逸面 E1-E14 枚举 | ✅ 2026-08 两次审计落地 |
 
 **已填缺口（2026-08）**：G3 签名 ✅、G5 fuzz+红队 ✅、G2 交互矩阵 ✅、G4 审计注释 ✅、
 G7 类型生态澄清 ✅、G1 wrapper 试点 ✅（S6，requests）。G6 错误信息迭代（S7）随 L0 P6 推进。
+
+**已填缺口（2026-08 二轮审查，13 项）**：only 块 dunder `__import__` 逃逸修复（E14，运行时特判 +
+编译期 onlyDeny∪escapeModules 联合 + `__builtins__` 纳入）、needs_guard 递归 only/trace/cage、
+aug_assign 单次求值（Go/Rust 双修 + golden 重生成）、fmt `not in` 空格、checkArgs `*args` 误报、
+propagateTaint 基符号、analyze 评分边界、lexer 省略号列号、http 相对重定向 scheme + 拒绝明文降级、
+LSP 单一 debounce 线程、prelude cage ctypes 投递、refCollector 参数默认值；fuzz 追加 FuzzCheckSource。
+
+### 1.1 待收尾清单（2026-08 不完备性报告，未决项）
+
+| # | 条目 | 类型 | 状态 |
+| :--- | :--- | :--- | :--- |
+| W1 | win/mac 无 OS 级沙箱（sandbox_other.go 直接 exit 2），release.yml 仍发三平台 sandboxd 空壳 | 平台 | 🔲 定调：声明"仅 Linux"或停发空壳（§8 建议 3） |
+| W2 | 发布链依赖人工 secret：`SIGN_PRIVATE_KEY`/`VSCE_PAT`/`NPM_TOKEN` 未配即静默跳过 → `fly update` 无 .sig 自断链 | 发布 | 🔲 CI 显性告警；PR 门禁 CI（当前仅 tag 触发 release.yml） |
+| W3 | 安全核心（escape/taint/only/guard 拦截逻辑）无专项 fuzz | 质量 | 🔲 补 fuzz 目标 |
+| W4 | 错误码双真源（errors.go ↔ errorinfo.rs）靠人工同步 | 质量 | 🔲 CI 一致性校验 |
+| W5 | Wasm 沙箱 `fly-sandbox` 与进程级沙箱双叙事并行，未内嵌产物、未收口取舍 | 架构 | 🔲 定去留，单沙箱主线 + 白皮书对齐 |
+| W6 | 高频语法暂不支持：`with`（E0004）、字典/集合推导式（E0008）、字典解包（E0009）；兼容度 74% | 生态 | 🔲 按优先级补语法 |
+| W7 | 第三方库 wrapper 只完成 requests（S6"任一"），sqlalchemy 未做 | 生态 | 🔲 排期 |
+| W8 | 改名撞车（fly-lang/fly）未落地，repo/产物名/.deb 包名仍为 flylang | 品牌 | 🔲 v1.0 前评估（风险表） |
+| W9 | Go（checker/沙箱）+ Rust（CLI）双实现并存，语义漂移风险靠 golden 对比兜底 | 维护 | 持续（D1/D6 已定，checker 留 Go） |
 
 ---
 
 ## 2. 阶段总览（统一时间线）
 
 ```
-现状 ──L0──► v0.3.0（基线收尾）──L1──► v1.0.0（Rust 全量）
+现状 ──L0──► v0.3.0（基线收尾）──L1──► v1.0.0（Rust 全量）✅ 2026-08 达成（实际 v0.6.4）
    └───── S 系列安全专项（S1-S6，随阶段插入，S2/S3 优先）──────┐
 v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自举编译器闭环）
    ──L4──► v2.x（开放协作）──L5──► v3.0（生态与治理）
@@ -39,9 +58,9 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 ### L0 基线收尾（→ v0.3.0）
 | 任务 | 说明 | 验收 |
 | :--- | :--- | :--- |
-| P6 打磨 | golden 全量覆盖、错误消息快照、边界用例（闭包/嵌套/f-string 内 mask） | `方案.md` 8 示例正反例全过 |
-| 行为测试接入 CI | 生成 .py 由 python3 实跑 | CI 全绿 |
-| S1 边界文档 | THREAT-MODEL §9/§10（本文件）+ README 安全边界声明 | 已交付 |
+| P6 打磨 | golden 全量覆盖、错误消息快照、边界用例（闭包/嵌套/f-string 内 mask） | ✅ 已交付 |
+| 行为测试接入 CI | 生成 .py 由 python3 实跑 | ✅ 已交付（release.yml python 3.10-3.14 矩阵） |
+| S1 边界文档 | THREAT-MODEL §9/§10（本文件）+ README 安全边界声明 | ✅ 已交付 |
 
 ### S 系列安全专项（插队规则：S2/S3 优先，不阻塞 L1）
 | 条目 | 任务 | 优先级 | 验收 |
@@ -55,27 +74,28 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 
 > S2 待用户操作：`~/.fly-sign/priv.pem`（本次生成）内容配置到 GitHub Actions secret `SIGN_PRIVATE_KEY`，否则 CI 跳过签名（无 .sig 时 fly update 默认拒绝安装）。
 
-### L1 Rust 迁移（→ v1.0.0）
+### L1 Rust 迁移（→ v1.0.0）✅ 2026-08 全部完成（实际版本 v0.6.4）
 | 阶段 | 内容 | 状态 |
 | :--- | :--- | :--- |
 | R0/R1 | lexer（token/缩进/字符串） | ✅ |
 | R1.5 | ast + parser（1322 行翻译） | ✅ |
 | P1/P2 | version/help/error + check（checkd 桥接，零差异） | ✅ |
-| R2 | gen + 运行时注入（only/seal/trace/cage/runtime/sandbox 节） | 🔲 |
-| P3 | `fly build` / `fly run`（checkd 复用，golden 逐字节一致） | 🔲 |
-| R3 | checker 语义子集自举（可选，checker 留 Go 为 D6 默认） | 🔲 |
-| P4 | `fly update`（签名先行，见 S2）/ `fly lsp` | 🔲 |
-| R4 | compile 管线整合、错误聚合 20 条上限 | 🔲 |
-| P5 | `fly sandbox`（决策 B：fly-sandboxd 二进制桥接） | 🔲 |
-| R5/P6 | 切换与退役：release.yml 切 Rust 构建，产物命名不变，AGENTS.md/README 更新 | 🔲 |
+| R2 | gen + 运行时注入（only/seal/trace/cage/runtime/sandbox 节） | ✅ |
+| P3 | `fly build` / `fly run`（checkd 复用，golden 逐字节一致） | ✅ |
+| R3 | checker 语义子集自举（可选，checker 留 Go 为 D6 默认） | 🔲 可选（D1/D6 决策：checker 留 Go） |
+| P4 | `fly update`（签名先行，见 S2）/ `fly lsp` | ✅ |
+| R4 | compile 管线整合、错误聚合 20 条上限 | ✅（checkd 侧） |
+| P5 | `fly sandbox`（决策 B：fly-sandboxd 二进制桥接） | ✅ |
+| R5/P6 | 切换与退役：release.yml 切 Rust 构建，产物命名不变，AGENTS.md/README 更新 | ✅（b147c25：cmd/fly 退役 + fmt/analyze 迁 Rust + 三二进制打包） |
 
-验收：v1.0.0 与 Go 版 CLI diff 零差异；单静态二进制（<3MB）；VSCode/CI/update 契约零改动。
+验收：v1.0.0 与 Go 版 CLI diff 零差异；单静态二进制（<3MB）；VSCode/CI/update 契约零改动。**已达成**（golden 双端逐字节一致 + LSP full_session 集成 + update 实测全链路）。
 
-### L2 工具链自举（→ v1.1）
+### L2 工具链自举（→ v1.1）← 当前主线
 - `fly fmt`（AST 驱动，注释保留，**用 Fly 编写**，Rust 壳调用）
 - `fly doc`（docstring → Markdown）、`fly test`（目录级测试运行器）
 - Neovim/JetBrains LSP 客户端配置
 - 验收：`fly fmt` 格式化自身源码后 golden 无差异（dogfooding 自证）
+- 前置：§1.1 W1-W4 收尾（平台定调、CI 门禁、安全 fuzz、错误码校验）随 L2 并行
 
 ### L3 自举编译器（→ v2.0）
 - gen 发射器用 Fly 重写（参考实现，D-1 双实现互证）
@@ -111,26 +131,28 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 | :--- | :--- | :--- |
 | 安全保证被"改写产物"绕过（THREAT-MODEL §9.1） | 高 | 文档诚实声明 + 编译期零残留关键字为不可篡改层 |
 | S2/S3 拖延导致信任链缺口 | 高 | 插队规则：S2/S3 优先于 L1 功能 |
-| Rust 迁移与工具链并行冲突 | 中 | 串行：L1 完成前不做 L2+ |
+| win/mac 沙箱承诺与实现不符（W1） | 高 | §1.1 W1 定调：声明"仅 Linux"或停发空壳 sandboxd |
+| 发布 secret 未配 → update 断链 / 发布静默缺件（W2） | 高 | §1.1 W2：CI 显性告警 + PR 门禁 CI |
+| 双实现（Go checker/Rust CLI）语义漂移 | 中 | golden 逐字节对比 + LSP full_session 集成 + fuzz（W3/W9） |
+| Rust 迁移与工具链并行冲突 | 中 | ✅ 已解除：L1 已达成，L2 串行开始 |
 | 自举版漂移 | 中 | golden diff + 双实现互证 |
-| 改名撞车（fly 名称已被占用） | 中 | docs/规划.md 建议 FlySafe/PyFly 子品牌，v1.0 前评估 |
+| 改名撞车（fly 名称已被占用） | 中 | docs/规划.md 建议 FlySafe/PyFly 子品牌，v1.0 前评估（W8） |
 | 单人维护精力 | 低 | 全自动 CI/发布 + RFC 流程 |
 
 ## 5. 成功指标
 
-- v0.3.0：8 关键字全落地 + S1-S3 完成（签名 + fuzz 就位）
-- v1.0.0：Rust CLI 全量零差异，单二进制，update 签名验证上线
-- v1.1：`fly fmt` 自举（dogfooding 闭环）
-- v2.0：自举编译器 `flyc` 闭环
-- v2.x+：示例库 10+、外部贡献 PR ≥ 1、合规试点 ≥ 1
+- ✅ v0.3.0（2026-08 达成，实际 v0.6.4）：8 关键字全落地 + S1-S3 完成（签名 + fuzz 就位）
+- ✅ v1.0.0（2026-08 达成）：Rust CLI 全量零差异（golden 逐字节 + full_session 集成），update 签名验证上线
+- 🔲 v1.1：`fly fmt` 自举（dogfooding 闭环）+ §1.1 W1-W4 收尾
+- 🔲 v2.0：自举编译器 `flyc` 闭环
+- 🔲 v2.x+：示例库 10+、外部贡献 PR ≥ 1、合规试点 ≥ 1
 
 ## 6. 版本时间线速览
 
 ```
-v0.3.0 ──── L0 + S1-S3
-v1.0.0 ──── L1（Rust 全量 + P3/P4/P5/P6）
-v1.1   ──── L2（工具链自举）
-v2.0   ──── L3（自举编译器 flyc）
-v2.x   ──── L4（开放协作）
-v3.0   ──── L5（生态与治理）
+✅ v0.3.0-v0.6.4 ──── L0 + S1-S3 + L1（Rust 全量，2026-08 达成）
+🔲 v1.1   ──── L2（工具链自举 + W1-W4 收尾）
+🔲 v2.0   ──── L3（自举编译器 flyc）
+🔲 v2.x   ──── L4（开放协作）
+🔲 v3.0   ──── L5（生态与治理）
 ```

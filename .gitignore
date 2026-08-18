@@ -19,3 +19,9 @@ payload.bin
 # 第三方工具产物
 .VSCodeCounter/
 fly-sandboxd/target/
+
+# 内部文档（禁止外发）
+docs/竞品对比.md
+docs/不完备性报告.md
+*.swp
+docs/规划.md

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞上报（不要开公开 Issue）
+    url: mailto:anwang13@outlook.com
+    about: 涉及安全边界绕过的内容请邮件上报，72 小时内确认回复（详见 SECURITY.md）
+  - name: VSCode 插件 / npm 包问题
+    url: https://github.com/29anan29/PyFly-lang/issues
+    about: 插件与 npm 包装器问题请按 Issue 表单提交，注明渠道

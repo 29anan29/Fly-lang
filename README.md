@@ -4,7 +4,7 @@
 
 # PyFly
 
-**Python 3.10+ 的安全受限超集转译器**（Go 实现，Fly → Python，类似 TypeScript → JavaScript）
+**Python 3.10+ 的安全受限超集转译器**（Rust 实现，Fly → Python，类似 TypeScript → JavaScript）
 
 </div>
 
@@ -27,7 +27,25 @@ PyFly 由人与 AI 结对开发：**人做决策，AI 写代码**。
 
 Fly 是 Python 3.10+ 的安全受限超集：用 Rust 实现的转译器（CLI 全 Rust，checker/沙箱以独立守护进程提供），把 `.fly` 源码转译为 Python。任何合法 Python 中违反安全规则的模式（危险内建/反射链/危险模块，见 [docs/THREAT-MODEL.md §6.2 不兼容清单](docs/THREAT-MODEL.md#62-不兼容模式清单安全受限超集的精确边界)）会被编译期拦截，其余安全子集零改造可编译；新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
 
-详细设计见 [方案.md](方案.md)（语言设计）、[Plan.md](Plan.md)（实现方案）与 [docs/CLI-Rust转型方案.md](docs/CLI-Rust转型方案.md)（CLI Rust 化）。
+## 文档索引
+
+| 文档 | 内容 |
+| :--- | :--- |
+| [方案.md](方案.md) | 语言设计（8 关键字语义、语法、示例） |
+| [Plan.md](Plan.md) | 实现方案 |
+| [ROADMAP.md](ROADMAP.md) | 总览唯一真源（L/R/P/S 阶段整合视图） |
+| [SECURITY.md](SECURITY.md) | 安全策略、漏洞上报流程 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南 |
+| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | 威胁模型：污点规则 R1-R5、逃逸面 E1-E14、边界 B1-B8、与静态工具定位差异 |
+| [docs/沙箱白皮书.md](docs/沙箱白皮书.md) | 进程级沙箱设计与隔离边界 |
+| [docs/关键字交互矩阵.md](docs/关键字交互矩阵.md) | 8 关键字组合交互与优先级规则 |
+| [docs/compat.md](docs/compat.md) | Python 语法兼容度与缺口 |
+| [docs/长期规划.md](docs/长期规划.md) | 生态规划 L0-L5 |
+| [docs/Rust迁移方案.md](docs/Rust迁移方案.md) · [docs/Rust迁移事项.md](docs/Rust迁移事项.md) · [docs/CLI-Rust转型方案.md](docs/CLI-Rust转型方案.md) | Rust 迁移方案与进度 |
+| [docs/第三方库安全包装.md](docs/第三方库安全包装.md) | 第三方库受控包装（requests 试点） |
+| [docs/安全测试报告.md](docs/安全测试报告.md) · [docs/报错清单.md](docs/报错清单.md) | 安全测试与错误码清单 |
+| [docs/pip.md](docs/pip.md) | pip 安装方案 |
+| [docs/demo/cve-pickle.md](docs/demo/cve-pickle.md) | CVE 对照演示（pickle RCE 编译期拦截） |
 
 ## 构建
 
@@ -74,6 +92,9 @@ fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ./fly build [选项] <file.fly>   转译为 Python（含沙箱运行时，见"沙箱"一节）
 ./fly check <file.fly>...       仅编译检查，支持多文件与目录递归（goroutine 并发，出错退出码 1）
 ./fly run <file.fly>            转译并在沙箱内执行（python3）
+./fly fmt [-w|--check] <file.fly>...  格式化（token 流级空白重排，注释保留；--check 仅检查）
+./fly analyze <file.fly>        代码质量评分（100 制：复杂度/嵌套/重复/注释/命名）
+./fly lsp                       启动语言服务器（stdio JSON-RPC，供编辑器插件连接）
 ./fly version                   打印版本与提交号
 ./fly error <E码>               查询错误码示例报错与修复方法（如 fly error E0066）
 ./fly update [--check|--force|--proxy <url>]  自更新（见上）
@@ -107,7 +128,7 @@ python3 out.py
 
 ## 沙箱（所有编译产物默认在沙箱内运行）
 
-每个生成的 `.py` 恒注入 `runtime` + `sandbox` 两个运行时节，沙箱在任意 Python 3.10+ 环境生效，编译期拦截与运行时兜底双层防护：
+每个生成的 `.py` 恒注入 `runtime` + `sandbox` 两个运行时节，运行时兜底（内建代理/反射黑名单/受限导入）在任意 Python 3.10+ 环境生效；**OS 层进程隔离仅 Linux 支持**（`fly sandbox`：clone ns + Landlock + seccomp），macOS/Windows 仅进程内解释器代理，无 OS 层隔离。编译期拦截与运行时兜底双层防护：
 
 | 逃逸途径 | 编译期（checker，E码） | 运行时（注入代理） |
 | :--- | :--- | :--- |

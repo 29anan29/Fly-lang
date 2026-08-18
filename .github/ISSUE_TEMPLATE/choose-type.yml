@@ -1,0 +1,58 @@
+name: 选择 Issue 类型
+description: 请从下方选择一个类型来创建 Issue（安全问题请勿在此提交，见下方说明）
+title: "[Issue]: "
+labels: ["需要分类"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 提示
+        - **安全问题请勿公开提交**：涉及安全边界绕过（逃逸 `safe`/`only`/`lock`/`mask`/`cage`/`guard`/`seal`/`trace`、沙箱逃逸、漏洞利用）的内容，请按 [SECURITY.md](../../SECURITY.md) 邮件上报（anwang13@outlook.com），72 小时内确认回复。
+        - 提交前请确认：`fly version` 已是最新（`fly update --check`）；问题在 `testdata/golden/` 产物下可复现。
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue 类型
+      description: 请选择此 Issue 的类型（必选）
+      options:
+        - 缺陷报告 (Bug)
+        - 功能请求 (Feature)
+        - 文档改进 (Documentation)
+        - 问题咨询 (Question)
+        - 其他 (Other)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 详细描述
+      description: 请在此详细描述你的 Issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤 / 最小样例
+      description: 提供最小 .fly 代码与期望/实际行为（缺陷报告必填）
+      placeholder: |
+        ```fly
+        only(json):
+            ...
+        ```
+        - 期望行为：
+        - 实际行为：
+      render: markdown
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: 环境信息
+      description: fly version 输出、操作系统、Python 版本（缺陷报告建议填写）
+      placeholder: "fly v0.6.4 (release) / Linux x86_64 / Python 3.12"
+    validations:
+      required: false
