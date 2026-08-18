@@ -25,3 +25,6 @@ docs/竞品对比.md
 docs/不完备性报告.md
 *.swp
 docs/规划.md
+
+# GitHub Wiki 镜像（独立 git 仓库，勿跟踪）
+wiki/
