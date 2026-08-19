@@ -43,7 +43,11 @@ jobs:
         with:
           targets: aarch64-unknown-linux-gnu
       - name: Install cross-linker for aarch64
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+        run: |
+          set -euo pipefail
+          timeout 240 sudo apt-get update || true
+          timeout 240 sudo apt-get install -y gcc-aarch64-linux-gnu || { sleep 5; timeout 300 sudo apt-get install -y gcc-aarch64-linux-gnu; }
+          aarch64-linux-gnu-gcc --version
       - name: Build and package
         shell: bash
         env:
