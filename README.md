@@ -98,6 +98,7 @@ fly update --proxy socks5://user:pass@host:1080   # 走 SOCKS5/HTTP 代理
 ./fly version                   打印版本与提交号
 ./fly error <E码>               查询错误码示例报错与修复方法（如 fly error E0066）
 ./fly update [--check|--force|--proxy <url>]  自更新（见上）
+./fly help [<指令名>]           指令教程（如 fly help sandbox 查看沙箱完整用法/示例/强度声明）
 ```
 
 build 选项：

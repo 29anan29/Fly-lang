@@ -10,6 +10,7 @@ pub mod format;
 pub mod lexer;
 pub mod parser;
 pub mod gen;
+pub mod help;
 pub mod http;
 pub mod json;
 pub mod lsp;

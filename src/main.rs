@@ -75,19 +75,46 @@ fn main() -> ExitCode {
         Some("update") => cmd_update(&args[1..]),
         Some("fmt") => cmd_fmt(&args[1..]),
         Some("analyze") => cmd_analyze(&args[1..]),
-        Some("help") | Some("-h") | Some("--help") => {
+        Some("help") => cmd_help(&args[1..]),
+        Some("-h") | Some("--help") => {
             println!("{}", USAGE);
             ExitCode::SUCCESS
         }
         Some("lsp") => cmd_lsp(&args[1..]),
         Some("sandbox") => cmd_sandbox(&args[1..]),
         Some(_) => {
-            eprintln!("未知子命令 {:?}\n\n{}\n", args[0], USAGE);
+            eprintln!("未知子命令 {:?}\n\n{}", args[0], USAGE);
+            eprintln!("提示: 用 fly help <指令名> 查看详细教程\n");
             ExitCode::from(2)
         }
         None => {
             eprintln!("{}", USAGE);
             ExitCode::from(2)
+        }
+    }
+}
+
+// cmd_help: `fly help [<指令名>]`——无参数显示总览；有参数显示该指令的全面教程。
+fn cmd_help(args: &[String]) -> ExitCode {
+    match args.first().map(String::as_str) {
+        Some(name) => match pyfly_lang::help::topic(name) {
+            Some(t) => {
+                println!("{}", t);
+                ExitCode::SUCCESS
+            }
+            None => {
+                eprintln!(
+                    "未知指令 {:?}\n\n可用指令: {}\n\n{}",
+                    name,
+                    pyfly_lang::help::COMMANDS.join(" / "),
+                    pyfly_lang::help::HELP_HINT
+                );
+                ExitCode::from(2)
+            }
+        },
+        None => {
+            println!("{}", pyfly_lang::help::HELP_HINT);
+            ExitCode::SUCCESS
         }
     }
 }
@@ -716,6 +743,7 @@ const USAGE: &str = "PyFly 编译器
   fly version                  显示版本
   fly error <E码>              查询错误码（示例报错与修复方法）
   fly update [选项]             检查/更新到最新版本
+  fly help [<指令名>]          指令教程（如 fly help build）
 
 build 选项:
   -o <out.py>   指定输出文件（默认输出到 build/ 目录，保留相对路径）
