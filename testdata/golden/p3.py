@@ -94,7 +94,7 @@ def _fly_binop(a, b, op, line, col):
             return a + b
         if isinstance(a, str) and isinstance(b, str):
             return a + b
-        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        if type(a) is type(b) and isinstance(a, (list, tuple)):
             return a + b
     elif op == "sub":
         if isinstance(a, int) and isinstance(b, int):
@@ -261,6 +261,40 @@ def _fly_cmp(a, b, op, line, col):
         ) from None
 
 
+_FLY_OP_MAP = {"<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
+
+
+def _fly_chain(getters, ops, line, col):
+    """链式比较：每个操作数惰性求值且只求值一次（`a < f() < c` 的 f() 不重复调用），
+    短路返回。op 支持 <,<=,>,>=,==,!=,is,is not,in,not in。"""
+    prev = getters[0]()
+    for i, op in enumerate(ops):
+        cur = getters[i + 1]()
+        try:
+            if op == "==":
+                ok = prev == cur
+            elif op == "!=":
+                ok = prev != cur
+            elif op == "is":
+                ok = prev is cur
+            elif op == "is not":
+                ok = prev is not cur
+            elif op == "in":
+                ok = prev in cur
+            elif op == "not in":
+                ok = prev not in cur
+            else:
+                ok = _FLY_OPS[_FLY_OP_MAP[op]](prev, cur)
+        except _FLY_SAFE_ERRORS as e:
+            raise FlyRuntimeError(
+                "%s: 比较失败: %s" % (_fly_loc(line, col), e)
+            ) from None
+        if not ok:
+            return False
+        prev = cur
+    return True
+
+
 def _fly_iter(x, line, col):
     try:
         return iter(x)
@@ -407,12 +441,12 @@ class _FlySandbox:
 __builtins__ = _FlySandbox()
 
 import json
-_fly_ob_b = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
+_fly_ob_1 = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('json',))
 def parse(raw):
     return _fly_attr(json, "loads", 3, 21)(raw)
 parse = _fly_patch_builtins(parse, ('json',))
-__builtins__ = _fly_ob_b
+__builtins__ = _fly_ob_1
 class Admin:
     role = "admin"
     def __init__(self, name):
@@ -434,12 +468,12 @@ print(parse('{"x": 9}'), _fly_attr(admin, "name", 12, 32))
 def twice(uid):
     _fly_log.log(_fly_log.INFO, "enter twice, uid=%r", uid)
     try:
-        _fly_ret_c = _fly_trace_impl_twice(uid)
-    except BaseException as _fly_err_c:
-        _fly_log.log(_fly_log.INFO, "exit twice: raise %r", _fly_err_c)
+        _fly_ret_2 = _fly_trace_impl_twice(uid)
+    except BaseException as _fly_err_2:
+        _fly_log.log(_fly_log.INFO, "exit twice: raise %r", _fly_err_2)
         raise
-    _fly_log.log(_fly_log.INFO, "exit twice: ret=%r", _fly_ret_c)
-    return _fly_ret_c
+    _fly_log.log(_fly_log.INFO, "exit twice: ret=%r", _fly_ret_2)
+    return _fly_ret_2
 def _fly_trace_impl_twice(uid):
     return _fly_binop(uid, 2, "mul", 16, 20)
 print(twice(3))

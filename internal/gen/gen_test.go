@@ -36,13 +36,13 @@ func TestGuardInsideOnlyTraceCageInjectsGuardError(t *testing.T) {
 // 增强赋值左值/下标只求值一次（重复求值回归：a[f()] += 1 只调用一次 f()）。
 func TestAugAssignSingleEval(t *testing.T) {
 	out := generateSrc(t, "def pickidx():\n    return 0\na = [1]\na[pickidx()] += 1\n")
-	if !strings.Contains(out, "_fly_ab_c = pickidx()") {
+	if !strings.Contains(out, "_fly_ab_2 = pickidx()") {
 		t.Errorf("期望下标被提升为临时变量且只求值一次，实际: %s", out)
 	}
 	if strings.Contains(out, "_fly_get(a, pickidx()") {
 		t.Errorf("读取路径必须复用临时变量，不得二次求值 pickidx(): %s", out)
 	}
-	if !strings.Contains(out, "_fly_get(_fly_aa_b, _fly_ab_c,") {
+	if !strings.Contains(out, "_fly_get(_fly_aa_1, _fly_ab_2,") {
 		t.Errorf("期望读取复用 _fly_ab_c 临时变量，实际: %s", out)
 	}
 	out = generateSrc(t, "class C:\n    pass\nc = C()\nc.x = 1\nc.x += 1\n")

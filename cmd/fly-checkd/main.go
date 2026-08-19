@@ -66,7 +66,7 @@ func encodeError(msg string) []byte {
 func encodeDiagnostics(diags []ast.Diagnostic, color byte) []byte {
 	var b []byte
 	b = append(b, 0x00)
-	b = append(b, byte(len(diags)))
+	b = append(b, uint32Bytes(len(diags))...)
 	for _, d := range diags {
 		b = append(b, uint32Bytes(len(d.Code))...)
 		b = append(b, d.Code...)

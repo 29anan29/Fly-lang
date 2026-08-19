@@ -169,8 +169,8 @@ pub fn parse_response(body: &[u8]) -> Result<CheckdResult, String> {
     if body[0] != 0x00 {
         return Err(format!("checkd 未知状态 {}", body[0]));
     }
-    let count = body[1] as usize;
-    let mut off = 2usize;
+    let count = be32(&body[1..5]) as usize;
+    let mut off = 5usize;
     let mut diags = Vec::with_capacity(count);
     for _ in 0..count {
         let code = read_str(body, off)?;

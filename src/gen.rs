@@ -477,7 +477,7 @@ impl Gen<'_> {
             self.w("\n");
         }
         self.nc += 1;
-        let saved = format!("_fly_ob_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
+        let saved = format!("_fly_ob_{}", self.nc);
         self.indent_line();
         self.w(&saved);
         self.w(" = _fly_sb_module_globals.get(\"__builtins__\", _fly_builtins)\n");
@@ -549,8 +549,8 @@ impl Gen<'_> {
         };
         self.nc += 1;
         let idx = self.nc;
-        let rt = format!("_fly_ret_{}", char::from_u32('a' as u32 + idx as u32).unwrap_or('a'));
-        let er = format!("_fly_err_{}", char::from_u32('a' as u32 + idx as u32).unwrap_or('a'));
+        let rt = format!("_fly_ret_{}", idx);
+        let er = format!("_fly_err_{}", idx);
         for d in decorators {
             self.indent_line();
             self.w("@");
@@ -698,9 +698,9 @@ impl Gen<'_> {
         if left.len() == 1 {
             if let Expr::Subscript { x, index, .. } = &left[0] {
                 self.nc += 1;
-                let tx = format!("_fly_aa_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
+                let tx = format!("_fly_aa_{}", self.nc);
                 self.nc += 1;
-                let ti = format!("_fly_ab_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
+                let ti = format!("_fly_ab_{}", self.nc);
                 self.indent_line();
                 self.w(&format!("{} = ", tx));
                 self.expr(x, PREC_COND);
@@ -717,7 +717,7 @@ impl Gen<'_> {
             }
             if let Expr::Attr { x, name, .. } = &left[0] {
                 self.nc += 1;
-                let tx = format!("_fly_aa_{}", char::from_u32('a' as u32 + self.nc as u32).unwrap_or('a'));
+                let tx = format!("_fly_aa_{}", self.nc);
                 self.indent_line();
                 self.w(&format!("{} = ", tx));
                 self.expr(x, PREC_COND);
@@ -1038,10 +1038,38 @@ impl Gen<'_> {
                     if i > 0 {
                         self.w(", ");
                     }
-                    self.expr(tg, PREC_LOWEST);
+                    self.delete_target(tg);
                 }
                 self.w("\n");
             }
+        }
+    }
+
+    // delete_target: del 目标渲染为明文（下标/属性不套 _fly_get/_fly_attr 代理，
+    // 否则产出 `del _fly_get(...)` 语法错误）。编译期已拦危险目标（反射链等），
+    // del 为删除操作不读值，明文安全。
+    fn delete_target(&mut self, e: &Expr) {
+        match e {
+            Expr::Subscript { x, index, .. } => {
+                self.expr(x, PREC_POST);
+                self.w("[");
+                self.index_arg(index);
+                self.w("]");
+            }
+            Expr::Attr { x, name, .. } => {
+                self.expr(x, PREC_POST);
+                self.w(".");
+                self.w(name);
+            }
+            Expr::TupleLit { elems, .. } => {
+                for (i, el) in elems.iter().enumerate() {
+                    if i > 0 {
+                        self.w(", ");
+                    }
+                    self.delete_target(el);
+                }
+            }
+            _ => self.expr(e, PREC_LOWEST),
         }
     }
 
@@ -1112,7 +1140,11 @@ impl Gen<'_> {
             Expr::Call { pos, func, args, kwargs, star, dbl_star } => {
                 if !self.plain {
                     if let Expr::Name { name, .. } = func.as_ref() {
-                        if name == "int" || name == "float" {
+                        if (name == "int" || name == "float")
+                            && kwargs.is_empty()
+                            && star.is_none()
+                            && dbl_star.is_none()
+                        {
                             self.w("_fly_cast(");
                             self.w(name);
                             for a in args {
@@ -1291,6 +1323,21 @@ impl Gen<'_> {
                         self.w(" ");
                         self.expr(&ys[i], PREC_COMPARE);
                     }
+                    return;
+                }
+                // 链长 ≥2 且中间操作数可能带副作用（函数调用/下标/属性等）：
+                // 走 _fly_chain 惰性求值，每个操作数只求值一次（a < f() < c 的 f() 不重复调用）。
+                let has_effect = ops.len() > 1
+                    && (chain_expr_has_effect(x)
+                        || ys[..ys.len() - 1].iter().any(chain_expr_has_effect));
+                if has_effect {
+                    self.w("_fly_chain([lambda: ");
+                    self.expr(x, PREC_LOWEST);
+                    for y in ys {
+                        self.w(", lambda: ");
+                        self.expr(y, PREC_LOWEST);
+                    }
+                    self.w(&format!("], {:?}, {}, {})", ops, pos.line, pos.col));
                     return;
                 }
                 for (i, op) in ops.iter().enumerate() {
@@ -1807,6 +1854,40 @@ fn cmp_name(op: &str) -> &str {
         ">" => "gt",
         ">=" => "ge",
         _ => "contains",
+    }
+}
+
+// chain_expr_has_effect: 表达式求值是否可能带副作用（函数调用/下标/属性/
+// 运算/条件式等）。用于链式比较判定——中间操作数重复求值有副作用时必须提为惰性求值。
+fn chain_expr_has_effect(e: &Expr) -> bool {
+    match e {
+        Expr::Name { .. }
+        | Expr::IntLit { .. }
+        | Expr::FloatLit { .. }
+        | Expr::StringLit { .. }
+        | Expr::EllipsisLit { .. } => false,
+        Expr::ListLit { elems, .. } => elems.iter().any(chain_expr_has_effect),
+        Expr::TupleLit { elems, .. } => elems.iter().any(chain_expr_has_effect),
+        Expr::DictLit { keys, vals, .. } => {
+            keys.iter().any(chain_expr_has_effect) || vals.iter().any(chain_expr_has_effect)
+        }
+        Expr::SetLit { elems, .. } => elems.iter().any(chain_expr_has_effect),
+        Expr::BoolOp { x, y, .. } => {
+            chain_expr_has_effect(x) || chain_expr_has_effect(y)
+        }
+        Expr::Slice { lo, hi, step, .. } => {
+            lo.as_ref().map_or(false, |e| chain_expr_has_effect(e))
+                || hi.as_ref().map_or(false, |e| chain_expr_has_effect(e))
+                || step.as_ref().map_or(false, |e| chain_expr_has_effect(e))
+        }
+        Expr::Call { .. }
+        | Expr::Attr { .. }
+        | Expr::Subscript { .. }
+        | Expr::BinOp { .. }
+        | Expr::UnaryOp { .. }
+        | Expr::Compare { .. }
+        | Expr::Cond { .. }
+        | Expr::ListComp { .. } => true,
     }
 }
 

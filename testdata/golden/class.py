@@ -33,7 +33,7 @@ def _fly_binop(a, b, op, line, col):
             return a + b
         if isinstance(a, str) and isinstance(b, str):
             return a + b
-        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        if type(a) is type(b) and isinstance(a, (list, tuple)):
             return a + b
     elif op == "sub":
         if isinstance(a, int) and isinstance(b, int):
@@ -198,6 +198,40 @@ def _fly_cmp(a, b, op, line, col):
         raise FlyRuntimeError(
             "%s: 比较失败: %s" % (_fly_loc(line, col), e)
         ) from None
+
+
+_FLY_OP_MAP = {"<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
+
+
+def _fly_chain(getters, ops, line, col):
+    """链式比较：每个操作数惰性求值且只求值一次（`a < f() < c` 的 f() 不重复调用），
+    短路返回。op 支持 <,<=,>,>=,==,!=,is,is not,in,not in。"""
+    prev = getters[0]()
+    for i, op in enumerate(ops):
+        cur = getters[i + 1]()
+        try:
+            if op == "==":
+                ok = prev == cur
+            elif op == "!=":
+                ok = prev != cur
+            elif op == "is":
+                ok = prev is cur
+            elif op == "is not":
+                ok = prev is not cur
+            elif op == "in":
+                ok = prev in cur
+            elif op == "not in":
+                ok = prev not in cur
+            else:
+                ok = _FLY_OPS[_FLY_OP_MAP[op]](prev, cur)
+        except _FLY_SAFE_ERRORS as e:
+            raise FlyRuntimeError(
+                "%s: 比较失败: %s" % (_fly_loc(line, col), e)
+            ) from None
+        if not ok:
+            return False
+        prev = cur
+    return True
 
 
 def _fly_iter(x, line, col):

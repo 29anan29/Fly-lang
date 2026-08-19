@@ -1,0 +1,13 @@
+calls = []
+def f():
+    calls.append(1)
+    return 3
+
+r = 1 < f() < 5
+print(r, len(calls))
+r2 = 10 > f() > 1
+print(r2, len(calls))
+a = b = c = 5
+print(a is b is c)
+r3 = 1 <= 2 <= 3
+print(r3)

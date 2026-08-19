@@ -439,9 +439,11 @@ func (u *uCheck) exprSeq(e ast.Expr, defined map[string]bool, fnMode bool) {
 		u.exprSeq(t.Y, defined, fnMode)
 	case *ast.CompareExpr:
 		u.exprSeq(t.X, defined, fnMode)
+		prev := t.X
 		for i, y := range t.Ys {
 			u.exprSeq(y, defined, fnMode)
-			u.checkCmp(t.Ops[i], t.X, y)
+			u.checkCmp(t.Ops[i], prev, y)
+			prev = y
 		}
 	case *ast.CondExpr:
 		u.exprSeq(t.Cond, defined, fnMode)

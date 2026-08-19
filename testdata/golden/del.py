@@ -379,29 +379,14 @@ class _FlySandbox:
 
 __builtins__ = _FlySandbox()
 
-json = _fly_sb_import("json", 1, 1)
-_fly_sb_mod_math = _fly_sb_import("math", 2, 1, fromlist=("sqrt", "pi"))
-s = _fly_sb_mod_math.sqrt
-pi = _fly_sb_mod_math.pi
-def process(items):
-    total = 0
-    for x in items:
-        total += _fly_binop(x, 2, "mul", 7, 20)
-    while _fly_cmp(lambda: total, lambda: 100, "lt", 8, 11):
-        total *= 2
-        if _fly_cmp(lambda: total, lambda: 500, "gt", 10, 12):
-            break
-    else:
-        print("never")
-    try:
-        data = _fly_attr(json, "loads", 15, 21)('{"a": [1, 2, 3]}')
-        return _fly_get(_fly_get(data, "a", 16, 20), slice(1, 3), 16, 25), total
-    except (ValueError, TypeError) as e:
-        print(f"err: {e}")
-    finally:
-        print("done")
-a, b = process([1, 2, 3])
-print(a, b)
-sq = [_fly_binop(i, i, "mul", 24, 9) for i in range(10) if _fly_binop(i, 2, "mod", 24, 37) == 0]
-d = {"x": 1, "y": s(9)}
-print(sq, d, pi)
+a = [1, 2, 3]
+del a[1]
+print(a)
+class O:
+    def __init__(self):
+        _fly_setattr(self, "x", 1, 6, 14)
+o = O()
+del o.x
+print(hasattr(o, 'x'))
+del a[0], a[0]
+print(a)

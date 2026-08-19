@@ -1,0 +1,11 @@
+a = [1, 2, 3]
+del a[1]
+print(a)
+class O:
+    def __init__(self):
+        self.x = 1
+o = O()
+del o.x
+print(hasattr(o, 'x'))
+del a[0], a[0]
+print(a)

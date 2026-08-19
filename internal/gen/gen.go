@@ -216,7 +216,7 @@ func needsRuntime(stmts []ast.Stmt) bool {
 				walkExpr(el)
 			}
 		case *ast.CallExpr:
-			if n, ok := t.Func.(*ast.Name); ok && (n.Name == "int" || n.Name == "float") {
+			if n, ok := t.Func.(*ast.Name); ok && (n.Name == "int" || n.Name == "float") && len(t.Kwargs) == 0 && t.Star == nil && t.DblStar == nil {
 				found = true
 				return
 			}
@@ -797,7 +797,7 @@ func (g *Gen) stmt(s ast.Stmt) {
 			if i > 0 {
 				g.w(", ")
 			}
-			g.expr(tg, precLowest)
+			g.deleteTarget(tg)
 		}
 		g.w("\n")
 	}
@@ -922,7 +922,7 @@ func (g *Gen) onlyStmt(t *ast.OnlyStmt) {
 		g.w("import " + m + "\n")
 	}
 	g.nc++
-	saved := "_fly_ob_" + string(rune('a'+g.nc))
+	saved := fmt.Sprintf("_fly_ob_%d", g.nc)
 	g.indentLine()
 	g.w(saved + " = _fly_sb_module_globals.get(\"__builtins__\", _fly_builtins)\n")
 	g.indentLine()
@@ -976,8 +976,8 @@ func (g *Gen) traceBody(s ast.Stmt, level string, args, ret bool) {
 
 func (g *Gen) traceFunc(f *ast.FuncDef, level string, args, ret bool) {
 	g.nc++
-	rt := "_fly_ret_" + string(rune('a'+g.nc))
-	er := "_fly_err_" + string(rune('a'+g.nc))
+	rt := fmt.Sprintf("_fly_ret_%d", g.nc)
+	er := fmt.Sprintf("_fly_err_%d", g.nc)
 	for _, d := range f.Decorators {
 		g.indentLine()
 		g.w("@")
@@ -1088,6 +1088,85 @@ func (g *Gen) slicePart(e ast.Expr) {
 	g.expr(e, precCond)
 }
 
+// deleteTarget: del 目标渲染为明文（下标/属性不套 _fly_get/_fly_attr 代理，
+// 否则产出 `del _fly_get(...)` 语法错误）。编译期已拦危险目标（反射链等），
+// del 为删除操作不读值，明文安全。
+func (g *Gen) deleteTarget(e ast.Expr) {
+	switch t := e.(type) {
+	case *ast.SubscriptExpr:
+		g.expr(t.X, precPost)
+		g.w("[")
+		g.indexArg(t.Index)
+		g.w("]")
+	case *ast.AttrExpr:
+		g.expr(t.X, precPost)
+		g.w("." + t.Name)
+	case *ast.TupleLit:
+		for i, el := range t.Elems {
+			if i > 0 {
+				g.w(", ")
+			}
+			g.deleteTarget(el)
+		}
+	default:
+		g.expr(e, precLowest)
+	}
+}
+
+// chainExprHasEffect: 表达式求值是否可能带副作用（函数调用/下标/属性/
+// 运算/条件式等）。用于链式比较判定——中间操作数重复求值有副作用时必须提为惰性求值。
+func chainExprHasEffect(e ast.Expr) bool {
+	switch t := e.(type) {
+	case *ast.Name, *ast.IntLit, *ast.FloatLit, *ast.StringLit, *ast.EllipsisLit:
+		return false
+	case *ast.ListLit:
+		for _, el := range t.Elems {
+			if chainExprHasEffect(el) {
+				return true
+			}
+		}
+		return false
+	case *ast.TupleLit:
+		for _, el := range t.Elems {
+			if chainExprHasEffect(el) {
+				return true
+			}
+		}
+		return false
+	case *ast.DictLit:
+		for _, k := range t.Keys {
+			if chainExprHasEffect(k) {
+				return true
+			}
+		}
+		for _, v := range t.Vals {
+			if chainExprHasEffect(v) {
+				return true
+			}
+		}
+		return false
+	case *ast.SetLit:
+		for _, el := range t.Elems {
+			if chainExprHasEffect(el) {
+				return true
+			}
+		}
+		return false
+	case *ast.BoolOpExpr:
+		return chainExprHasEffect(t.X) || chainExprHasEffect(t.Y)
+	case *ast.SliceExpr:
+		if t.Lo != nil && chainExprHasEffect(t.Lo) {
+			return true
+		}
+		if t.Hi != nil && chainExprHasEffect(t.Hi) {
+			return true
+		}
+		return t.Step != nil && chainExprHasEffect(t.Step)
+	default:
+		return true
+	}
+}
+
 func (g *Gen) indexArg(e ast.Expr) {
 	if sl, ok := e.(*ast.SliceExpr); ok {
 		g.w("slice(")
@@ -1109,9 +1188,9 @@ func (g *Gen) augAssign(t *ast.AssignStmt) {
 	if len(t.Left) == 1 {
 		if l, ok := t.Left[0].(*ast.SubscriptExpr); ok {
 			g.nc++
-			tx := "_fly_aa_" + string(rune('a'+g.nc))
+			tx := fmt.Sprintf("_fly_aa_%d", g.nc)
 			g.nc++
-			ti := "_fly_ab_" + string(rune('a'+g.nc))
+			ti := fmt.Sprintf("_fly_ab_%d", g.nc)
 			g.indentLine()
 			g.w(tx + " = ")
 			g.expr(l.X, precCond)
@@ -1129,7 +1208,7 @@ func (g *Gen) augAssign(t *ast.AssignStmt) {
 		}
 		if l, ok := t.Left[0].(*ast.AttrExpr); ok {
 			g.nc++
-			tx := "_fly_aa_" + string(rune('a'+g.nc))
+			tx := fmt.Sprintf("_fly_aa_%d", g.nc)
 			g.indentLine()
 			g.w(tx + " = ")
 			g.expr(l.X, precCond)
@@ -1336,7 +1415,7 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 		g.w("}")
 	case *ast.CallExpr:
 		if !g.plain {
-			if n, ok := t.Func.(*ast.Name); ok && (n.Name == "int" || n.Name == "float") {
+			if n, ok := t.Func.(*ast.Name); ok && (n.Name == "int" || n.Name == "float") && len(t.Kwargs) == 0 && t.Star == nil && t.DblStar == nil {
 				g.w("_fly_cast(" + n.Name)
 				for _, a := range t.Args {
 					g.w(", ")
@@ -1497,6 +1576,34 @@ func (g *Gen) expr(e ast.Expr, parent int) {
 				g.w(" " + op + " ")
 				g.expr(t.Ys[i], precCompare)
 			}
+			break
+		}
+		// 链长 ≥2 且中间操作数可能带副作用（函数调用/下标/属性等）：
+		// 走 _fly_chain 惰性求值，每个操作数只求值一次（a < f() < c 的 f() 不重复调用）。
+		hasEffect := len(t.Ops) > 1 && (chainExprHasEffect(t.X) || func() bool {
+			for _, y := range t.Ys[:len(t.Ys)-1] {
+				if chainExprHasEffect(y) {
+					return true
+				}
+			}
+			return false
+		}())
+		if hasEffect {
+			g.w("_fly_chain([lambda: ")
+			g.expr(t.X, precLowest)
+			for _, y := range t.Ys {
+				g.w(", lambda: ")
+				g.expr(y, precLowest)
+			}
+			ops := "["
+			for i, op := range t.Ops {
+				if i > 0 {
+					ops += ", "
+				}
+				ops += fmt.Sprintf("%q", op)
+			}
+			ops += "]"
+			g.w(fmt.Sprintf("], %s, %d, %d)", ops, t.Pos_.Line, t.Pos_.Col))
 			break
 		}
 		for i, op := range t.Ops {

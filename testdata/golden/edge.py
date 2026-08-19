@@ -99,7 +99,7 @@ def _fly_binop(a, b, op, line, col):
             return a + b
         if isinstance(a, str) and isinstance(b, str):
             return a + b
-        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        if type(a) is type(b) and isinstance(a, (list, tuple)):
             return a + b
     elif op == "sub":
         if isinstance(a, int) and isinstance(b, int):
@@ -266,6 +266,40 @@ def _fly_cmp(a, b, op, line, col):
         ) from None
 
 
+_FLY_OP_MAP = {"<": "lt", "<=": "le", ">": "gt", ">=": "ge"}
+
+
+def _fly_chain(getters, ops, line, col):
+    """链式比较：每个操作数惰性求值且只求值一次（`a < f() < c` 的 f() 不重复调用），
+    短路返回。op 支持 <,<=,>,>=,==,!=,is,is not,in,not in。"""
+    prev = getters[0]()
+    for i, op in enumerate(ops):
+        cur = getters[i + 1]()
+        try:
+            if op == "==":
+                ok = prev == cur
+            elif op == "!=":
+                ok = prev != cur
+            elif op == "is":
+                ok = prev is cur
+            elif op == "is not":
+                ok = prev is not cur
+            elif op == "in":
+                ok = prev in cur
+            elif op == "not in":
+                ok = prev not in cur
+            else:
+                ok = _FLY_OPS[_FLY_OP_MAP[op]](prev, cur)
+        except _FLY_SAFE_ERRORS as e:
+            raise FlyRuntimeError(
+                "%s: 比较失败: %s" % (_fly_loc(line, col), e)
+            ) from None
+        if not ok:
+            return False
+        prev = cur
+    return True
+
+
 def _fly_iter(x, line, col):
     try:
         return iter(x)
@@ -430,23 +464,23 @@ def fib(n):
         return n
     return fib(n - 1) + fib(n - 2)
 import json
-_fly_ob_b = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
+_fly_ob_1 = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('json',))
 def parse(raw):
     return _fly_attr(json, "loads", 31, 21)(raw)
 parse = _fly_patch_builtins(parse, ('json',))
 import math
-_fly_ob_c = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
+_fly_ob_2 = _fly_sb_module_globals.get("__builtins__", _fly_builtins)
 __builtins__ = _FlyOnly(('math',))
 def sq(x):
     return _fly_attr(math, "sqrt", 35, 25)(x)
 sq = _fly_patch_builtins(sq, ('math',))
 data = sq(4.0)
-__builtins__ = _fly_ob_c
+__builtins__ = _fly_ob_2
 def double(raw):
     return _fly_attr(json, "dumps", 40, 21)(raw)
 double = _fly_patch_builtins(double, ('json',))
-__builtins__ = _fly_ob_b
+__builtins__ = _fly_ob_1
 uid = "42"
 def use_taint():
     clean = _fly_cast(int, uid, line=46, col=16)
