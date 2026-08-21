@@ -7,7 +7,7 @@ on:
 
 jobs:
   go:
-    name: Go (vet / test / fuzz smoke / errorinfo)
+    name: Go (checkd/sandboxd 守护进程专用：vet / test / fuzz smoke / errorinfo)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
         run: go test ./...
       - name: errorinfo 双真源一致性
         run: ./scripts/check-errorinfo.sh
-      - name: fuzz smoke（parser/compile/checker 安全核心）
+      - name: fuzz smoke（checkd 守护进程安全核心；lexer/parser/compile 为 checkd 内部实现，一并保障）
         run: |
           go test -fuzz FuzzParse -fuzztime 8s ./internal/parser/
           go test -fuzz FuzzLexer -fuzztime 8s ./internal/lexer/

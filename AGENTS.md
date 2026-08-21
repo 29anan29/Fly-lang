@@ -34,6 +34,8 @@ testdata/            正反例测试文件
 
 管线：`Lexer → Parser(AST) → checker（编译期报错）→ gen（输出 Python）`。
 
+> **Rust 化状态（R5 已收尾）**：CLI 全 Rust（`src/` 主流程承担 lexer/ast/parser/gen/typeinfer/compile 编排，`fly check` 经 `src/checkd.rs` 桥接）。Go 仅保留**守护进程**：`cmd/fly-checkd`（checker 语义，D6 决策保留）、`cmd/fly-sandboxd`（沙箱）、共享 `internal/runtime/fly_runtime.py`。Rust 端经 `include_str!`/`go:embed` 复用同一份 runtime。进一步"完全 Rust 化"= R3 checker 自举（详见 docs/Rust迁移方案.md），需推翻 D6，属后续大步。
+
 ## LSP 约定
 
 - `fly lsp`：stdio JSON-RPC 2.0，`Content-Length` 帧；诊断由 checkd（Go 编译管线 CheckSource）驱动，与 `fly check` 同一管线——改 checker 行为自动同步编辑器诊断

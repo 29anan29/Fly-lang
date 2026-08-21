@@ -144,10 +144,17 @@ pub struct Report { pub errors: Vec<Diagnostic> }   // 聚合，上限 MAX_ERROR
 - Rust 侧：`checkd.rs` 客户端（spawn + 发现同目录二进制 + 并发分发 + 结果聚合），`fly check` 输出与 Go 版一致（错误块/退出码）
 - 验收：`fly check` 多文件并发、反例全部报错且消息一致；checkd 缺失时 Rust `fly check` 报友好错误
 
-### R5 切换与退役
-- CI：release.yml 换 `dtolnay/rust-toolchain@stable`，跨编译（linux arm64 用 `cross` 或容器），产物命名不变（含 `fly-checkd-<os>-<arch>` 一并分发）
-- 删除 legacy-go/ 中除 checker/checkd 外的源码，AGENTS.md/README/CONTRIBUTING 更新
-- 验收：打 v1.0.0 tag，Release 产物与 v0.1.0 同构；VSCode 插件直接可用
+### R5 切换与退役（✅ 已收尾，实际 v0.6.4）
+- ✅ CLI 全 Rust（cmd/fly 退役，fmt/analyze 迁 Rust，三二进制打包 fly+fly-checkd+fly-sandboxd）
+- ✅ Rust 主流程（lexer/ast/parser/gen/typeinfer/compile 编排）独立，golden 双端逐字节一致
+- ✅ `fly check` 经 `src/checkd.rs` 桥接 Go 版 `fly-checkd`（D6 保留 checker 语义）
+- 剩余：Go 的 `internal/lexer/ast/parser/checker/compile` 仍被 `fly-checkd` 内部依赖，**在 D6 未被推翻前不可删**（删则 checkd 崩溃）。源码删除留待 R3 checker 自举完成后。
+
+### R3 checker 自举（🔲 → 🟡 进行中，今日启动）
+- 目标：把 `fly-checkd` 的 Go checker 语义用 Rust 重写，使 `fly` 单一二进制即可独立 `check`，不再依赖 Go 守护进程（推翻 D6 的决策前提）。
+- 边界：Rust 端已有 `src/ast.rs`/`src/parser.rs`/`src/typeinfer.rs`，缺的是**语义检查**（危险内建/反射链/危险模块/污点/guard 等），需逐块从 `internal/checker/*` 翻译。
+- 策略：先建 `src/checker.rs` 骨架 + 实验开关（`FLY_RUST_CHECKER=1` 走 Rust checker，默认仍走 checkd 桥接），保证双实现过渡期；golden 行为须与 Go 版逐字节一致（新增 `errorf` 须登记 `internal/ast/errors.go` 并经 `tools/gen_errorinfo` 生成 `src/errorinfo.rs`）。
+- 注意：R3 是大步，非单日可完成；今日仅落定 R5 文档边界 + 标记 R3 为当前进行中，实质 checker 翻译留后续提交。
 
 ## 11. 注意事项与坑（checklist）
 

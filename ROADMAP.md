@@ -82,7 +82,7 @@ v1.0.0 ──L2──► v1.1（工具链自举）──L3──► v2.0（自�
 | P1/P2 | version/help/error + check（checkd 桥接，零差异） | ✅ |
 | R2 | gen + 运行时注入（only/seal/trace/cage/runtime/sandbox 节） | ✅ |
 | P3 | `fly build` / `fly run`（checkd 复用，golden 逐字节一致） | ✅ |
-| R3 | checker 语义子集自举（可选，checker 留 Go 为 D6 默认） | 🔲 可选（D1/D6 决策：checker 留 Go） |
+| R3 | checker 语义子集自举（可选，checker 留 Go 为 D6 默认） | 🟡 进行中（今日启动：R5 已收尾，Rust 主流程独立；R3 为「完全 Rust 化」最后缺口，需推翻 D6 做 checker 翻译） |
 | P4 | `fly update`（签名先行，见 S2）/ `fly lsp` | ✅ |
 | R4 | compile 管线整合、错误聚合 20 条上限 | ✅（checkd 侧） |
 | P5 | `fly sandbox`（决策 B：fly-sandboxd 二进制桥接） | ✅ |

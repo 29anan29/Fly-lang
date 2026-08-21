@@ -27,6 +27,8 @@ PyFly 由人与 AI 结对开发：**人做决策，AI 写代码**。
 
 Fly 是 Python 3.10+ 的安全受限超集：用 Rust 实现的转译器（CLI 全 Rust，checker/沙箱以独立守护进程提供），把 `.fly` 源码转译为 Python。任何合法 Python 中违反安全规则的模式（危险内建/反射链/危险模块，见 [docs/THREAT-MODEL.md §6.2 不兼容清单](docs/THREAT-MODEL.md#62-不兼容模式清单安全受限超集的精确边界)）会被编译期拦截，其余安全子集零改造可编译；新增 8 个安全关键字，在编译期静态检查 + 展开删除，零运行时残留语法；产物默认注入沙箱运行时（见"沙箱"一节）。
 
+> **Rust 化状态（R5 已收尾，v0.6.4）**：CLI 全 Rust（`src/` 主流程独立承担 lexer/ast/parser/gen/typeinfer/compile 编排），Go 仅保留 `fly-checkd`/`fly-sandboxd` 守护进程与共享运行时 `fly_runtime.py`。`fly check` 经 `src/checkd.rs` 桥接 Go 版 `fly-checkd`（D6 决策保留 checker 语义）。进一步"完全 Rust 化"= R3 checker 自举，属后续大步（详见 [docs/Rust迁移方案.md](docs/Rust迁移方案.md)）。
+
 ## 文档索引
 
 | 文档 | 内容 |
